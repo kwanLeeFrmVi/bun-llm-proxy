@@ -1,0 +1,25 @@
+{
+  "name": "bun-runtime",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts",
+    "migrate": "bun db/migrate.ts",
+    "dev:dashboard": "bun --cwd dashboard dev",
+    "build:dashboard": "bun --cwd dashboard build",
+    "preview:dashboard": "bun --cwd dashboard preview"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
