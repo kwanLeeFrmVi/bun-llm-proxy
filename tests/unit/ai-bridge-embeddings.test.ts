@@ -3,7 +3,6 @@
  * Uses Bun's native test runner.
  */
 
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { handleEmbeddingsCore } from "../../ai-bridge/handlers/embeddingsCore.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

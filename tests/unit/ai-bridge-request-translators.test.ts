@@ -3,7 +3,6 @@
  * Uses Bun's native test runner.
  */
 
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { Request, NeedsTranslation } from "../../ai-bridge/translator/index.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -129,7 +128,7 @@ describe("openai → claude (Request)", () => {
 });
 
 describe("claude → openai (Request)", () => {
-  it("converts text blocks to string content", () => {
+  it("maps text block array to openai content array", () => {
     const body = {
       model: "gpt-4o",
       messages: [{
@@ -142,8 +141,11 @@ describe("claude → openai (Request)", () => {
     expect(result.model).toBe("gpt-4o");
     const msgs = result.messages as Array<Record<string, unknown>>;
     expect(msgs[0].role).toBe("user");
-    expect(typeof msgs[0].content).toBe("string");
-    expect(msgs[0].content).toBe("hi");
+    // ai-bridge preserves array content structure
+    expect(Array.isArray(msgs[0].content)).toBe(true);
+    const content = msgs[0].content as Array<Record<string, unknown>>;
+    expect(content[0].type).toBe("text");
+    expect(content[0].text).toBe("hi");
   });
 
   it("preserves multimodal arrays (text + image)", () => {
