@@ -1,9 +1,8 @@
-
-
 import { getProviderConnectionById, updateProviderConnection, deleteProviderConnection } from "@/lib/localDb";
+import { testProviderConnection } from "../../../../lib/providerTest";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
-import { register } from "lib/routeRegistry";
+import { register } from "lib/routeRegistry.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -46,8 +45,29 @@ export async function DELETE(req: Request): Promise<Response> {
   return Response.json({ success: true }, { headers: CORS_HEADERS });
 }
 
+export async function POST(req: Request): Promise<Response> {
+  const auth = await checkAdminAuth(req);
+  if (!auth.ok) return auth.response;
+
+  const id = (req as BunRequest).params.id ?? "";
+  if (!id) {
+    return Response.json({ error: "Connection ID is required" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  try {
+    const result = await testProviderConnection(id);
+    return Response.json(result, { headers: CORS_HEADERS });
+  } catch (error) {
+    console.log("Error testing connection:", error);
+    return Response.json(
+      { error: "Test failed", valid: false, latencyMs: 0, testedAt: new Date().toISOString() },
+      { status: 500, headers: CORS_HEADERS }
+    );
+  }
+}
+
 export function OPTIONS(): Response {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-register("/api/providers/:id", { GET, PUT, DELETE, OPTIONS });
+register("/api/providers/:id", { GET, PUT, DELETE, POST, OPTIONS });

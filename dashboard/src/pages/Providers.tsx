@@ -10,7 +10,7 @@ import { AddOpenAICompatibleModal } from "@/components/AddOpenAICompatibleModal"
 import { AddAnthropicCompatibleModal } from "@/components/AddAnthropicCompatibleModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Play, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 // Fix the typo in import
@@ -20,10 +20,8 @@ interface ProviderStats {
   connected: number;
   error: number;
   total: number;
+  connections?: ProviderConnection[];
 }
-
-// Group type for provider sections
-type ProviderGroup = "oauth" | "free" | "freeTier" | "apiKey" | "compatible";
 
 // ─── Section header ─────────────────────────────────────────────────────────────
 
@@ -42,7 +40,6 @@ function SectionHeader({ title, testAllLoading, onTestAll }: {
         onClick={onTestAll}
         disabled={testAllLoading}
       >
-        <Play className="w-3 h-3 mr-1" />
         {testAllLoading ? "Testing..." : "Test All"}
       </Button>
     </div>
@@ -122,7 +119,7 @@ export default function ProvidersPage() {
     const conns = connections.filter(c => c.provider === providerId);
     const active = conns.filter(c => (c.isActive !== false) && (c.testStatus === "active" || c.testStatus === "success"));
     const error = conns.filter(c => (c.isActive !== false) && (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable"));
-    return { connected: active.length, error: error.length, total: conns.length };
+    return { connected: active.length, error: error.length, total: conns.length, connections: conns };
   }
 
   // Toggle provider active state
@@ -134,11 +131,24 @@ export default function ProvidersPage() {
     await fetchData();
   }
 
-  // Test all connections (stub)
+  // Test all connections
   async function handleTestAll() {
     setTestAllLoading(true);
-    toast.info("Batch test not yet implemented");
-    setTimeout(() => setTestAllLoading(false), 500);
+    try {
+      const result = await api.providers.testBatch("apikey");
+      if (result.summary) {
+        const { passed, failed, total } = result.summary;
+        if (failed === 0) {
+          toast.success(`All ${total} tests passed`);
+        } else {
+          toast.warning(`${passed}/${total} passed, ${failed} failed`);
+        }
+      }
+    } catch (err) {
+      toast.error(`Batch test failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setTestAllLoading(false);
+    }
   }
 
   // Toggle provider active state

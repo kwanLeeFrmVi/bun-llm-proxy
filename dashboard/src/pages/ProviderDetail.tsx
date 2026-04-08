@@ -13,15 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, ChevronUp, ChevronDown, Pencil, Trash2, Copy, ArrowLeft, ExternalLink } from "lucide-react";
+import { ProviderIcon } from "@/components/ProviderIcon";
+import { Plus, ChevronUp, ChevronDown, Pencil, Trash2, Copy, ArrowLeft, ExternalLink, Play, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
-interface ModelAlias {
-  alias: string;
-  fullModel: string;
-}
 
 // ─── Status helpers ──────────────────────────────────────────────────────────────
 
@@ -43,19 +40,19 @@ function statusColor(variant: string): string {
   return "text-[--on-surface-variant]";
 }
 
-// ─── Provider icon ──────────────────────────────────────────────────────────────
+// ─── Helper to get logo path for a provider ───────────────────────────────────────
 
-function ProviderIcon({ providerId, color, textIcon, size = 48 }: {
-  providerId: string; color: string; textIcon: string; size?: number;
-}) {
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-lg font-bold text-white shrink-0"
-      style={{ backgroundColor: color, width: size, height: size, fontSize: size * 0.35 }}
-    >
-      {textIcon}
-    </span>
-  );
+function getLogoPath(providerId: string, node?: ProviderNode): string {
+  // Handle compatible providers
+  if (node) {
+    if (isAnthropicCompatibleProvider(node.type ?? "")) {
+      return "/providers/anthropic-m.webp";
+    }
+    if (isOpenAICompatibleProvider(node.type ?? "")) {
+      return node.apiType === "responses" ? "/providers/oai-r.webp" : "/providers/oai-cc.webp";
+    }
+  }
+  return `/providers/${providerId}.webp`;
 }
 
 // ─── Connection Row ─────────────────────────────────────────────────────────────
@@ -70,6 +67,7 @@ function ConnectionRow({
   onToggle,
   onEdit,
   onDelete,
+  onTest,
 }: {
   conn: ProviderConnection;
   isFirst: boolean;
@@ -80,11 +78,22 @@ function ConnectionRow({
   onToggle: (v: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onTest: (id: string) => void;
 }) {
+  const [testing, setTesting] = useState(false);
   const variant = statusVariant(conn);
   const label = statusLabel(conn);
   const color = statusColor(variant);
   const dotColor = variant === "success" ? "bg-green-500" : variant === "error" ? "bg-red-500" : "bg-gray-400";
+
+  const handleTestClick = async () => {
+    setTesting(true);
+    try {
+      onTest(conn.id);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 hover:bg-[--surface-container-low]/50 transition-colors ${conn.isActive === false ? "opacity-60" : ""}`}>
@@ -130,6 +139,20 @@ function ConnectionRow({
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">
+        {/* Test button */}
+        <button
+          onClick={handleTestClick}
+          disabled={testing}
+          className="flex flex-col items-center px-2 py-1 rounded text-[--on-surface-variant] hover:text-[--on-surface] hover:bg-[--surface-container-low]"
+          title="Test connection"
+        >
+          {testing ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Play className="w-3.5 h-3.5" />
+          )}
+          <span className="text-[10px] leading-tight">Test</span>
+        </button>
         <button
           onClick={onEdit}
           className="flex flex-col items-center px-2 py-1 rounded text-[--on-surface-variant] hover:text-[--on-surface] hover:bg-[--surface-container-low]"
@@ -156,7 +179,7 @@ function ConnectionRow({
 
 // ─── Add API Key Modal ─────────────────────────────────────────────────────────
 
-function AddApiKeyModal({ isOpen, providerId, providerName, onSave, onClose }: {
+function AddApiKeyModal({ isOpen, providerId: _providerId, providerName, onSave, onClose }: {
   isOpen: boolean;
   providerId: string;
   providerName: string;
@@ -340,7 +363,7 @@ function EditConnectionModal({ isOpen, connection, onSave, onClose }: {
 
 // ─── Add Custom Model Modal ────────────────────────────────────────────────────
 
-function AddCustomModelModal({ isOpen, providerId, onAdd, onClose }: {
+function AddCustomModelModal({ isOpen, providerId: _providerId, onAdd, onClose }: {
   isOpen: boolean;
   providerId: string;
   onAdd: (modelId: string) => void;
@@ -443,6 +466,7 @@ export default function ProviderDetail() {
   const [showAddModel, setShowAddModel] = useState(false);
   const [editingConn, setEditingConn] = useState<ProviderConnection | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [testingAll, setTestingAll] = useState(false);
 
   // Determine provider info
   const isCompatible = isOpenAICompatibleProvider(decodedId) || isAnthropicCompatibleProvider(decodedId);
@@ -555,6 +579,51 @@ export default function ProviderDetail() {
     toast.success("Connection updated");
   }
 
+  async function handleTestConnection(id: string) {
+    try {
+      const result = await api.providers.test(id);
+      if (result.valid) {
+        toast.success(`Connection tested successfully (${result.latencyMs}ms)`);
+      } else {
+        toast.error(`Test failed: ${result.error || "Unknown error"}`);
+      }
+      await fetchData();
+    } catch (err) {
+      toast.error(`Test failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  }
+
+  async function handleTestAllConnections() {
+    setTestingAll(true);
+    const results = [];
+    let passed = 0;
+    let failed = 0;
+
+    for (const conn of connections) {
+      try {
+        const result = await api.providers.test(conn.id);
+        results.push({ id: conn.id, valid: result.valid, latencyMs: result.latencyMs });
+        if (result.valid) {
+          passed++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        results.push({ id: conn.id, valid: false, latencyMs: 0 });
+        failed++;
+      }
+    }
+
+    await fetchData();
+    setTestingAll(false);
+
+    if (failed === 0) {
+      toast.success(`All ${connections.length} connections tested successfully`);
+    } else {
+      toast.warning(`${passed}/${connections.length} passed, ${failed} failed`);
+    }
+  }
+
   function handleAddModel(modelId: string) {
     const updated = [...customModels, modelId];
     setCustomModels(updated);
@@ -594,7 +663,14 @@ export default function ProviderDetail() {
 
       {/* Provider header */}
       <div className="flex items-center gap-4">
-        <ProviderIcon providerId={decodedId} color={color} textIcon={textIcon} />
+        <ProviderIcon
+          src={getLogoPath(decodedId, node)}
+          alt={displayName}
+          size={48}
+          className="rounded-lg"
+          fallbackText={textIcon}
+          fallbackColor={color}
+        />
         <div>
           <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]">
             {displayName}
@@ -629,15 +705,26 @@ export default function ProviderDetail() {
       <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between">
           <h2 className="text-sm font-semibold text-[--on-surface]">Connections</h2>
-          {!isOAuth && (
+          <div className="flex items-center gap-2">
             <Button
+              variant="outline"
               size="sm"
-              className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
-              onClick={() => setShowAddApiKey(true)}
+              className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]"
+              onClick={handleTestAllConnections}
+              disabled={testingAll}
             >
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add
+              {testingAll ? "Testing..." : "Test All"}
             </Button>
-          )}
+            {!isOAuth && (
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
+                onClick={() => setShowAddApiKey(true)}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add
+              </Button>
+            )}
+          </div>
         </div>
 
         {connections.length === 0 ? (
@@ -676,6 +763,7 @@ export default function ProviderDetail() {
                 }}
                 onEdit={() => { setEditingConn(conn); setShowEditConn(true); }}
                 onDelete={() => handleDelete(conn.id)}
+                onTest={handleTestConnection}
               />
             ))}
           </div>

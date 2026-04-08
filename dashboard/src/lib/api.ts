@@ -2,6 +2,13 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 // ─── Shared types ────────────────────────────────────────────────────────────────
 
+export interface TestResult {
+  valid: boolean;
+  error: string | null;
+  latencyMs: number;
+  testedAt: string;
+}
+
 export interface ProviderCatalog {
   color: string;
   textIcon: string;
@@ -38,6 +45,8 @@ export interface ProviderConnection {
   authType?: string;
   testStatus?: string;
   lastError?: string;
+  lastErrorAt?: string;
+  lastTested?: string;
   [key: string]: unknown;
 }
 
@@ -91,12 +100,34 @@ export const api = {
 
   // ─── Providers ─────────────────────────────────────────────────────────────
   providers: {
-    list:    () => request<{ connections: unknown[] }>("/api/providers"),
+    list:    () => request<{ connections: ProviderConnection[] }>("/api/providers"),
     catalog: () => request<CatalogResponse>("/api/providers/catalog"),
-    nodes:   () => request<{ nodes: unknown[] }>("/api/provider-nodes"),
+    nodes:   () => request<{ nodes: ProviderNode[] }>("/api/provider-nodes"),
     create:  (data: unknown) => request("/api/providers", { method: "POST", body: JSON.stringify(data) }),
     update:  (id: string, data: unknown) => request(`/api/providers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove:  (id: string) => request(`/api/providers/${id}`, { method: "DELETE" }),
+    test:    (id: string) => request<TestResult>(`/api/providers/${id}`, { method: "POST" }),
+    testBatch: (mode: string) => request<{
+      mode: string;
+      providerId: string | null;
+      results: Array<{
+        provider: string;
+        connectionId: string;
+        connectionName: string;
+        authType: string;
+        valid: boolean;
+        latencyMs: number;
+        error: string | null;
+        testedAt: string;
+      }>;
+      testedAt: string;
+      summary: { total: number; passed: number; failed: number };
+    }>("/api/providers/test-batch", { method: "POST", body: JSON.stringify({ mode }) }),
+    getModels: (id: string) => request<{
+      provider: string;
+      alias: string;
+      models: Array<{ id: string; name?: string; type?: string }>;
+    }>(`/api/providers/${id}/models`),
   },
 
   // ─── Provider Nodes ─────────────────────────────────────────────────────────
