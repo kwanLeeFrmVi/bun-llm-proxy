@@ -19,8 +19,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { NetworkGraph } from "@/components/NetworkGraph";
-import { ChevronLeft, ChevronRight, ExternalLink, SlidersHorizontal, X } from "lucide-react";
+import { ProviderTopology } from "@/components/ProviderTopology";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ExternalLink, SlidersHorizontal, X } from "lucide-react";
 
 const PERIODS = ["24h", "7d", "30d", "all"] as const;
 type Period = (typeof PERIODS)[number];
@@ -162,7 +163,7 @@ function OverviewTab({
               Aggregate usage across all active gateways
             </p>
           </div>
-          <NetworkGraph />
+          <ProviderTopology providers={stats.byProvider} lastProvider={recentRows[0]?.provider} />
         </div>
 
         {/* Recent Requests */}
@@ -236,7 +237,7 @@ function OverviewTab({
         {tableRows.length === 0 ? (
           <div className="p-10 text-center text-sm text-[--on-surface-variant]">No data for this period.</div>
         ) : (
-          <Table>
+          <Table stickyHeader>
             <TableHeader>
               <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
                 <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
@@ -246,7 +247,7 @@ function OverviewTab({
                   Requests
                 </TableHead>
                 {view !== "apikey" && (
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right hidden sm:table-cell">
                     Tokens
                   </TableHead>
                 )}
@@ -271,7 +272,7 @@ function OverviewTab({
                     {r.requests.toLocaleString()}
                   </TableCell>
                   {view !== "apikey" && (
-                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3 hidden sm:table-cell">
                       {fmt(r.tokens)}
                     </TableCell>
                   )}
@@ -356,7 +357,7 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
       {/* Filter Bar */}
       <div className={cardStyle + " p-4"}>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1 min-w-[160px]">
+          <div className="flex flex-col gap-1 min-w-[140px] sm:min-w-[160px]">
             <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
               Provider
             </label>
@@ -368,7 +369,7 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
               className="h-9 px-3 text-[13px] rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary] placeholder:text-[--on-surface-variant]/50"
             />
           </div>
-          <div className="flex flex-col gap-1 min-w-[180px]">
+          <div className="flex flex-col gap-1 min-w-[150px] sm:min-w-[180px]">
             <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
               API Key
             </label>
@@ -436,7 +437,7 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
           </div>
         ) : (
           <>
-            <Table>
+            <Table stickyHeader className="min-w-[900px]">
               <TableHeader>
                 <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
@@ -445,25 +446,25 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
                     Model
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell">
                     Provider
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell">
                     API Key
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right hidden sm:table-cell">
                     Input Tokens
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right hidden sm:table-cell">
                     Output Tokens
                   </TableHead>
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
                     Cost
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell">
                     Status
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell">
                     Latency
                   </TableHead>
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pr-6 text-right">
@@ -487,10 +488,10 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
                     <TableCell className="py-3">
                       <Badge variant="endpoint">{r.model ?? "—"}</Badge>
                     </TableCell>
-                    <TableCell className="text-[13px] text-[--on-surface] py-3">
+                    <TableCell className="text-[13px] text-[--on-surface] py-3 hidden md:table-cell">
                       {r.provider ?? "—"}
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="py-3 hidden lg:table-cell">
                       {r.apiKeyId ? (
                         <Badge variant="secondary">
                           {apiKeyMap.get(r.apiKeyId) ?? r.apiKeyId}
@@ -499,19 +500,19 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
                         <span className="text-[13px] text-[--on-surface-variant]">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-[13px] text-right tabular-nums text-[--primary] py-3">
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--primary] py-3 hidden sm:table-cell">
                       {r.promptTokens.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3 hidden sm:table-cell">
                       {r.completionTokens.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
                       ${r.cost.toFixed(5)}
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="py-3 hidden md:table-cell">
                       <StatusBadge status={r.status} />
                     </TableCell>
-                    <TableCell className="text-[13px] text-[--on-surface-variant] py-3 whitespace-nowrap">
+                    <TableCell className="text-[13px] text-[--on-surface-variant] py-3 whitespace-nowrap hidden lg:table-cell">
                       {r.durationMs ? `${r.durationMs.toLocaleString()}ms` : "—"}
                     </TableCell>
                     <TableCell className="pr-6 text-right py-3">
@@ -534,32 +535,14 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
             </Table>
 
             {/* Pagination */}
-            <div className="px-6 py-3 border-t border-[rgba(203,213,225,0.4)] flex items-center justify-between">
-              <p className="text-[11px] text-[--on-surface-variant] font-medium tracking-wide">
-                SHOWING {page * PAGE_SIZE + 1}–
-                {Math.min((page + 1) * PAGE_SIZE, total)} OF{" "}
-                {total.toLocaleString()} RECORDS
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  disabled={page === 0}
-                  onClick={() => handlePage(page - 1)}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4 text-[--on-surface-variant]" />
-                </button>
-                <span className="text-[12px] text-[--on-surface] font-medium px-2">
-                  {page + 1} / {totalPages || 1}
-                </span>
-                <button
-                  disabled={page + 1 >= totalPages}
-                  onClick={() => handlePage(page + 1)}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4 text-[--on-surface-variant]" />
-                </button>
-              </div>
-            </div>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={handlePage}
+              label="RECORDS"
+            />
           </>
         )}
       </div>
