@@ -34,6 +34,11 @@ export const FREE_PROVIDERS: Record<string, ProviderMeta> = {
     website: "https://iflowbot.com",
     notice: { text: "Free tier available.", apiKeyUrl: "https://iflowbot.com" },
   },
+  claude: {
+    color: "#D97757", textIcon: "CC", name: "Claude Code",
+    website: "https://claude.ai",
+    notice: { text: "Connect via OAuth for free access to Claude models.", apiKeyUrl: "https://claude.ai" },
+  },
 };
 
 // ─── Free Tier Providers ────────────────────────────────────────────────────────

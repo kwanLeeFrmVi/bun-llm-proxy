@@ -11,6 +11,7 @@ import Logs from "@/pages/Logs.tsx";
 import Models from "@/pages/Models.tsx";
 import Users from "@/pages/Users.tsx";
 import ChangePassword from "@/pages/ChangePassword.tsx";
+import OAuthCallback from "@/pages/OAuthCallback.tsx";
 import { Loader } from "@/components/Loader.tsx";
 
 function ProtectedLayout() {
@@ -83,6 +84,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path='/login' element={<Login />} />
+        <Route path='/oauth/callback' element={<OAuthCallback />} />
         <Route path='/*' element={<ProtectedLayout />} />
       </Routes>
     </BrowserRouter>
