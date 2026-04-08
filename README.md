@@ -12,7 +12,7 @@ A fast, self-hosted AI gateway built with **Bun** that proxies OpenAI-compatible
 - **Proxy pool management** — Attach HTTP(S)/SOCKS proxies to providers; auto-tests connectivity
 - **Token refresh & streaming** — Handles token refresh flows and SSE streaming end-to-end
 - **Usage tracking** — Records every request; view logs and usage stats in the dashboard
-- **SQLite persistence** — All config stored in `~/.9router/router.db` (WAL mode)
+- **SQLite persistence** — All config stored in `~/.bunLLM/router.db` (WAL mode)
 - **Embedded dashboard** — React SPA served alongside the API on the same port
 
 ---
@@ -33,13 +33,13 @@ The server listens on port **20129** by default (configurable via `PORT` env var
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `20129` | TCP port to listen on |
-| `DATA_DIR` | `~/.9router` | Where `router.db` is stored |
-| `ADMIN_USERNAME` | — | Create an admin user on first boot |
-| `ADMIN_PASSWORD` | — | Password for the admin user |
-| `CLOUD_URL` | — | Remote cloud sync URL (optional) |
+| Variable         | Default     | Description                        |
+| ---------------- | ----------- | ---------------------------------- |
+| `PORT`           | `20129`     | TCP port to listen on              |
+| `DATA_DIR`       | `~/.bunLLM` | Where `router.db` is stored        |
+| `ADMIN_USERNAME` | —           | Create an admin user on first boot |
+| `ADMIN_PASSWORD` | —           | Password for the admin user        |
+| `CLOUD_URL`      | —           | Remote cloud sync URL (optional)   |
 
 ---
 
@@ -138,47 +138,47 @@ curl http://localhost:20129/v1/chat/completions \
   -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-| Endpoint | Description |
-|---|---|
+| Endpoint                    | Description                                  |
+| --------------------------- | -------------------------------------------- |
 | `POST /v1/chat/completions` | Chat completions (streaming & non-streaming) |
-| `POST /v1/embeddings` | Embeddings |
-| `POST /v1/messages` | Anthropic Messages API |
-| `GET /v1/models` | List available models |
-| `POST /v1/responses` | OpenAI Responses API |
-| `POST /v1beta/messages` | Legacy Anthropic beta messages |
+| `POST /v1/embeddings`       | Embeddings                                   |
+| `POST /v1/messages`         | Anthropic Messages API                       |
+| `GET /v1/models`            | List available models                        |
+| `POST /v1/responses`        | OpenAI Responses API                         |
+| `POST /v1beta/messages`     | Legacy Anthropic beta messages               |
 
 ### Dashboard REST API
 
 All `/api/*` routes require an active dashboard session cookie or `Authorization: Bearer <session_token>`.
 
-| Method | Path | Description |
-|---|---|---|
-| `POST /api/auth/login` | Authenticate |
-| `POST /api/auth/logout` | Invalidate session |
-| `GET /api/auth/me` | Current user |
-| `GET/POST /api/keys` | List / create API keys |
-| `GET/PATCH/DELETE /api/keys/:id` | Manage API key |
-| `GET/POST /api/providers` | List / create provider connections |
-| `GET/PATCH/DELETE /api/providers/:id` | Manage provider connection |
-| `GET/POST /api/combos` | List / create model combos |
-| `GET/PATCH/DELETE /api/combos/:id` | Manage combo |
-| `GET /api/usage` | Aggregated usage stats |
-| `GET /api/usage/request-details` | Per-request breakdown |
-| `GET /api/usage/stream` | SSE usage feed |
-| `GET /api/console-logs` | Server log history |
-| `GET /api/console-logs/stream` | Live log stream (SSE) |
-| `GET/PATCH /api/settings` | Read / update global settings |
+| Method                                | Path                               | Description |
+| ------------------------------------- | ---------------------------------- | ----------- |
+| `POST /api/auth/login`                | Authenticate                       |
+| `POST /api/auth/logout`               | Invalidate session                 |
+| `GET /api/auth/me`                    | Current user                       |
+| `GET/POST /api/keys`                  | List / create API keys             |
+| `GET/PATCH/DELETE /api/keys/:id`      | Manage API key                     |
+| `GET/POST /api/providers`             | List / create provider connections |
+| `GET/PATCH/DELETE /api/providers/:id` | Manage provider connection         |
+| `GET/POST /api/combos`                | List / create model combos         |
+| `GET/PATCH/DELETE /api/combos/:id`    | Manage combo                       |
+| `GET /api/usage`                      | Aggregated usage stats             |
+| `GET /api/usage/request-details`      | Per-request breakdown              |
+| `GET /api/usage/stream`               | SSE usage feed                     |
+| `GET /api/console-logs`               | Server log history                 |
+| `GET /api/console-logs/stream`        | Live log stream (SSE)              |
+| `GET/PATCH /api/settings`             | Read / update global settings      |
 
 ---
 
 ## Supported Providers
 
-| Provider | API Type | Notes |
-|---|---|---|
-| **OpenAI** | OpenAI | Direct proxy; no translation needed |
-| **Anthropic** | Anthropic / OpenAI | Request/response translation between formats |
-| **Google Gemini** | Gemini / OpenAI | REST + SSE translation |
-| **Ollama** | Ollama / OpenAI / Claude | Local models; REST translation |
+| Provider          | API Type                 | Notes                                        |
+| ----------------- | ------------------------ | -------------------------------------------- |
+| **OpenAI**        | OpenAI                   | Direct proxy; no translation needed          |
+| **Anthropic**     | Anthropic / OpenAI       | Request/response translation between formats |
+| **Google Gemini** | Gemini / OpenAI          | REST + SSE translation                       |
+| **Ollama**        | Ollama / OpenAI / Claude | Local models; REST translation               |
 
 Each provider connection is stored as a JSON blob in SQLite and supports arbitrary config fields (base URL, API key, custom headers, proxy URL, priority, etc.).
 
@@ -194,7 +194,7 @@ pm2 start pm2.config.js
 bun run start
 ```
 
-Data is stored at `~/.9router/router.db`. The SQLite database uses **WAL mode** and supports `SO_REUSEPORT` on Linux for multi-process clustering (set `reusePort: true` in `index.ts`).
+Data is stored at `~/.bunLLM/router.db`. The SQLite database uses **WAL mode** and supports `SO_REUSEPORT` on Linux for multi-process clustering (set `reusePort: true` in `index.ts`).
 
 ---
 

@@ -3,8 +3,12 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "workspaces": [
+    "dashboard"
+  ],
   "scripts": {
-    "dev": "bun --hot index.ts",
+    "dev": "concurrently \"bun run dev:proxy\" \"bun run dev:dashboard\"",
+    "dev:proxy": "bun --hot index.ts",
     "dev:dashboard": "bun --cwd dashboard dev",
     "start": "bun index.ts",
     "start:dashboard": "bun --cwd dashboard preview",
@@ -22,7 +26,8 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "concurrently": "^9.2.1"
   },
   "peerDependencies": {
     "typescript": "^5"

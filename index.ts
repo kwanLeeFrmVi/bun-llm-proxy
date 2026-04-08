@@ -43,8 +43,21 @@ const server = Bun.serve({
   reusePort: isLinux, // SO_REUSEPORT: Linux only, enables multi-process clustering
   routes,
 
-  fetch(req) {
+  async fetch(req) {
     if (req.method === "OPTIONS") return corsResponse();
+    const url = new URL(req.url);
+
+    // Serve dashboard built assets (CSS, JS, images)
+    if (url.pathname.startsWith("/assets/")) {
+      const file = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
+      if (await file.exists()) return new Response(file);
+    }
+
+    // Serve dashboard SPA for all non-API routes
+    if (!url.pathname.startsWith("/api") && !url.pathname.startsWith("/v1")) {
+      return new Response("hello world");
+    }
+
     return new Response("Not found", { status: 404 });
   },
 });

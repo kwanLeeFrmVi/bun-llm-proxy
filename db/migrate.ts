@@ -1,5 +1,5 @@
 /**
- * Migration: ~/.9router/db.json → SQLite (router.db)
+ * Migration: ~/.bunLLM/db.json → SQLite (router.db)
  * Idempotent: skips if provider_connections already has data.
  * Run: bun db/migrate.ts
  */
