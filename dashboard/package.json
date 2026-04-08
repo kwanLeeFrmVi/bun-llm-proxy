@@ -9,6 +9,7 @@
     "preview": "vite preview --port 20130"
   },
   "dependencies": {
+    "tailwindcss": "^4.2.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.6.1",

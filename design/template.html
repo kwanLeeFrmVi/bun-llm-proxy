@@ -1,0 +1,831 @@
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Usage Analytics | LLM Gateway</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              error: "#9f403d",
+              "inverse-primary": "#618bff",
+              "on-primary-container": "#0048bf",
+              "on-error-container": "#752121",
+              "secondary-dim": "#465468",
+              "on-tertiary-container": "#003047",
+              "error-dim": "#4e0309",
+              "on-secondary-fixed-variant": "#4e5c71",
+              "on-primary": "#f8f7ff",
+              "tertiary-fixed-dim": "#17a8ec",
+              tertiary: "#006592",
+              "tertiary-dim": "#005980",
+              surface: "#f7f9fb",
+              "surface-tint": "#0053db",
+              outline: "#717c82",
+              "on-secondary-fixed": "#324053",
+              "on-secondary": "#f8f8ff",
+              "on-primary-fixed": "#003798",
+              "primary-fixed": "#dbe1ff",
+              "tertiary-fixed": "#34b5fa",
+              "on-error": "#fff7f6",
+              "error-container": "#fe8983",
+              "primary-fixed-dim": "#c7d3ff",
+              "secondary-fixed": "#d5e3fc",
+              primary: "#0053db",
+              "on-tertiary-fixed": "#00121e",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-container": "#455367",
+              "secondary-fixed-dim": "#c7d5ed",
+              "inverse-on-surface": "#9a9d9f",
+              "on-tertiary": "#f8f9ff",
+              "tertiary-container": "#34b5fa",
+              "surface-container-highest": "#d9e4ea",
+              "on-surface-variant": "#566166",
+              "surface-dim": "#cfdce3",
+              "on-primary-fixed-variant": "#0050d4",
+              "on-tertiary-fixed-variant": "#003954",
+              "surface-container": "#e8eff3",
+              "on-surface": "#2a3439",
+              "inverse-surface": "#0b0f10",
+              background: "#f7f9fb",
+              "primary-dim": "#0048c1",
+              "surface-container-low": "#f0f4f7",
+              "surface-bright": "#f7f9fb",
+              "surface-container-high": "#e1e9ee",
+              secondary: "#526074",
+              "secondary-container": "#d5e3fc",
+              "outline-variant": "#a9b4b9",
+              "primary-container": "#dbe1ff",
+              "on-background": "#2a3439",
+              "surface-variant": "#d9e4ea",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .font-headline {
+        font-family: "Space Grotesk", sans-serif;
+      }
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface antialiased">
+    <!-- Sidebar Navigation -->
+    <aside
+      class="fixed left-0 top-0 h-full flex flex-col p-4 space-y-2 docked left-0 h-screen w-64 bg-slate-100 dark:bg-slate-900 font-['Inter'] text-sm antialiased z-50"
+    >
+      <div class="flex items-center gap-3 px-2 mb-8">
+        <div
+          class="w-10 h-10 bg-primary flex items-center justify-center rounded-lg shadow-lg"
+        >
+          <span class="material-symbols-outlined text-white" data-icon="hub"
+            >hub</span
+          >
+        </div>
+        <div>
+          <h1
+            class="font-['Space_Grotesk'] font-bold text-lg text-slate-900 dark:text-slate-100"
+          >
+            LLM Gateway
+          </h1>
+          <p
+            class="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase"
+          >
+            Management Console
+          </p>
+        </div>
+      </div>
+      <nav class="flex-1 space-y-1">
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all translate-x-1 duration-200"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="hub">hub</span>
+          <span>Providers</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all translate-x-1 duration-200"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="vpn_key"
+            >vpn_key</span
+          >
+          <span>API Keys</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold bg-white/50 dark:bg-white/5 rounded-md transition-all translate-x-1 duration-200"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="bar_chart"
+            >bar_chart</span
+          >
+          <span>Usage</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all translate-x-1 duration-200"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="terminal"
+            >terminal</span
+          >
+          <span>Console</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all translate-x-1 duration-200"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="token">token</span>
+          <span>Models</span>
+        </a>
+      </nav>
+      <div class="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="help_outline"
+            >help_outline</span
+          >
+          <span>Support</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-md transition-all"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="settings"
+            >settings</span
+          >
+          <span>Settings</span>
+        </a>
+      </div>
+    </aside>
+    <!-- Main Content Area -->
+    <main class="ml-64 min-h-screen">
+      <!-- Top App Bar -->
+      <header
+        class="flex justify-between items-center w-full px-8 py-4 bg-slate-50 dark:bg-slate-950 sticky top-0 z-40"
+      >
+        <div class="flex items-center gap-6 flex-1">
+          <div class="relative w-full max-w-md">
+            <span
+              class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg"
+              >search</span
+            >
+            <input
+              class="w-full pl-10 pr-4 py-2 bg-surface-container-high rounded-lg text-sm border-none focus:ring-1 focus:ring-primary focus:bg-surface-container-highest transition-all"
+              placeholder="Search analytics..."
+              type="text"
+            />
+          </div>
+          <nav class="hidden md:flex gap-6">
+            <a
+              class="text-blue-700 dark:text-blue-500 font-bold border-b-2 border-blue-700 text-sm py-1"
+              href="#"
+              >Overview</a
+            >
+            <a
+              class="text-slate-500 dark:text-slate-400 hover:text-slate-900 text-sm py-1 transition-colors"
+              href="#"
+              >By Provider</a
+            >
+            <a
+              class="text-slate-500 dark:text-slate-400 hover:text-slate-900 text-sm py-1 transition-colors"
+              href="#"
+              >By Model</a
+            >
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <button
+            class="text-on-surface-variant hover:bg-slate-100 p-2 rounded-lg transition-all scale-98 active:opacity-80"
+          >
+            <span class="material-symbols-outlined" data-icon="notifications"
+              >notifications</span
+            >
+          </button>
+          <div class="h-8 w-px bg-slate-200 mx-2"></div>
+          <div class="flex items-center gap-3 cursor-pointer group">
+            <img
+              alt="User Profile"
+              class="w-8 h-8 rounded-full border border-primary/20 shadow-sm"
+              data-alt="headshot of a modern software engineer with short hair, wearing a neutral grey hoodie, sharp professional portrait lighting"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa4bJZBuOZ3vJIGvWvzfS_shyhGbIwT-rijQhTYYqjln9Zme4XrHWq-Rz4kQ9q60C6iTkdTXanAbJdfMyriyJLq2vluXqg4to4z227HoAiWk8BVav-xcMw8oOIWfpzjrhvSMXLqtqv64ANhCHWMSkelNn8HZNzVLMDfr83Uz0vo2hkmv9ArvhRNpPPEQQTnWgrhC9THGDeZFqZAKXlcPGhpLt93RWO_oYKttBBXqyWUeE-uYZcDiFqhbca7DaWOOnixOtiCSMJS-I5"
+            />
+            <span
+              class="material-symbols-outlined text-on-surface-variant group-hover:rotate-180 transition-transform duration-300"
+              data-icon="expand_more"
+              >expand_more</span
+            >
+          </div>
+        </div>
+      </header>
+      <!-- Page Content -->
+      <div class="p-8 max-w-7xl mx-auto space-y-8">
+        <!-- Header & Date Picker -->
+        <div
+          class="flex flex-col md:flex-row md:items-end justify-between gap-4"
+        >
+          <div>
+            <h2 class="text-3xl font-headline font-bold text-on-surface">
+              Usage Analytics
+            </h2>
+            <p class="text-on-surface-variant text-sm mt-1">
+              Real-time performance metrics and token orchestration data.
+            </p>
+          </div>
+          <div
+            class="flex items-center gap-2 bg-surface-container-low p-1 rounded-xl"
+          >
+            <button
+              class="px-4 py-2 text-xs font-semibold bg-surface-container-lowest shadow-sm rounded-lg text-primary transition-all"
+            >
+              Last 24h
+            </button>
+            <button
+              class="px-4 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all"
+            >
+              Last 7 Days
+            </button>
+            <button
+              class="px-4 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all"
+            >
+              Last 30 Days
+            </button>
+            <div class="w-px h-6 bg-slate-200 mx-1"></div>
+            <button
+              class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all"
+            >
+              <span
+                class="material-symbols-outlined text-base"
+                data-icon="calendar_today"
+                >calendar_today</span
+              >
+              Custom Range
+            </button>
+          </div>
+        </div>
+        <!-- Summary Cards Bento Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <!-- Total Tokens -->
+          <div
+            class="bg-surface-container-lowest p-6 rounded-xl relative overflow-hidden group"
+          >
+            <div
+              class="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"
+            ></div>
+            <div class="flex items-center justify-between mb-4">
+              <span
+                class="material-symbols-outlined text-primary p-2 bg-primary-container/30 rounded-lg"
+                data-icon="toll"
+                >toll</span
+              >
+              <span
+                class="text-xs font-bold text-tertiary-fixed-dim bg-tertiary-container/10 px-2 py-0.5 rounded-full flex items-center gap-1"
+              >
+                <span
+                  class="material-symbols-outlined text-xs"
+                  data-icon="trending_up"
+                  >trending_up</span
+                >
+                12%
+              </span>
+            </div>
+            <p
+              class="text-on-surface-variant text-xs font-medium uppercase tracking-wider"
+            >
+              Total Tokens Used
+            </p>
+            <h3 class="text-2xl font-headline font-bold mt-1">1,248,502</h3>
+            <div class="mt-4 flex items-end gap-1 h-8">
+              <div
+                class="flex-1 bg-primary/10 h-3 rounded-full overflow-hidden relative"
+              >
+                <div
+                  class="absolute inset-0 bg-primary w-[75%] rounded-full"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <!-- Total Spend -->
+          <div
+            class="bg-surface-container-lowest p-6 rounded-xl relative overflow-hidden group"
+          >
+            <div
+              class="absolute -right-4 -top-4 w-24 h-24 bg-tertiary/5 rounded-full blur-2xl group-hover:bg-tertiary/10 transition-colors"
+            ></div>
+            <div class="flex items-center justify-between mb-4">
+              <span
+                class="material-symbols-outlined text-tertiary p-2 bg-tertiary-container/20 rounded-lg"
+                data-icon="payments"
+                >payments</span
+              >
+              <span
+                class="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full"
+                >Stable</span
+              >
+            </div>
+            <p
+              class="text-on-surface-variant text-xs font-medium uppercase tracking-wider"
+            >
+              Total Spend
+            </p>
+            <h3 class="text-2xl font-headline font-bold mt-1">$412.38</h3>
+            <p class="text-[10px] text-on-surface-variant mt-2">
+              Avg. $0.33 per 1k tokens
+            </p>
+          </div>
+          <!-- Avg Latency -->
+          <div
+            class="bg-surface-container-lowest p-6 rounded-xl relative overflow-hidden group"
+          >
+            <div
+              class="absolute -right-4 -top-4 w-24 h-24 bg-secondary/5 rounded-full blur-2xl group-hover:bg-secondary/10 transition-colors"
+            ></div>
+            <div class="flex items-center justify-between mb-4">
+              <span
+                class="material-symbols-outlined text-secondary p-2 bg-secondary-container/30 rounded-lg"
+                data-icon="timer"
+                >timer</span
+              >
+              <span
+                class="text-xs font-bold text-error bg-error-container/20 px-2 py-0.5 rounded-full flex items-center gap-1"
+              >
+                <span
+                  class="material-symbols-outlined text-xs"
+                  data-icon="trending_down"
+                  >trending_down</span
+                >
+                4ms
+              </span>
+            </div>
+            <p
+              class="text-on-surface-variant text-xs font-medium uppercase tracking-wider"
+            >
+              Avg Latency
+            </p>
+            <h3 class="text-2xl font-headline font-bold mt-1">284ms</h3>
+            <div class="mt-4 flex items-center gap-1 h-4">
+              <div class="w-1.5 h-2 bg-secondary-container rounded-full"></div>
+              <div class="w-1.5 h-4 bg-secondary-container rounded-full"></div>
+              <div class="w-1.5 h-3 bg-secondary-container rounded-full"></div>
+              <div class="w-1.5 h-1 bg-secondary-container rounded-full"></div>
+              <div class="w-1.5 h-4 bg-primary rounded-full"></div>
+              <div class="w-1.5 h-2 bg-secondary-container rounded-full"></div>
+              <div class="w-1.5 h-3 bg-secondary-container rounded-full"></div>
+            </div>
+          </div>
+          <!-- Error Rate -->
+          <div
+            class="bg-surface-container-lowest p-6 rounded-xl relative overflow-hidden group"
+          >
+            <div
+              class="absolute -right-4 -top-4 w-24 h-24 bg-error/5 rounded-full blur-2xl group-hover:bg-error/10 transition-colors"
+            ></div>
+            <div class="flex items-center justify-between mb-4">
+              <span
+                class="material-symbols-outlined text-error p-2 bg-error-container/20 rounded-lg"
+                data-icon="bug_report"
+                >bug_report</span
+              >
+              <span
+                class="text-xs font-bold text-tertiary-fixed-dim bg-tertiary-container/10 px-2 py-0.5 rounded-full"
+                >-0.02%</span
+              >
+            </div>
+            <p
+              class="text-on-surface-variant text-xs font-medium uppercase tracking-wider"
+            >
+              Error Rate
+            </p>
+            <h3 class="text-2xl font-headline font-bold mt-1">0.14%</h3>
+            <p class="text-[10px] text-on-surface-variant mt-2">
+              1,748 successful requests
+            </p>
+          </div>
+        </div>
+        <!-- Main Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Usage Over Time -->
+          <div
+            class="lg:col-span-2 bg-surface-container-lowest p-8 rounded-2xl shadow-sm"
+          >
+            <div class="flex items-center justify-between mb-8">
+              <div>
+                <h4 class="font-headline font-bold text-lg">
+                  Token Traffic Orchestration
+                </h4>
+                <p class="text-xs text-on-surface-variant">
+                  Aggregate usage across all active gateways
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <div
+                  class="flex items-center gap-1 text-[10px] font-bold text-on-surface-variant"
+                >
+                  <span class="w-2 h-2 rounded-full bg-primary"></span> INPUT
+                </div>
+                <div
+                  class="flex items-center gap-1 text-[10px] font-bold text-on-surface-variant"
+                >
+                  <span class="w-2 h-2 rounded-full bg-tertiary-fixed"></span>
+                  OUTPUT
+                </div>
+              </div>
+            </div>
+            <!-- Mock Line Chart -->
+            <div
+              class="relative h-64 w-full flex items-end justify-between gap-2 border-b border-surface-container-high pb-4"
+            >
+              <div
+                class="absolute inset-0 flex flex-col justify-between py-2 pointer-events-none"
+              >
+                <div
+                  class="w-full border-t border-dashed border-surface-container-highest"
+                ></div>
+                <div
+                  class="w-full border-t border-dashed border-surface-container-highest"
+                ></div>
+                <div
+                  class="w-full border-t border-dashed border-surface-container-highest"
+                ></div>
+              </div>
+              <!-- Bar Groups -->
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[30%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[40%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >MON</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[45%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[35%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >TUE</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[55%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[60%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >WED</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[40%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[30%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >THU</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[75%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[80%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >FRI</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[20%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[15%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >SAT</span
+                >
+              </div>
+              <div
+                class="flex-1 flex flex-col justify-end gap-1 group cursor-pointer h-full"
+              >
+                <div
+                  class="w-full bg-tertiary-fixed/30 rounded-t-sm h-[15%] group-hover:bg-tertiary-fixed transition-colors"
+                ></div>
+                <div
+                  class="w-full bg-primary/40 rounded-t-sm h-[10%] group-hover:bg-primary transition-colors"
+                ></div>
+                <span
+                  class="text-[9px] text-on-surface-variant text-center mt-2"
+                  >SUN</span
+                >
+              </div>
+            </div>
+          </div>
+          <!-- Cost by Provider -->
+          <div class="bg-surface-container-lowest p-8 rounded-2xl shadow-sm">
+            <h4 class="font-headline font-bold text-lg mb-2">
+              Spend by Provider
+            </h4>
+            <p class="text-xs text-on-surface-variant mb-8">
+              Cost allocation for the current period
+            </p>
+            <div class="space-y-6">
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-semibold">
+                  <span>OpenAI</span>
+                  <span class="text-primary">$212.45</span>
+                </div>
+                <div class="h-2 w-full bg-surface-container rounded-full">
+                  <div class="h-full bg-primary rounded-full w-[51%]"></div>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-semibold">
+                  <span>Anthropic</span>
+                  <span class="text-primary">$124.90</span>
+                </div>
+                <div class="h-2 w-full bg-surface-container rounded-full">
+                  <div
+                    class="h-full bg-tertiary-fixed rounded-full w-[30%]"
+                  ></div>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-semibold">
+                  <span>Google Vertex</span>
+                  <span class="text-primary">$54.12</span>
+                </div>
+                <div class="h-2 w-full bg-surface-container rounded-full">
+                  <div
+                    class="h-full bg-on-surface-variant/40 rounded-full w-[13%]"
+                  ></div>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-semibold">
+                  <span>Mistral AI</span>
+                  <span class="text-primary">$20.91</span>
+                </div>
+                <div class="h-2 w-full bg-surface-container rounded-full">
+                  <div
+                    class="h-full bg-on-surface-variant/20 rounded-full w-[6%]"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="mt-10 pt-6 border-t border-surface-container flex justify-between items-center"
+            >
+              <span
+                class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest"
+                >Total Managed</span
+              >
+              <span class="font-headline font-bold text-xl">$412.38</span>
+            </div>
+          </div>
+        </div>
+        <!-- Top Models & Real-time Logs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Top Performing Models Table -->
+          <div class="bg-surface-container-lowest p-8 rounded-2xl shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-headline font-bold text-lg">
+                Top Performing Models
+              </h4>
+              <button class="text-xs font-bold text-primary hover:underline">
+                View All
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead>
+                  <tr
+                    class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest border-b border-surface-container pb-4"
+                  >
+                    <th class="pb-3 font-semibold">Model ID</th>
+                    <th class="pb-3 font-semibold">Usage</th>
+                    <th class="pb-3 font-semibold">Avg Latency</th>
+                    <th class="pb-3 font-semibold text-right">Health</th>
+                  </tr>
+                </thead>
+                <tbody class="text-sm">
+                  <tr
+                    class="group hover:bg-surface-container-low transition-colors border-b border-surface-container/50"
+                  >
+                    <td class="py-4">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="px-2 py-1 bg-tertiary-container/10 text-tertiary-dim rounded-md text-[10px] font-mono font-bold"
+                          >gpt-4o</span
+                        >
+                      </div>
+                    </td>
+                    <td class="py-4 font-medium">842k</td>
+                    <td class="py-4 text-on-surface-variant">342ms</td>
+                    <td class="py-4 text-right">
+                      <div class="flex justify-end">
+                        <span
+                          class="w-2 h-2 rounded-full bg-tertiary-fixed-dim ring-4 ring-tertiary-fixed-dim/10"
+                        ></span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr
+                    class="group hover:bg-surface-container-low transition-colors border-b border-surface-container/50"
+                  >
+                    <td class="py-4">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="px-2 py-1 bg-tertiary-container/10 text-tertiary-dim rounded-md text-[10px] font-mono font-bold"
+                          >claude-3-5-sonnet</span
+                        >
+                      </div>
+                    </td>
+                    <td class="py-4 font-medium">215k</td>
+                    <td class="py-4 text-on-surface-variant">210ms</td>
+                    <td class="py-4 text-right">
+                      <div class="flex justify-end">
+                        <span
+                          class="w-2 h-2 rounded-full bg-tertiary-fixed-dim ring-4 ring-tertiary-fixed-dim/10"
+                        ></span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr
+                    class="group hover:bg-surface-container-low transition-colors border-b border-surface-container/50"
+                  >
+                    <td class="py-4">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="px-2 py-1 bg-tertiary-container/10 text-tertiary-dim rounded-md text-[10px] font-mono font-bold"
+                          >llama-3-70b</span
+                        >
+                      </div>
+                    </td>
+                    <td class="py-4 font-medium">158k</td>
+                    <td class="py-4 text-on-surface-variant">154ms</td>
+                    <td class="py-4 text-right">
+                      <div class="flex justify-end">
+                        <span
+                          class="w-2 h-2 rounded-full bg-error ring-4 ring-error/10"
+                        ></span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Recent Gateway Events (Console Peek) -->
+          <div
+            class="bg-surface-container-lowest p-8 rounded-2xl shadow-sm border border-surface-container-high"
+          >
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-headline font-bold text-lg">
+                System Orchestrator Logs
+              </h4>
+              <div class="flex items-center gap-2">
+                <span
+                  class="w-2 h-2 rounded-full bg-tertiary-fixed animate-pulse"
+                ></span>
+                <span class="text-[10px] font-bold text-on-surface-variant"
+                  >LIVE</span
+                >
+              </div>
+            </div>
+            <div class="space-y-4 font-mono text-[11px] text-slate-600">
+              <div
+                class="p-3 bg-surface rounded flex items-start gap-3 border-l-2 border-primary"
+              >
+                <span class="text-on-surface-variant shrink-0">14:24:01</span>
+                <p>
+                  <span class="text-primary font-bold">REQ</span> Forwarding
+                  prompt to
+                  <span class="text-on-surface font-bold">OpenAI:gpt-4o</span>
+                  via 'Production' gateway...
+                </p>
+              </div>
+              <div
+                class="p-3 bg-surface rounded flex items-start gap-3 border-l-2 border-tertiary-fixed"
+              >
+                <span class="text-on-surface-variant shrink-0">14:23:58</span>
+                <p>
+                  <span class="text-tertiary font-bold">RES</span>
+                  <span class="text-on-surface font-bold"
+                    >Anthropic:claude-3-5</span
+                  >
+                  returned 1.2k tokens. Latency: 480ms.
+                </p>
+              </div>
+              <div
+                class="p-3 bg-surface rounded flex items-start gap-3 border-l-2 border-error"
+              >
+                <span class="text-on-surface-variant shrink-0">14:23:45</span>
+                <p>
+                  <span class="text-error font-bold">ERR</span> Gateway
+                  'Dev-Tier-1' reached rate limit on
+                  <span class="text-on-surface font-bold">llama-3-70b</span>.
+                  Retrying with backup...
+                </p>
+              </div>
+              <div
+                class="p-3 bg-surface rounded flex items-start gap-3 border-l-2 border-primary"
+              >
+                <span class="text-on-surface-variant shrink-0">14:23:12</span>
+                <p>
+                  <span class="text-primary font-bold">REQ</span> Token pool
+                  audit completed. Usage: 72.4% of monthly quota.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- Floating Action Button -->
+    <div class="fixed bottom-8 right-8 z-50">
+      <button
+        class="bg-primary text-white p-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group overflow-hidden"
+      >
+        <span class="material-symbols-outlined" data-icon="add">add</span>
+        <span
+          class="max-w-0 group-hover:max-w-xs transition-all duration-300 overflow-hidden whitespace-nowrap text-sm font-bold"
+          >Deploy New Model</span
+        >
+      </button>
+    </div>
+  </body>
+</html>
