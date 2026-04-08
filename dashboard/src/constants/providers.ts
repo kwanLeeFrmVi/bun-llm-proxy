@@ -139,3 +139,60 @@ export function getProviderConfig(providerId: string): ProviderMeta {
 export function isOAuthProvider(providerId: string): boolean {
   return providerId in FREE_PROVIDERS;
 }
+
+// ─── Provider ID to Alias mapping ──────────────────────────────────────────────
+// Maps provider IDs to their model alias prefix (e.g., "nvidia" → "nvidia/glm-5")
+
+export const PROVIDER_ID_TO_ALIAS: Record<string, string> = {
+  // OAuth providers (short aliases)
+  claude: "cc",
+  codex: "cx",
+  "gemini-cli": "gc",
+  qwen: "qw",
+  iflow: "if",
+  antigravity: "ag",
+  github: "gh",
+  kiro: "kr",
+  cursor: "cu",
+  "kimi-coding": "kmc",
+  kilocode: "kc",
+  cline: "cl",
+  vertex: "vertex",
+  "vertex-partner": "vertex-partner",
+  // API Key providers (alias = provider id)
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "gemini",
+  deepseek: "deepseek",
+  "deepseek-cn": "deepseek-cn",
+  groq: "groq",
+  xai: "xai",
+  mistral: "mistral",
+  perplexity: "perplexity",
+  together: "together",
+  fireworks: "fireworks",
+  cerebras: "cerebras",
+  cohere: "cohere",
+  nebius: "nebius",
+  siliconflow: "siliconflow",
+  hyperbolic: "hyperbolic",
+  deepgram: "deepgram",
+  assemblyai: "assemblyai",
+  nanobanana: "nanobanana",
+  chutes: "chutes",
+  glm: "glm",
+  "glm-cn": "glm-cn",
+  kimi: "kimi",
+  minimax: "minimax",
+  "minimax-cn": "minimax-cn",
+  alicode: "alicode",
+  "alicode-intl": "alicode-intl",
+  openrouter: "openrouter",
+  nvidia: "nvidia",
+  ollama: "ollama",
+  "ollama-local": "ollama-local",
+};
+
+export function getProviderAlias(providerId: string): string {
+  return PROVIDER_ID_TO_ALIAS[providerId] ?? providerId;
+}

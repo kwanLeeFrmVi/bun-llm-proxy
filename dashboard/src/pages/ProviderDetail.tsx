@@ -12,6 +12,7 @@ import {
   isAnthropicCompatibleProvider,
   isOAuthProvider,
   getProviderConfig,
+  getProviderAlias,
 } from "@/constants/providers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -720,7 +721,9 @@ export default function ProviderDetail() {
   const [oauthMeta, setOauthMeta] = useState<Record<string, unknown>>({});
   const [showKiroAuth, setShowKiroAuth] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(null);
+  const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(
+    null,
+  );
   const [editingConn, setEditingConn] = useState<ProviderConnection | null>(
     null,
   );
@@ -991,6 +994,10 @@ export default function ProviderDetail() {
         headers["Authorization"] = `Bearer ${activeKey}`;
       }
 
+      // Construct full model path with provider alias (e.g., "nvidia/glm-5")
+      const providerAlias = getProviderAlias(decodedId);
+      const fullModel = `${providerAlias}/${modelId}`;
+
       const start = Date.now();
       const res = await fetch(
         `${window.location.origin}/api/v1/chat/completions`,
@@ -998,7 +1005,7 @@ export default function ProviderDetail() {
           method: "POST",
           headers,
           body: JSON.stringify({
-            model: modelId,
+            model: fullModel,
             max_tokens: 1,
             stream: false,
             messages: [{ role: "user", content: "hi" }],
@@ -1372,20 +1379,29 @@ export default function ProviderDetail() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
+        <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
           <DialogHeader>
-            <DialogTitle className="font-headline text-lg font-bold">Delete Connection</DialogTitle>
-            <DialogDescription className="text-sm text-[--on-surface-variant]">
-              Are you sure you want to delete <span className="font-medium text-[--on-surface]">"{deletingConn?.name || 'this connection'}"</span>? This action cannot be undone.
+            <DialogTitle className='font-headline text-lg font-bold'>
+              Delete Connection
+            </DialogTitle>
+            <DialogDescription className='text-sm text-[--on-surface-variant]'>
+              Are you sure you want to delete{" "}
+              <span className='font-medium text-[--on-surface]'>
+                "{deletingConn?.name || "this connection"}"
+              </span>
+              ? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+          <DialogFooter className='gap-2'>
+            <Button
+              variant='outline'
+              onClick={() => setShowDeleteConfirm(false)}
+            >
               Cancel
             </Button>
             <Button
               onClick={executeDelete}
-              className="bg-red-600 text-white hover:bg-red-700"
+              className='bg-red-600 text-white hover:bg-red-700'
             >
               Delete
             </Button>
