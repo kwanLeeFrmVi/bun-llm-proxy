@@ -1,60 +1,135 @@
-export interface ProviderConfig {
+// ─── Provider metadata (single source of truth) ──────────────────────────────────
+
+export interface ProviderMeta {
   color: string;
   textIcon: string;
   name: string;
+  website?: string;
+  notice?: { text: string; apiKeyUrl?: string };
+  deprecated?: boolean;
+  deprecationNotice?: string;
 }
 
-export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
-  // OAuth providers
-  "claude-code": { color: "#CC6B47", textIcon: "CC", name: "Claude Code" },
-  "claude": { color: "#D97757", textIcon: "CL", name: "Claude" },
-  "github-copilot": { color: "#333333", textIcon: "GH", name: "GitHub Copilot" },
-  "cursor": { color: "#00D4AA", textIcon: "CU", name: "Cursor" },
-  "codex": { color: "#3B82F6", textIcon: "CX", name: "OpenAI Codex" },
-  "kiro": { color: "#FF6B35", textIcon: "KR", name: "Kiro AI" },
-  "kilocode": { color: "#FF6B35", textIcon: "KC", name: "Kilo Code" },
-  "cline": { color: "#5B9BD5", textIcon: "CL", name: "Cline" },
+// ─── Free Providers ────────────────────────────────────────────────────────────
 
-  // API key providers
-  "openai": { color: "#10A37F", textIcon: "OA", name: "OpenAI" },
-  "anthropic": { color: "#D97757", textIcon: "AN", name: "Anthropic" },
-  "gemini": { color: "#4285F4", textIcon: "GE", name: "Gemini" },
-  "deepseek": { color: "#4D6BFE", textIcon: "DS", name: "DeepSeek" },
-  "groq": { color: "#F55036", textIcon: "GQ", name: "Groq" },
-  "xai": { color: "#1DA1F2", textIcon: "XA", name: "xAI (Grok)" },
-  "mistral": { color: "#FF7000", textIcon: "MI", name: "Mistral" },
-  "perplexity": { color: "#20808D", textIcon: "PP", name: "Perplexity" },
-  "together": { color: "#0F6FFF", textIcon: "TG", name: "Together AI" },
-  "fireworks": { color: "#7B2EF2", textIcon: "FW", name: "Fireworks AI" },
-  "cerebras": { color: "#FF4F00", textIcon: "CB", name: "Cerebras" },
-  "cohere": { color: "#39594D", textIcon: "CO", name: "Cohere" },
-  "ollama": { color: "#8b5cf6", textIcon: "OL", name: "Ollama" },
-  "nvidia": { color: "#76B900", textIcon: "NV", name: "NVIDIA NIM" },
-  "openrouter": { color: "#F97316", textIcon: "OR", name: "OpenRouter" },
-  "qwen": { color: "#10B981", textIcon: "QW", name: "Qwen Code" },
-  "glm": { color: "#2563EB", textIcon: "GL", name: "GLM Coding" },
-  "kimi": { color: "#1E3A8A", textIcon: "KM", name: "Kimi" },
-  "minimax": { color: "#7C3AED", textIcon: "MM", name: "Minimax" },
-  "nebius": { color: "#6C5CE7", textIcon: "NB", name: "Nebius AI" },
-  "siliconflow": { color: "#5B6EF5", textIcon: "SF", name: "SiliconFlow" },
-  "hyperbolic": { color: "#00D4FF", textIcon: "HY", name: "Hyperbolic" },
-
-  // Platform providers
-  "azure-openai": { color: "#0078D4", textIcon: "AZ", name: "Azure OpenAI" },
-  "vertex": { color: "#4285F4", textIcon: "VX", name: "Vertex AI" },
-  "bedrock": { color: "#FF9900", textIcon: "BK", name: "AWS Bedrock" },
-
-  // Aliases (case variations from API data)
-  "Claude": { color: "#3A8DDE", textIcon: "CL", name: "Claude" },
-  "google": { color: "#4285F4", textIcon: "GO", name: "Google" },
+export const FREE_PROVIDERS: Record<string, ProviderMeta> = {
+  kiro: {
+    color: "#FF6B35", textIcon: "KR", name: "Kiro AI",
+    website: "https://kiro.dev",
+    notice: { text: "Free tier: unlimited requests. May require referral for full access.", apiKeyUrl: "https://kiro.dev" },
+  },
+  qwen: {
+    color: "#10B981", textIcon: "QW", name: "Qwen Code",
+    website: "https://qwenlm.ai",
+    notice: { text: "Free tier: Qwen models available.", apiKeyUrl: "https://qwenlm.ai" },
+  },
+  "gemini-cli": {
+    color: "#4285F4", textIcon: "GC", name: "Gemini CLI",
+    website: "https://ai.google.dev",
+    deprecated: true,
+    deprecationNotice: "Google has tightened Gemini CLI abuse detection. Using this provider may violate ToS and risk account bans.",
+  },
+  iflow: {
+    color: "#6366F1", textIcon: "IF", name: "iFlow AI",
+    website: "https://iflowbot.com",
+    notice: { text: "Free tier available.", apiKeyUrl: "https://iflowbot.com" },
+  },
 };
 
-const DEFAULT_CONFIG: ProviderConfig = {
-  color: "#6B7280",
-  textIcon: "??",
-  name: "Unknown",
+// ─── Free Tier Providers ────────────────────────────────────────────────────────
+
+export const FREE_TIER_PROVIDERS: Record<string, ProviderMeta> = {
+  openrouter: {
+    color: "#F97316", textIcon: "OR", name: "OpenRouter",
+    website: "https://openrouter.ai",
+    notice: { text: "Free tier: 27+ free models, no credit card needed, 200 req/day. After $10 credit: 1,000 req/day.", apiKeyUrl: "https://openrouter.ai/settings/keys" },
+  },
+  nvidia: {
+    color: "#76B900", textIcon: "NV", name: "NVIDIA NIM",
+    website: "https://developer.nvidia.com/nim",
+    notice: { text: "Free access for NVIDIA Developer Program members (prototyping & testing).", apiKeyUrl: "https://build.nvidia.com/settings/api-keys" },
+  },
+  ollama: {
+    color: "#8b5cf6", textIcon: "OL", name: "Ollama Cloud",
+    website: "https://ollama.com",
+    notice: { text: "Free tier: light usage, 1 cloud model at a time (limits reset every 5h & 7d). Pro $20/mo.", apiKeyUrl: "https://ollama.com/settings/keys" },
+  },
+  vertex: {
+    color: "#4285F4", textIcon: "VX", name: "Vertex AI",
+    website: "https://cloud.google.com/vertex-ai",
+    notice: { text: "New Google Cloud accounts get $300 free credits. Requires GCP project + Service Account.", apiKeyUrl: "https://console.cloud.google.com/iam-admin/serviceaccounts" },
+  },
 };
 
-export function getProviderConfig(providerId: string): ProviderConfig {
-  return PROVIDER_CONFIGS[providerId] ?? PROVIDER_CONFIGS[providerId.toLowerCase()] ?? DEFAULT_CONFIG;
+// ─── API Key Providers ─────────────────────────────────────────────────────────
+
+export const APIKEY_PROVIDERS: Record<string, ProviderMeta> = {
+  glm:      { color: "#2563EB", textIcon: "GL", name: "GLM Coding",         website: "https://open.bigmodel.cn" },
+  "glm-cn": { color: "#DC2626", textIcon: "GC", name: "GLM (China)",        website: "https://open.bigmodel.cn" },
+  kimi:     { color: "#1E3A8A", textIcon: "KM", name: "Kimi",               website: "https://kimi.moonshot.cn" },
+  minimax:  { color: "#7C3AED", textIcon: "MM", name: "Claude Coding",      website: "https://www.Claudei.com" },
+  "Claude-cn": { color: "#DC2626", textIcon: "MC", name: "Claude (China)", website: "https://www.Claudei.com" },
+  alicode:  { color: "#FF6A00", textIcon: "ALi", name: "Alibaba",            website: "https://www.alibabacloud.com" },
+  "alicode-intl": { color: "#FF6A00", textIcon: "ALi", name: "Alibaba Intl",  website: "https://www.alibabacloud.com" },
+  openai:   { color: "#10A37F", textIcon: "OA", name: "OpenAI",               website: "https://platform.openai.com" },
+  anthropic:{ color: "#D97757", textIcon: "AN", name: "Anthropic",            website: "https://console.anthropic.com" },
+  gemini:   { color: "#4285F4", textIcon: "GE", name: "Gemini",              website: "https://ai.google.dev" },
+  Claude: { color: "#4D6BFE", textIcon: "DS", name: "Claude",            website: "https://deepseek.com" },
+  groq:     { color: "#F55036", textIcon: "GQ", name: "Groq",                website: "https://groq.com" },
+  xai:      { color: "#1DA1F2", textIcon: "XA", name: "xAI (Grok)",         website: "https://x.ai" },
+  mistral:  { color: "#FF7000", textIcon: "MI", name: "Mistral",             website: "https://mistral.ai" },
+  perplexity:{ color: "#20808D", textIcon: "PP", name: "Perplexity",          website: "https://www.perplexity.ai" },
+  together: { color: "#0F6FFF", textIcon: "TG", name: "Together AI",          website: "https://www.together.ai" },
+  fireworks:{ color: "#7B2EF2", textIcon: "FW", name: "Fireworks AI",         website: "https://fireworks.ai" },
+  cerebras: { color: "#FF4F00", textIcon: "CB", name: "Cerebras",            website: "https://www.cerebras.ai" },
+  cohere:   { color: "#39594D", textIcon: "CO", name: "Cohere",              website: "https://cohere.com" },
+  nebius:   { color: "#6C5CE7", textIcon: "NB", name: "Nebius AI",           website: "https://nebius.com" },
+  siliconflow:{ color: "#5B6EF5", textIcon: "SF", name: "SiliconFlow",       website: "https://cloud.siliconflow.com" },
+  hyperbolic:{ color: "#00D4FF", textIcon: "HY", name: "Hyperbolic",          website: "https://hyperbolic.xyz" },
+  deepgram: { color: "#13EF93", textIcon: "DG", name: "Deepgram",            website: "https://deepgram.com" },
+  assemblyai:{ color: "#0062FF", textIcon: "AA", name: "AssemblyAI",         website: "https://assemblyai.com" },
+  nanobanana:{ color: "#FFD700", textIcon: "NB", name: "NanoBanana",         website: "https://nanobananaapi.ai" },
+  chutes:   { color: "#6366F1", textIcon: "CH", name: "Chutes AI",           website: "https://chutes.ai" },
+  "ollama-local": { color: "#8b5cf6", textIcon: "OL", name: "Ollama Local",  website: "https://ollama.com" },
+  "vertex-partner": { color: "#34A853", textIcon: "VP", name: "Vertex Partner", website: "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models" },
+};
+
+// ─── Compatible provider prefix constants ──────────────────────────────────────
+
+export const OPENAI_COMPATIBLE_PREFIX    = "openai-compatible-";
+export const ANTHROPIC_COMPATIBLE_PREFIX = "anthropic-compatible-";
+
+export function isOpenAICompatibleProvider(providerId: string): boolean {
+  return typeof providerId === "string" && providerId.startsWith(OPENAI_COMPATIBLE_PREFIX);
+}
+
+export function isAnthropicCompatibleProvider(providerId: string): boolean {
+  return typeof providerId === "string" && providerId.startsWith(ANTHROPIC_COMPATIBLE_PREFIX);
+}
+
+// ─── All providers merged ──────────────────────────────────────────────────────
+
+export const ALL_PROVIDERS: Record<string, ProviderMeta> = {
+  ...FREE_PROVIDERS,
+  ...FREE_TIER_PROVIDERS,
+  ...APIKEY_PROVIDERS,
+};
+
+// ─── Backward-compat alias ─────────────────────────────────────────────────────
+
+/** @deprecated Use ALL_PROVIDERS / FREE_PROVIDERS / FREE_TIER_PROVIDERS / APIKEY_PROVIDERS directly. */
+export const PROVIDER_CONFIGS: Record<string, ProviderMeta> = ALL_PROVIDERS;
+
+export function getProviderConfig(providerId: string): ProviderMeta {
+  return ALL_PROVIDERS[providerId] ?? ALL_PROVIDERS[providerId.toLowerCase()] ?? {
+    color: "#6B7280",
+    textIcon: "??",
+    name: "Unknown",
+  };
+}
+
+// ─── Auth type helpers ─────────────────────────────────────────────────────────
+
+export function isOAuthProvider(providerId: string): boolean {
+  return providerId in FREE_PROVIDERS;
 }

@@ -36,6 +36,9 @@ export async function PUT(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
+  if (auth.role !== "admin") {
+    return Response.json({ error: "Forbidden: only admins can delete providers" }, { status: 403, headers: CORS_HEADERS });
+  }
   const id = (req as BunRequest).params.id ?? "";
   const existing = await getProviderConnectionById(id);
   if (!existing) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });

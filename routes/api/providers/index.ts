@@ -2,36 +2,106 @@ import { getProviderConnections, createProviderConnection } from "@/lib/localDb"
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
+import {
+  FREE_PROVIDERS,
+  FREE_TIER_PROVIDERS,
+  APIKEY_PROVIDERS,
+} from "dashboard/src/constants/providers.ts";
 
-const SENSITIVE_FIELDS = ["apiKey", "accessToken", "refreshToken", "idToken"];
+// ─── Validation helper ──────────────────────────────────────────────────────────
 
-function sanitize(conn: Record<string, unknown>): Record<string, unknown> {
-  const safe = { ...conn };
-  for (const k of SENSITIVE_FIELDS) delete safe[k];
-  return safe;
+const KNOWN_PROVIDER_IDS = new Set([
+  ...Object.keys(FREE_PROVIDERS),
+  ...Object.keys(FREE_TIER_PROVIDERS),
+  ...Object.keys(APIKEY_PROVIDERS),
+]);
+
+function isKnownProvider(id: string): boolean {
+  return KNOWN_PROVIDER_IDS.has(id);
 }
+
+// ─── GET /api/providers/catalog ───────────────────────────────────────────────
 
 export async function GET(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
+
+  const url = new URL(req.url);
+  // Serve catalog at /api/providers/catalog (also matches /api/providers via exact route match)
+  if (url.pathname.endsWith("/catalog")) {
+    return Response.json(
+      {
+        free: FREE_PROVIDERS,
+        freeTier: FREE_TIER_PROVIDERS,
+        apiKey: APIKEY_PROVIDERS,
+      },
+      { headers: CORS_HEADERS }
+    );
+  }
+
+  // Default: list all connections
   const connections = await getProviderConnections();
-  return Response.json({ connections: connections.map(c => sanitize(c as Record<string, unknown>)) }, { headers: CORS_HEADERS });
+  const safe = connections.map((c) => {
+    const { apiKey, accessToken, refreshToken, idToken, ...rest } = c as Record<string, unknown>;
+    return rest;
+  });
+  return Response.json({ connections: safe }, { headers: CORS_HEADERS });
 }
+
+// ─── POST /api/providers ───────────────────────────────────────────────────────
 
 export async function POST(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
 
   let body: Record<string, unknown>;
-  try { body = await req.json() as Record<string, unknown>; } catch {
+  try {
+    body = await req.json();
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  if (!body.provider)
-    return Response.json({ error: "Missing required field: provider" }, { status: 400, headers: CORS_HEADERS });
+  const { provider, apiKey, name, priority, baseUrl } = body;
 
-  const connection = await createProviderConnection(body);
-  return Response.json(sanitize(connection as Record<string, unknown>), { status: 201, headers: CORS_HEADERS });
+  // Validate provider
+  if (!provider || typeof provider !== "string") {
+    return Response.json({ error: "Missing required field: provider" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  // Support compatible providers (openai-compatible-* and anthropic-compatible-*)
+  const isCompatible =
+    provider.startsWith("openai-compatible-") || provider.startsWith("anthropic-compatible-");
+
+  if (!isKnownProvider(provider) && !isCompatible) {
+    return Response.json({ error: `Unknown provider: ${provider}` }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  // apiKey is required for non-free-tier
+  const isFreeTier = provider in FREE_TIER_PROVIDERS || provider in FREE_PROVIDERS;
+  if (!isFreeTier && (!apiKey || typeof apiKey !== "string" || !apiKey.trim())) {
+    return Response.json({ error: "API Key is required" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  // Name is required
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return Response.json({ error: "Name is required" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  // Build the connection record
+  const conn = await createProviderConnection({
+    provider,
+    authType: "apikey",
+    name: (name as string).trim(),
+    apiKey: apiKey ? (apiKey as string).trim() : undefined,
+    baseUrl: baseUrl ? (baseUrl as string).trim() : undefined,
+    priority: typeof priority === "number" ? priority : 1,
+    isActive: true,
+    testStatus: "unknown",
+  });
+
+  // Sanitize response
+  const { apiKey: _ek, accessToken: _at, refreshToken: _rt, idToken: _it, ...safe } = conn as Record<string, unknown>;
+  return Response.json(safe, { status: 201, headers: CORS_HEADERS });
 }
 
 export function OPTIONS(): Response {
@@ -39,3 +109,4 @@ export function OPTIONS(): Response {
 }
 
 register("/api/providers", { GET, POST, OPTIONS });
+register("/api/providers/catalog", { GET, OPTIONS });

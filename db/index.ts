@@ -25,6 +25,10 @@ export function openDb(): Database {
   // Clean up expired sessions on startup
   _db.run("DELETE FROM sessions WHERE expires_at < ?", [new Date().toISOString()]);
 
+  // ── Backward-compatible migrations ─────────────────────────────────────────
+  try { _db.run("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'"); } catch {}
+  try { _db.run("ALTER TABLE api_keys ADD COLUMN user_id TEXT REFERENCES users(id)"); } catch {}
+
   // Bootstrap admin user from env vars (only if username doesn't exist yet)
   const adminUsername = process.env.ADMIN_USERNAME;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -37,7 +41,7 @@ export function openDb(): Database {
       const hash = Bun.password.hashSync(adminPassword);
       const id = randomUUID();
       _db.run(
-        "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, 'admin', ?)",
         [id, adminUsername, hash, new Date().toISOString()]
       );
       console.log(`[AUTH] Created admin user: ${adminUsername}`);
@@ -372,15 +376,22 @@ export interface ApiKey {
   machineId?: string;
   isActive?: boolean;
   createdAt?: string;
+  userId?: string | null;
 }
 
-export async function getApiKeys(): Promise<ApiKey[]> {
-  return db()
-    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string }, []>(
-      "SELECT id, name, key, machine_id, is_active, created_at FROM api_keys"
-    )
-    .all()
-    .map(r => ({ id: r.id, name: r.name, key: r.key, machineId: r.machine_id, isActive: r.is_active === 1, createdAt: r.created_at }));
+export async function getApiKeys(filter: { userId?: string } = {}): Promise<ApiKey[]> {
+  const rows = filter.userId
+    ? db()
+        .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
+          "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE user_id = ?"
+        )
+        .all(filter.userId)
+    : db()
+        .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, []>(
+          "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys"
+        )
+        .all();
+  return rows.map(r => ({ id: r.id, name: r.name, key: r.key, machineId: r.machine_id, isActive: r.is_active === 1, createdAt: r.created_at, userId: r.user_id ?? null }));
 }
 
 export async function validateApiKey(key: string): Promise<boolean> {
@@ -392,33 +403,33 @@ export async function validateApiKey(key: string): Promise<boolean> {
 
 export async function getApiKeyByKey(key: string): Promise<ApiKey | null> {
   const row = db()
-    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string }, string>(
-      "SELECT id, name, key, machine_id, is_active, created_at FROM api_keys WHERE key = ?"
+    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
+      "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE key = ?"
     )
     .get(key);
   if (!row) return null;
-  return { id: row.id, name: row.name, key: row.key, machineId: row.machine_id, isActive: row.is_active === 1, createdAt: row.created_at };
+  return { id: row.id, name: row.name, key: row.key, machineId: row.machine_id, isActive: row.is_active === 1, createdAt: row.created_at, userId: row.user_id ?? null };
 }
 
 export async function getApiKeyById(id: string): Promise<ApiKey | null> {
   const row = db()
-    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string }, string>(
-      "SELECT id, name, key, machine_id, is_active, created_at FROM api_keys WHERE id = ?"
+    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
+      "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE id = ?"
     )
     .get(id);
   if (!row) return null;
-  return { id: row.id, name: row.name, key: row.key, machineId: row.machine_id, isActive: row.is_active === 1, createdAt: row.created_at };
+  return { id: row.id, name: row.name, key: row.key, machineId: row.machine_id, isActive: row.is_active === 1, createdAt: row.created_at, userId: row.user_id ?? null };
 }
 
-export async function createApiKey(name: string, _machineId?: string): Promise<ApiKey> {
+export async function createApiKey(name: string, _machineId?: string, userId?: string | null): Promise<ApiKey> {
   const id = randomUUID();
   const key = `sk-${randomUUID().replace(/-/g, "")}`;
   const now = new Date().toISOString();
   db().run(
-    "INSERT INTO api_keys (id, name, key, machine_id, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)",
-    [id, name, key, _machineId ?? null, now]
+    "INSERT INTO api_keys (id, name, key, machine_id, is_active, created_at, user_id) VALUES (?, ?, ?, ?, 1, ?, ?)",
+    [id, name, key, _machineId ?? null, now, userId ?? null]
   );
-  return { id, name, key, machineId: _machineId, isActive: true, createdAt: now };
+  return { id, name, key, machineId: _machineId, isActive: true, createdAt: now, userId: userId ?? null };
 }
 
 export async function updateApiKey(id: string, data: Partial<ApiKey>): Promise<ApiKey | null> {
@@ -439,41 +450,58 @@ export async function deleteApiKey(id: string): Promise<boolean> {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+export type UserRole = 'admin' | 'user';
+
 export interface User {
   id: string;
   username: string;
   passwordHash: string;
+  role: UserRole;
   createdAt?: string;
 }
 
-export async function createUser(username: string, passwordHash: string): Promise<User> {
+export async function getUsers(): Promise<Omit<User, 'passwordHash'>[]> {
+  return db()
+    .query<{ id: string; username: string; role: string; created_at: string }, []>(
+      "SELECT id, username, role, created_at FROM users"
+    )
+    .all()
+    .map(r => ({ id: r.id, username: r.username, role: (r.role ?? 'admin') as UserRole, createdAt: r.created_at }));
+}
+
+export async function createUser(username: string, passwordHash: string, role: UserRole = 'admin'): Promise<User> {
   const id = randomUUID();
   const now = new Date().toISOString();
   db().run(
-    "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
-    [id, username, passwordHash, now]
+    "INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
+    [id, username, passwordHash, role, now]
   );
-  return { id, username, passwordHash, createdAt: now };
+  return { id, username, passwordHash, role, createdAt: now };
+}
+
+export async function updateUserPassword(id: string, newHash: string): Promise<boolean> {
+  const result = db().run("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, id]);
+  return (result.changes ?? 0) > 0;
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
   const row = db()
-    .query<{ id: string; username: string; password_hash: string; created_at: string }, string>(
-      "SELECT id, username, password_hash, created_at FROM users WHERE username = ?"
+    .query<{ id: string; username: string; password_hash: string; role: string; created_at: string }, string>(
+      "SELECT id, username, password_hash, role, created_at FROM users WHERE username = ?"
     )
     .get(username);
   if (!row) return null;
-  return { id: row.id, username: row.username, passwordHash: row.password_hash, createdAt: row.created_at };
+  return { id: row.id, username: row.username, passwordHash: row.password_hash, role: (row.role ?? 'admin') as UserRole, createdAt: row.created_at };
 }
 
 export async function getUserById(id: string): Promise<User | null> {
   const row = db()
-    .query<{ id: string; username: string; password_hash: string; created_at: string }, string>(
-      "SELECT id, username, password_hash, created_at FROM users WHERE id = ?"
+    .query<{ id: string; username: string; password_hash: string; role: string; created_at: string }, string>(
+      "SELECT id, username, password_hash, role, created_at FROM users WHERE id = ?"
     )
     .get(id);
   if (!row) return null;
-  return { id: row.id, username: row.username, passwordHash: row.password_hash, createdAt: row.created_at };
+  return { id: row.id, username: row.username, passwordHash: row.password_hash, role: (row.role ?? 'admin') as UserRole, createdAt: row.created_at };
 }
 
 // ─── Sessions ──────────────────────────────────────────────────────────────────

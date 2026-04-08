@@ -1,5 +1,48 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
+// ─── Shared types ────────────────────────────────────────────────────────────────
+
+export interface ProviderCatalog {
+  color: string;
+  textIcon: string;
+  name: string;
+  website?: string;
+  notice?: { text: string; apiKeyUrl?: string };
+  deprecated?: boolean;
+  deprecationNotice?: string;
+}
+
+export interface CatalogResponse {
+  free: Record<string, ProviderCatalog>;
+  freeTier: Record<string, ProviderCatalog>;
+  apiKey: Record<string, ProviderCatalog>;
+}
+
+export interface ProviderNode {
+  id: string;
+  type?: string;
+  name?: string;
+  prefix?: string;
+  apiType?: string;
+  baseUrl?: string;
+}
+
+export interface ProviderConnection {
+  id: string;
+  provider: string;
+  name?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  priority?: number;
+  isActive?: boolean;
+  authType?: string;
+  testStatus?: string;
+  lastError?: string;
+  [key: string]: unknown;
+}
+
+// ─── Request helper ─────────────────────────────────────────────────────────────
+
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
@@ -43,23 +86,42 @@ export const api = {
         body: JSON.stringify({ username, password }),
       }),
     logout: () => request("/api/auth/logout", { method: "POST" }),
-    me: () => request<{ username: string }>("/api/auth/me"),
+    me: () => request<{ id: string; username: string; role: 'admin' | 'user' }>("/api/auth/me"),
   },
 
   // ─── Providers ─────────────────────────────────────────────────────────────
   providers: {
-    list:  () => request<{ connections: unknown[] }>("/api/providers"),
-    create: (data: unknown) => request("/api/providers", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: string, data: unknown) => request(`/api/providers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    remove: (id: string) => request(`/api/providers/${id}`, { method: "DELETE" }),
+    list:    () => request<{ connections: unknown[] }>("/api/providers"),
+    catalog: () => request<CatalogResponse>("/api/providers/catalog"),
+    nodes:   () => request<{ nodes: unknown[] }>("/api/provider-nodes"),
+    create:  (data: unknown) => request("/api/providers", { method: "POST", body: JSON.stringify(data) }),
+    update:  (id: string, data: unknown) => request(`/api/providers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove:  (id: string) => request(`/api/providers/${id}`, { method: "DELETE" }),
+  },
+
+  // ─── Provider Nodes ─────────────────────────────────────────────────────────
+  nodes: {
+    validate: (data: unknown) => request("/api/provider-nodes/validate", { method: "POST", body: JSON.stringify(data) }),
   },
 
   // ─── API Keys ─────────────────────────────────────────────────────────────
   keys: {
     list:    () => request<{ keys: unknown[] }>("/api/keys"),
-    create:  (name: string) => request("/api/keys", { method: "POST", body: JSON.stringify({ name }) }),
+    create:  (name: string, userId?: string | null) => request("/api/keys", { method: "POST", body: JSON.stringify({ name, ...(userId ? { userId } : {}) }) }),
     update:  (id: string, data: unknown) => request(`/api/keys/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove:  (id: string) => request(`/api/keys/${id}`, { method: "DELETE" }),
+  },
+
+  // ─── Users ────────────────────────────────────────────────────────────────
+  users: {
+    list: () => request<{ users: { id: string; username: string; role: string; createdAt: string }[] }>("/api/users"),
+    create: (username: string, password: string, role: string) =>
+      request<{ id: string; username: string; role: string; createdAt: string }>("/api/users", {
+        method: "POST",
+        body: JSON.stringify({ username, password, role }),
+      }),
+    changePassword: (id: string, password: string) =>
+      request(`/api/users/${id}/password`, { method: "PUT", body: JSON.stringify({ password }) }),
   },
 
   // ─── Usage ────────────────────────────────────────────────────────────────

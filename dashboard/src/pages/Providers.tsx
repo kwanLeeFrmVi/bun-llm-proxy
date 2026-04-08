@@ -1,596 +1,296 @@
-import { useState, useEffect, useMemo } from "react";
-import { api } from "@/lib/api.ts";
-import { Plus, Search, Star, Copy, Trash2, Pencil } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, CatalogResponse, ProviderNode, ProviderConnection } from "@/lib/api";
+import {
+  isOpenAICompatibleProvider,
+  isAnthropicCompatibleProvider,
+} from "@/constants/providers";
+import { ProviderCard } from "@/components/ProviderCard";
+import { AddOpenAICompatibleModal } from "@/components/AddOpenAICompatibleModal";
+import { AddAnthropicCompatibleModal } from "@/components/AddAnthropicCompatibleModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { PaginationControls } from "@/components/PaginationControls";
-import type { ProviderConnection } from "@/lib/types.ts";
+import { Plus, Play, Search } from "lucide-react";
+import { toast } from "sonner";
 
-const PAGE_SIZE = 10;
+// Fix the typo in import
+import { isOpenAICompatibleProvider as isOpenAICompatible, isAnthropicCompatibleProvider as isAnthropicCompatible } from "@/constants/providers";
 
-const PROVIDER_COLORS: Record<string, string> = {
-  openai: "#10a37f",
-  anthropic: "#d4a574",
-  google: "#4285f4",
-  azure: "#0078d4",
-  ollama: "#8b5cf6",
-  groq: "#f97316",
-  Claude: "#3b82f6",
-};
-
-function getProviderColor(p: string) {
-  return PROVIDER_COLORS[p.toLowerCase()] ?? "#64748b";
+interface ProviderStats {
+  connected: number;
+  error: number;
+  total: number;
 }
 
-function getInitials(provider: string) {
-  return provider.slice(0, 2).toUpperCase();
-}
+// Group type for provider sections
+type ProviderGroup = "oauth" | "free" | "freeTier" | "apiKey" | "compatible";
 
-function ProviderAvatar({ provider }: { provider: string }) {
-  const color = getProviderColor(provider);
+// ─── Section header ─────────────────────────────────────────────────────────────
+
+function SectionHeader({ title, testAllLoading, onTestAll }: {
+  title: string;
+  testAllLoading: boolean;
+  onTestAll: () => void;
+}) {
   return (
-    <span
-      className='inline-flex items-center justify-center w-7 h-7 rounded font-bold text-xs text-white shrink-0'
-      style={{ backgroundColor: color }}
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="text-sm font-semibold text-[--on-surface] tracking-wide">{title}</h2>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 px-2.5 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]"
+        onClick={onTestAll}
+        disabled={testAllLoading}
+      >
+        <Play className="w-3 h-3 mr-1" />
+        {testAllLoading ? "Testing..." : "Test All"}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Provider section card ──────────────────────────────────────────────────────
+
+function ProviderSection({ title, testAllLoading, onTestAll, children }: {
+  title: string;
+  testAllLoading: boolean;
+  onTestAll: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden"
     >
-      {getInitials(provider)}
-    </span>
+      <div className="px-5 py-3 border-b border-[rgba(203,213,225,0.4)]">
+        <SectionHeader title={title} testAllLoading={testAllLoading} onTestAll={onTestAll} />
+      </div>
+      <div className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function PriorityBadge({ priority }: { priority: number }) {
-  if (priority <= 1) {
-    return (
-      <span className='inline-flex items-center gap-1 text-xs font-semibold text-amber-600'>
-        <Star className='w-3 h-3 fill-amber-500 text-amber-500' /> Primary
-      </span>
-    );
-  }
-  if (priority <= 10) {
-    return (
-      <span className='text-sm text-[--on-surface-variant] font-medium'>
-        Secondary
-      </span>
-    );
-  }
+// ─── Loading skeleton ──────────────────────────────────────────────────────────
+
+function SkeletonCard() {
   return (
-    <span className='text-sm text-[--on-surface-variant] font-medium'>
-      Failover
-    </span>
+    <div className="h-[68px] rounded-xl border border-[rgba(203,213,225,0.4)] bg-[--surface-container-low] animate-pulse" />
   );
 }
 
-const cardStyle =
-  "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
-const cardHeaderStyle = "px-6 py-4 border-b border-[rgba(203,213,225,0.4)]";
-const primaryBtnStyle =
-  "h-10 px-5 rounded font-semibold text-sm tracking-wide bg-[#0F172A] text-white hover:bg-[#1e293b] transition-colors duration-150";
+// ─── Main page ─────────────────────────────────────────────────────────────────
 
-export default function Providers() {
+export default function ProvidersPage() {
+  const navigate = useNavigate();
+  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [connections, setConnections] = useState<ProviderConnection[]>([]);
+  const [nodes, setNodes] = useState<ProviderNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<ProviderConnection | null>(null);
+  const [testAllLoading, setTestAllLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const [form, setForm] = useState({
-    provider: "",
-    apiKey: "",
-    baseUrl: "",
-    priority: "100",
-  });
 
-  async function load() {
-    setLoading(true);
+  // Compatible modals
+  const [showOpenAICompat, setShowOpenAICompat] = useState(false);
+  const [showAnthropicCompat, setShowAnthropicCompat] = useState(false);
+
+  const fetchData = useCallback(async () => {
     try {
-      const data = (await api.providers.list()) as {
-        connections: ProviderConnection[];
-      };
-      setConnections(data.connections);
+      const [catRes, connRes, nodeRes] = await Promise.all([
+        api.providers.catalog(),
+        api.providers.list(),
+        api.providers.nodes(),
+      ]);
+      setCatalog(catRes as CatalogResponse);
+      setConnections(((connRes as { connections: ProviderConnection[] }).connections));
+      setNodes(((nodeRes as { nodes: ProviderNode[] }).nodes));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
+      console.error("Failed to load providers:", e);
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
 
-  // Reset page when search changes
   useEffect(() => {
-    setPage(0);
-  }, [search]);
+    fetchData();
+  }, [fetchData]);
 
-  async function handleSave() {
-    const payload: Record<string, unknown> = {
-      provider: form.provider,
-      priority: parseInt(form.priority),
-    };
-    if (form.apiKey) payload.apiKey = form.apiKey;
-    if (form.baseUrl) payload.baseUrl = form.baseUrl;
-
-    try {
-      if (editing) {
-        await api.providers.update(editing.id, payload);
-        toast.success("Provider updated");
-      } else {
-        await api.providers.create(payload);
-        toast.success("Provider created");
-      }
-      setShowModal(false);
-      setEditing(null);
-      setForm({ provider: "", apiKey: "", baseUrl: "", priority: "100" });
-      load();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Save failed";
-      setError(msg);
-      toast.error(msg);
-    }
+  // Compute stats per provider
+  function getStats(providerId: string): ProviderStats {
+    const conns = connections.filter(c => c.provider === providerId);
+    const active = conns.filter(c => (c.isActive !== false) && (c.testStatus === "active" || c.testStatus === "success"));
+    const error = conns.filter(c => (c.isActive !== false) && (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable"));
+    return { connected: active.length, error: error.length, total: conns.length };
   }
 
-  async function handleToggle(conn: ProviderConnection) {
-    try {
-      await api.providers.update(conn.id, { isActive: !conn.isActive });
-      toast.success(conn.isActive ? "Provider disabled" : "Provider enabled");
-      load();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Toggle failed";
-      setError(msg);
-      toast.error(msg);
-    }
+  // Toggle provider active state
+  async function handleToggleProvider(providerId: string, active: boolean) {
+    const conns = connections.filter(c => c.provider === providerId);
+    await Promise.allSettled(
+      conns.map(c => api.providers.update(c.id, { isActive: active }))
+    );
+    await fetchData();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this provider?")) return;
-    try {
-      await api.providers.remove(id);
-      toast.success("Provider deleted");
-      load();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Delete failed";
-      setError(msg);
-      toast.error(msg);
-    }
+  // Test all connections (stub)
+  async function handleTestAll() {
+    setTestAllLoading(true);
+    toast.info("Batch test not yet implemented");
+    setTimeout(() => setTestAllLoading(false), 500);
   }
 
-  function openEdit(conn: ProviderConnection) {
-    setEditing(conn);
-    setForm({
-      provider: conn.provider ?? "",
-      apiKey: (conn.apiKey as string) ?? "",
-      baseUrl: (conn.baseUrl as string) ?? "",
-      priority: String(conn.priority ?? 100),
-    });
-    setShowModal(true);
-  }
-
-  const filtered = connections.filter((c) =>
-    c.provider?.toLowerCase().includes(search.toLowerCase()),
+  // Toggle provider active state
+  const compatibleNodes = nodes.filter(n =>
+    isOpenAICompatible(n.id) || isAnthropicCompatible(n.id)
   );
 
-  const total = connections.length;
-  const active = connections.filter((c) => c.isActive).length;
-  const filteredTotal = filtered.length;
-  const totalPages = Math.ceil(filteredTotal / PAGE_SIZE);
-  const paged = useMemo(
-    () => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [filtered, page],
-  );
+  // OAuth/free providers (from free + freeTier)
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-16 skeleton rounded-xl animate-pulse" />
+        <div className="grid grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
-          Providers
-        </h1>
-        <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium'>
-          Manage and orchestrate LLM endpoint connections across your
-          infrastructure.
-        </p>
-      </div>
-
-      {/* Stat Cards */}
-      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-        <div className={cardStyle + " p-6"}>
-          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
-            Total Providers
-          </p>
-          <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
-            {total}
-          </p>
-          <p className='text-xs text-[--primary] mt-1'>+2 this month</p>
-        </div>
-        <div className={cardStyle + " p-6"}>
-          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
-            Active Providers
-          </p>
-          <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
-            {active}
-          </p>
-          <p className='text-xs text-[--on-surface-variant] mt-1'>
-            {total > 0 ? Math.round((active / total) * 100) : 0}% utilization
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]">
+            Providers
+          </h1>
+          <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 font-medium">
+            Manage your AI provider connections
           </p>
         </div>
-        <div className={cardStyle + " p-6 sm:col-span-2 lg:col-span-1"}>
-          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
-            System Health
-          </p>
-          <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
-            99.9%
-          </p>
-          <p className='text-xs text-[--on-surface-variant] mt-1'>
-            Average Latency: 240ms
-          </p>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--on-surface-variant]" />
+          <Input
+            placeholder="Search providers..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-9 w-52 pl-9 bg-[--surface-container-low] border border-[rgba(203,213,225,0.6)] rounded-lg text-sm"
+          />
         </div>
       </div>
 
-      {error && (
-        <Alert variant='destructive'>
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {/* OAuth & Free Tier */}
+      <ProviderSection title="OAuth Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+        {Object.entries(catalog?.free ?? {}).map(([id, meta]) => (
+          <ProviderCard
+            key={id}
+            providerId={id}
+            catalog={meta}
+            stats={getStats(id)}
+            authType="oauth"
+            onToggle={(active) => handleToggleProvider(id, active)}
+          />
+        ))}
+      </ProviderSection>
 
-      {/* Action Bar + Table */}
-      <div className={cardStyle}>
-        {/* Table Header Bar */}
-        <div className='px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[rgba(203,213,225,0.4)]'>
-          <div className='flex items-center gap-2 w-full sm:w-auto'>
-            <div className='relative flex-1 sm:flex-none'>
-              <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--on-surface-variant]' />
-              <Input
-                placeholder='Search providers...'
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className='pl-9 h-9 w-full sm:w-64 bg-[--surface-container-low] border border-[rgba(203,213,225,0.6)] rounded-lg text-sm focus:border-[--primary]'
-              />
-            </div>
-          </div>
-          <Button
-            className={primaryBtnStyle}
-            onClick={() => {
-              setEditing(null);
-              setForm({
-                provider: "",
-                apiKey: "",
-                baseUrl: "",
-                priority: "100",
-              });
-              setShowModal(true);
-            }}
-          >
-            <Plus className='h-4 w-4 mr-1' /> Add Provider
-          </Button>
-        </div>
+      {/* Free Tier */}
+      <ProviderSection title="Free &amp; Free Tier Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+        {Object.entries(catalog?.freeTier ?? {}).map(([id, meta]) => (
+          <ProviderCard
+            key={id}
+            providerId={id}
+            catalog={meta}
+            stats={getStats(id)}
+            authType="free"
+            onToggle={(active) => handleToggleProvider(id, active)}
+          />
+        ))}
+      </ProviderSection>
 
-        {loading ? (
-          <div className='p-12 text-center'>
-            <p className='text-[--on-surface-variant] text-sm'>Loading…</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className='p-12 text-center'>
-            <p className='text-[--on-surface-variant] text-sm'>
-              No providers found.
-            </p>
+      {/* API Key Providers */}
+      <ProviderSection title="API Key Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+        {Object.entries(catalog?.apiKey ?? {}).map(([id, meta]) => (
+          <ProviderCard
+            key={id}
+            providerId={id}
+            catalog={meta}
+            stats={getStats(id)}
+            authType="apikey"
+            onToggle={(active) => handleToggleProvider(id, active)}
+          />
+        ))}
+      </ProviderSection>
+
+      {/* API Key Compatible Providers */}
+      <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[--on-surface] tracking-wide">API Key Compatible Providers</h2>
+          <div className="flex gap-2">
             <Button
-              variant='outline'
-              className='mt-4'
-              onClick={() => setShowModal(true)}
+              size="sm"
+              className="h-7 px-3 text-xs font-medium bg-[#0F172A] text-white hover:bg-[#1e293b]"
+              onClick={() => setShowAnthropicCompat(true)}
             >
-              Add your first provider
+              <Plus className="w-3 h-3 mr-1" /> Add Anthropic Compatible
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface]"
+              onClick={() => setShowOpenAICompat(true)}
+            >
+              <Plus className="w-3 h-3 mr-1" /> Add OpenAI Compatible
             </Button>
           </div>
-        ) : (
-          <>
-            <Table stickyHeader>
-              <TableHeader>
-                <TableRow className='border-b border-[rgba(203,213,225,0.4)]'>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pl-6'>
-                    Provider
-                  </TableHead>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell'>
-                    Endpoint
-                  </TableHead>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell'>
-                    API Key
-                  </TableHead>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3'>
-                    Priority
-                  </TableHead>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3'>
-                    Status
-                  </TableHead>
-                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pr-6 text-right'>
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((c, i) => (
-                  <TableRow
-                    key={c.id}
-                    className={
-                      "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors" +
-                      ((page * PAGE_SIZE + i) % 2 === 1
-                        ? " bg-[--surface-container-low]/40"
-                        : "")
-                    }
-                  >
-                    {/* Provider */}
-                    <TableCell className='pl-6 py-4'>
-                      <div className='flex items-center gap-3'>
-                        <ProviderAvatar provider={c.provider ?? "?"} />
-                        <div>
-                          <p className='text-sm font-semibold text-[--on-surface] capitalize'>
-                            {c.provider}
-                          </p>
-                          <p className='text-xs text-[--on-surface-variant] mt-0.5 md:hidden'>
-                            {c.baseUrl
-                              ? String(c.baseUrl)
-                                  .replace(/^https?:\/\//, "")
-                                  .split("/")[0]
-                              : `${c.provider}.com`}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    {/* Endpoint — hidden on mobile */}
-                    <TableCell className='hidden md:table-cell'>
-                      <Badge className='bg-[--primary-fixed-dim] text-[--on-primary-fixed] font-normal text-xs px-2.5 py-0.5 rounded-full'>
-                        {String(c.baseUrl ?? c.provider ?? "")
-                          .replace(/^https?:\/\//, "")
-                          .split("/")[0] || c.provider}
-                      </Badge>
-                    </TableCell>
-
-                    {/* API Key — hidden on smaller screens */}
-                    <TableCell className='hidden lg:table-cell'>
-                      {c.apiKey ? (
-                        <span className='font-mono text-xs text-[--on-surface-variant]'>
-                          {"sk_••••••" + String(c.apiKey).slice(-4)}
-                        </span>
-                      ) : (
-                        <span className='inline-flex items-center gap-1 text-xs text-red-500 font-medium'>
-                          <span className='w-1.5 h-1.5 rounded-full bg-red-500 inline-block' />
-                          Expired
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Priority */}
-                    <TableCell>
-                      <PriorityBadge priority={Number(c.priority ?? 100)} />
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell>
-                      <Switch
-                        checked={!!c.isActive}
-                        onCheckedChange={() => handleToggle(c)}
-                      />
-                    </TableCell>
-
-                    {/* Actions */}
-                    <TableCell className='pr-6 text-right'>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        className='h-8 w-8 hover:bg-[--surface-container-low]'
-                        onClick={() => openEdit(c)}
-                      >
-                        <Pencil className='h-3.5 w-3.5 text-[--on-surface-variant]' />
-                      </Button>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        className='h-8 w-8 hover:bg-red-50'
-                        onClick={() => handleDelete(c.id)}
-                      >
-                        <Trash2 className='h-3.5 w-3.5 text-red-500' />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              total={filteredTotal}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-              label='PROVIDERS'
-            />
-          </>
-        )}
-      </div>
-
-      {/* Quick Integration Panel */}
-      <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
-        {/* Left: Quick Integration */}
-        <div className={cardStyle}>
-          <div className={cardHeaderStyle}>
-            <p className='text-sm font-semibold text-[--on-surface]'>
-              Quick Integration
-            </p>
-            <p className='text-xs text-[--on-surface-variant] mt-0.5'>
-              Start using this provider in minutes
-            </p>
-          </div>
-          <div className='p-4'>
-            <div className='bg-[#0F172A] text-green-400 rounded-lg p-4 font-mono text-xs leading-relaxed'>
-              <div className='flex items-center justify-between mb-2'>
-                <span className='text-blue-400'>bash</span>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='h-6 w-6'
-                  onClick={() => {
-                    const domain =
-                      import.meta.env.VITE_DOMAIN ?? "gateway.example.com";
-                    navigator.clipboard.writeText(
-                      `curl -X POST https://${domain}/v1/chat/completions \\\n  -H "Authorization: Bearer ${connections[0]?.apiKey ?? "<YOUR_KEY>"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`,
-                    );
-                    toast.success("Copied to clipboard");
-                  }}
-                >
-                  <Copy className='h-3 w-3 text-[--on-surface-variant]' />
-                </Button>
-              </div>
-              <pre className='text-[--on-surface-variant] whitespace-pre-wrap'>
-                {`curl -X POST https://${import.meta.env.VITE_DOMAIN ?? "gateway.example.com"}/v1/chat/completions \\
-  -H "Authorization: Bearer <YOUR_KEY>" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`}
-              </pre>
-            </div>
-          </div>
         </div>
 
-        {/* Right: Automated Routing */}
-        <div className={cardStyle}>
-          <div className={cardHeaderStyle}>
-            <p className='text-sm font-semibold text-[--on-surface]'>
-              Automated Routing
-            </p>
-            <p className='text-xs text-[--on-surface-variant] mt-0.5'>
-              Intelligent traffic distribution
-            </p>
-          </div>
-          <div className='p-6 flex flex-col justify-between h-full'>
-            <div>
-              <p className='text-sm text-[--on-surface] leading-relaxed'>
-                Automatically route requests across providers based on latency,
-                cost, and availability. Set fallback chains and priority rules
-                to ensure maximum uptime.
+        <div className="p-4">
+          {compatibleNodes.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-[rgba(203,213,225,0.4)] rounded-xl">
+              <p className="text-sm text-[--on-surface-variant]">No compatible providers yet</p>
+              <p className="text-xs text-[--on-surface-variant] mt-1">
+                Use the buttons above to add OpenAI or Anthropic compatible endpoints
               </p>
             </div>
-            <Button
-              className={primaryBtnStyle + " mt-4 self-start"}
-              variant='outline'
-            >
-              Configure Routing Rules
-              <span className='ml-2'>→</span>
-            </Button>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {compatibleNodes.map(node => (
+                <ProviderCard
+                  key={node.id}
+                  providerId={node.id}
+                  node={node}
+                  stats={getStats(node.id)}
+                  authType="apikey"
+                  onToggle={(active) => handleToggleProvider(node.id, active)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Dialog */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
-          <DialogHeader>
-            <DialogTitle className='font-headline text-lg font-bold'>
-              {editing ? "Edit Provider" : "Add Provider"}
-            </DialogTitle>
-            <DialogDescription className='text-sm text-[--on-surface-variant]'>
-              Configure your LLM provider connection
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className='space-y-4 py-2'>
-            <div className='space-y-1.5'>
-              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
-                Provider
-              </Label>
-              <Input
-                value={form.provider}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, provider: e.target.value }))
-                }
-                placeholder='e.g. openai'
-                className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]'
-              />
-            </div>
-            <div className='space-y-1.5'>
-              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
-                API Key
-              </Label>
-              <Input
-                type='password'
-                value={form.apiKey}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, apiKey: e.target.value }))
-                }
-                placeholder='sk-…'
-                className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]'
-              />
-            </div>
-            <div className='space-y-1.5'>
-              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
-                Base URL{" "}
-                <span className='font-normal normal-case tracking-normal text-[--on-surface-variant]'>
-                  (optional)
-                </span>
-              </Label>
-              <Input
-                value={form.baseUrl}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, baseUrl: e.target.value }))
-                }
-                placeholder='https://api.example.com'
-                className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]'
-              />
-            </div>
-            <div className='space-y-1.5'>
-              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
-                Priority
-              </Label>
-              <Input
-                type='number'
-                value={form.priority}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, priority: e.target.value }))
-                }
-                className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]'
-              />
-            </div>
-          </div>
-
-          <DialogFooter className='gap-2'>
-            <Button
-              variant='outline'
-              onClick={() => setShowModal(false)}
-              className='h-10 px-4 rounded font-medium text-sm'
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              className='h-10 px-5 rounded font-semibold text-sm bg-[#0F172A] text-white hover:bg-[#1e293b] transition-colors'
-            >
-              {editing ? "Save Changes" : "Add Provider"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modals */}
+      <AddOpenAICompatibleModal
+        isOpen={showOpenAICompat}
+        onClose={() => setShowOpenAICompat(false)}
+        onCreated={async (node: ProviderNode) => {
+          setShowOpenAICompat(false);
+          await fetchData();
+          navigate(`/providers/${encodeURIComponent(node.id)}`);
+        }}
+      />
+      <AddAnthropicCompatibleModal
+        isOpen={showAnthropicCompat}
+        onClose={() => setShowAnthropicCompat(false)}
+        onCreated={async (node: ProviderNode) => {
+          setShowAnthropicCompat(false);
+          await fetchData();
+          navigate(`/providers/${encodeURIComponent(node.id)}`);
+        }}
+      />
     </div>
   );
 }
