@@ -84,6 +84,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       const errorText = await upstream.text().catch(() => "");
       const errResult = handleUpstreamError(upstream.status, errorText);
       if (errResult) return errResult;
+      // For other non-ok statuses, return a generic error (don't continue to read body again)
+      return { success: false, status: upstream.status, error: errorText || `Upstream error: ${upstream.status}` };
     }
 
     if (stream) {

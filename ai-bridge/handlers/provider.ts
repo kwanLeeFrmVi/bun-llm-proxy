@@ -69,7 +69,9 @@ export function getTargetFormat(provider: string): string {
     case "gemini": case "gemini-cli": return FORMATS.GEMINI;
     case "ollama": return FORMATS.OLLAMA;
     case "antigravity": return FORMATS.ANTIGRAVITY;
-    default: return FORMATS.OPENAI;
+    default:
+      if (provider.startsWith("anthropic-compatible-")) return FORMATS.CLAUDE;
+      return FORMATS.OPENAI;
   }
 }
 
@@ -118,8 +120,22 @@ export function buildUpstreamUrl(
     case "kimi-coding":
       return `https://api.kimi.com/coding/v1/messages`;
 
-    default:
+    default: {
+      // Handle openai-compatible-* and anthropic-compatible-* providers
+      if (provider.startsWith("openai-compatible-")) {
+        const base = (psd?.baseUrl as string | undefined) ?? "https://api.openai.com";
+        // Strip trailing /v1 if present to avoid /v1/v1
+        const cleanBase = base.replace(/\/v1\/?$/, "");
+        return `${cleanBase}/v1/chat/completions`;
+      }
+      if (provider.startsWith("anthropic-compatible-")) {
+        const base = (psd?.baseUrl as string | undefined) ?? "https://api.anthropic.com";
+        // Strip trailing /v1 if present to avoid /v1/v1
+        const cleanBase = base.replace(/\/v1\/?$/, "");
+        return `${cleanBase}/v1/messages`;
+      }
       return "https://api.openai.com/v1/chat/completions";
+    }
   }
 }
 
@@ -164,6 +180,16 @@ export function buildUpstreamHeaders(
       break;
 
     default:
+      // Handle anthropic-compatible-* providers
+      if (provider.startsWith("anthropic-compatible-")) {
+        if (apiKey) {
+          headers["x-api-key"] = apiKey;
+        } else if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+        headers["Anthropic-Version"] = "2023-06-01";
+        break;
+      }
       headers["Authorization"] = `Bearer ${apiKey ?? accessToken ?? ""}`;
   }
 
