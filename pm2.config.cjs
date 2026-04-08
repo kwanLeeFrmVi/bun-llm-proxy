@@ -5,7 +5,7 @@ module.exports = {
     {
       name: "bunLLM-proxy",
       script: "index.ts",
-      interpreter: "bun",
+      interpreter: `${process.env.HOME}/.bun/bin/bun`,
       exec_mode: "fork",
       instances: isLinux ? 4 : 1,
       cwd: __dirname,
