@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api.ts";
 import { Box } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,13 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationControls } from "@/components/PaginationControls";
 
+const PAGE_SIZE = 20;
 const cardStyle = "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
 export default function Models() {
   const [models, setModels] = useState<{ id: string; created?: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     api.models
@@ -26,6 +29,13 @@ export default function Models() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, []);
+
+  const total = models.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paged = useMemo(
+    () => models.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [models, page],
+  );
 
   return (
     <div className="space-y-6">
@@ -72,7 +82,7 @@ export default function Models() {
             </div>
           </div>
 
-          <Table>
+          <Table stickyHeader>
             <TableHeader>
               <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
                 <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
@@ -87,7 +97,7 @@ export default function Models() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {models.map((m, i) => {
+              {paged.map((m, i) => {
                 // Extract provider from model ID if possible
                 const parts = m.id.split("/");
                 const provider = parts.length > 1 ? parts[0] : "—";
@@ -97,7 +107,7 @@ export default function Models() {
                     key={m.id}
                     className={
                       "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors" +
-                      (i % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
+                      ((page * PAGE_SIZE + i) % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
                     }
                   >
                     <TableCell className="pl-6 py-3">
@@ -120,6 +130,17 @@ export default function Models() {
               })}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && (
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              label="MODELS"
+            />
+          )}
         </div>
       )}
     </div>

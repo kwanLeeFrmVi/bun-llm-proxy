@@ -3,12 +3,16 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLTableElement> & { stickyHeader?: boolean }
+>(({ className, stickyHeader, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
     <table
       ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
+      className={cn(
+        "w-full caption-bottom text-sm min-w-[600px]",
+        stickyHeader && "[&_thead_tr]:sticky [&_thead_tr]:top-0 [&_thead_tr]:bg-[--surface-container-lowest] [&_thead_tr]:z-10",
+        className
+      )}
       {...props}
     />
   </div>

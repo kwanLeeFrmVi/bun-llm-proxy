@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api.ts";
 import { maskKey } from "@/lib/utils.ts";
 import { Plus, Trash2, Copy, Check, Key, Shield } from "lucide-react";
@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PaginationControls } from "@/components/PaginationControls";
 
 interface ApiKey {
   id: string;
@@ -33,6 +34,7 @@ interface ApiKey {
   createdAt?: string;
 }
 
+const PAGE_SIZE = 10;
 const cardStyle = "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 const primaryBtnStyle = "h-10 px-5 rounded font-semibold text-[14px] tracking-wide bg-[#0F172A] text-white hover:bg-[#1e293b] transition-colors duration-150";
 
@@ -61,6 +63,7 @@ export default function ApiKeys() {
   const [newlyCreated, setNewlyCreated] = useState<ApiKey | null>(null);
   const [copied, setCopied] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -77,6 +80,11 @@ export default function ApiKeys() {
   useEffect(() => {
     load();
   }, []);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -120,6 +128,13 @@ export default function ApiKeys() {
     k.name?.toLowerCase().includes(search.toLowerCase()),
   );
   const activeCount = keys.filter((k) => k.isActive).length;
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paged = useMemo(
+    () => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filtered, page],
+  );
 
   return (
     <div className="space-y-6">
@@ -178,15 +193,15 @@ export default function ApiKeys() {
       {/* Table */}
       <div className={cardStyle}>
         {/* Table Header Bar */}
-        <div className="px-6 py-4 flex items-center justify-between border-b border-[rgba(203,213,225,0.4)]">
-          <div className="flex items-center gap-2">
-            <div className="relative">
+        <div className="px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[rgba(203,213,225,0.4)]">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-none">
               <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--on-surface-variant]" />
               <Input
                 placeholder="Search keys..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 w-64 bg-[--surface-container-low] border border-[rgba(203,213,225,0.6)] rounded-lg text-sm focus:border-[--primary]"
+                className="pl-9 h-9 w-full sm:w-64 bg-[--surface-container-low] border border-[rgba(203,213,225,0.6)] rounded-lg text-sm focus:border-[--primary]"
               />
             </div>
           </div>
@@ -214,7 +229,7 @@ export default function ApiKeys() {
           </div>
         ) : (
           <>
-            <Table>
+            <Table stickyHeader>
               <TableHeader>
                 <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
@@ -223,10 +238,10 @@ export default function ApiKeys() {
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
                     Prefix
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell">
                     Created
                   </TableHead>
-                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell">
                     Last Used
                   </TableHead>
                   <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
@@ -238,12 +253,12 @@ export default function ApiKeys() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((k, i) => (
+                {paged.map((k, i) => (
                   <TableRow
                     key={k.id}
                     className={
                       "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors" +
-                      (i % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
+                      ((page * PAGE_SIZE + i) % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
                     }
                   >
                     <TableCell className="pl-6 py-4">
@@ -261,7 +276,7 @@ export default function ApiKeys() {
                         {maskKey(k.key ?? "")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-[13px] text-[--on-surface-variant]">
+                    <TableCell className="text-[13px] text-[--on-surface-variant] hidden md:table-cell">
                       {k.createdAt
                         ? new Date(k.createdAt).toLocaleDateString("en-US", {
                             month: "short",
@@ -270,7 +285,7 @@ export default function ApiKeys() {
                           })
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-[13px] text-[--on-surface-variant]">
+                    <TableCell className="text-[13px] text-[--on-surface-variant] hidden lg:table-cell">
                       2 mins ago
                     </TableCell>
                     <TableCell>
@@ -304,20 +319,14 @@ export default function ApiKeys() {
               </TableBody>
             </Table>
 
-            {/* Table Footer */}
-            <div className="px-6 py-3 border-t border-[rgba(203,213,225,0.4)] flex items-center justify-between">
-              <p className="text-[11px] text-[--on-surface-variant] font-medium tracking-wide">
-                SHOWING {filtered.length} OF {keys.length} KEYS
-              </p>
-              <div className="flex items-center gap-2">
-                <button className="text-[11px] text-[--on-surface-variant] hover:text-[--on-surface] font-medium px-2 py-1 rounded transition-colors disabled:opacity-40" disabled>
-                  Previous
-                </button>
-                <button className="text-[11px] text-[--on-surface-variant] hover:text-[--on-surface] font-medium px-2 py-1 rounded transition-colors disabled:opacity-40" disabled>
-                  Next
-                </button>
-              </div>
-            </div>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              label="KEYS"
+            />
           </>
         )}
       </div>

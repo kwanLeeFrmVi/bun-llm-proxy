@@ -4,7 +4,13 @@ import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { register } from "lib/routeRegistry";
 
 export async function GET(req: Request): Promise<Response> {
-  const auth = await checkAdminAuth(req);
+  // EventSource can't send Authorization headers — fall back to ?token= query param
+  const url = new URL(req.url);
+  const qToken = url.searchParams.get("token");
+  const authReq = qToken
+    ? new Request(req.url, { headers: { ...Object.fromEntries(req.headers), Authorization: `Bearer ${qToken}` } })
+    : req;
+  const auth = await checkAdminAuth(authReq);
   if (!auth.ok) return auth.response;
 
   let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
