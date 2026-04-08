@@ -234,54 +234,76 @@ function calculateCost(
 
 export function getUsageStats(period: string): UsageStats {
   const since = periodToTimestamp(period);
-  const where = since ? `WHERE timestamp >= '${since.replace(/'/g, "''")}'` : "";
-  const groupByProvider = `SELECT provider, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens FROM usage_log ${where} AND provider IS NOT NULL GROUP BY provider`;
-  const groupByModel    = `SELECT model,    COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens FROM usage_log ${where} AND model    IS NOT NULL GROUP BY model`;
-  const groupByApiKey   = `SELECT api_key_id, COUNT(*) as requests, SUM(cost) as cost FROM usage_log ${where} AND api_key_id IS NOT NULL GROUP BY api_key_id`;
+  const baseWhere = since ? `WHERE timestamp >= '${since.replace(/'/g, "''")}'` : "WHERE 1=1";
 
   const totals = db()
-    .query<{ cnt: number; pt: number; ct: number; c: number }, string>(
-      `SELECT COUNT(*) as cnt, COALESCE(SUM(prompt_tokens),0) as pt, COALESCE(SUM(completion_tokens),0) as ct, COALESCE(SUM(cost),0) as c FROM usage_log ${where}`
+    .query<{ cnt: number; pt: number; ct: number; c: number }, []>(
+      `SELECT COUNT(*) as cnt, COALESCE(SUM(prompt_tokens),0) as pt, COALESCE(SUM(completion_tokens),0) as ct, COALESCE(SUM(cost),0) as c FROM usage_log ${baseWhere === "WHERE 1=1" ? "" : baseWhere}`
     )
-    .get(where) ?? { cnt: 0, pt: 0, ct: 0, c: 0 };
+    .get() ?? { cnt: 0, pt: 0, ct: 0, c: 0 };
+
+  const baseFilter = since ? `timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
+
+  const byProvider = db().query<{ provider: string; requests: number; cost: number; tokens: number }, []>(
+    `SELECT provider, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
+     FROM usage_log WHERE ${baseFilter} AND provider IS NOT NULL GROUP BY provider ORDER BY cost DESC`
+  ).all();
+
+  const byModel = db().query<{ model: string; requests: number; cost: number; tokens: number }, []>(
+    `SELECT model, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
+     FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL GROUP BY model ORDER BY cost DESC`
+  ).all();
+
+  const byApiKeyRaw = db().query<{ api_key_id: string; requests: number; cost: number }, []>(
+    `SELECT api_key_id, COUNT(*) as requests, SUM(cost) as cost
+     FROM usage_log WHERE ${baseFilter} AND api_key_id IS NOT NULL GROUP BY api_key_id ORDER BY cost DESC`
+  ).all();
 
   return {
-    totalRequests:        totals.cnt,
-    totalPromptTokens:    totals.pt,
+    totalRequests:         totals.cnt,
+    totalPromptTokens:     totals.pt,
     totalCompletionTokens: totals.ct,
-    totalCost:            totals.c,
-    byProvider: db().query<{ provider: string; requests: number; cost: number; tokens: number }, []>(groupByProvider).all(),
-    byModel:    db().query<{ model: string;    requests: number; cost: number; tokens: number }, []>(groupByModel).all(),
-    byApiKey:   db().query<{ api_key_id: string; requests: number; cost: number }, []>(
-      groupByApiKey.replace("api_key_id", "api_key_id")
-    ).all().map((r: { api_key_id: string; requests: number; cost: number }) => ({
-      apiKeyId: r.api_key_id,
-      requests: r.requests,
-      cost: r.cost,
-    })),
+    totalCost:             totals.c,
+    byProvider,
+    byModel,
+    byApiKey: byApiKeyRaw.map(r => ({ apiKeyId: r.api_key_id, requests: r.requests, cost: r.cost })),
   };
 }
 
 export function getUsageDetails(opts: {
   page?: number;
   limit?: number;
+  offset?: number;
   provider?: string;
   model?: string;
+  apiKeyId?: string;
+  startDate?: string;
+  endDate?: string;
   period?: string;
 }): { rows: UsageRecord[]; total: number } {
-  const { page = 1, limit = 50, provider, model, period = "24h" } = opts;
-  const since = periodToTimestamp(period);
-  const conditions: string[] = [];
-  if (since) conditions.push(`timestamp >= '${since.replace(/'/g, "''")}'`);
-  if (provider) conditions.push(`provider = '${provider.replace(/'/g, "''")}'`);
-  if (model)    conditions.push(`model    = '${model.replace(/'/g, "''")}'`);
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const { page, limit = 50, provider, model, apiKeyId, startDate, endDate, period } = opts;
+  const offset = opts.offset ?? (page != null ? (page - 1) * limit : 0);
+
+  const conditions: string[] = ["status != 'pending'"];
+
+  // Date filtering: prefer startDate/endDate over period
+  if (startDate) conditions.push(`timestamp >= '${startDate.replace(/'/g, "''")}'`);
+  if (endDate)   conditions.push(`timestamp <= '${endDate.replace(/'/g, "''")}'`);
+  if (!startDate && !endDate && period) {
+    const since = periodToTimestamp(period);
+    if (since) conditions.push(`timestamp >= '${since.replace(/'/g, "''")}'`);
+  }
+
+  if (provider)  conditions.push(`provider  = '${provider.replace(/'/g, "''")}'`);
+  if (model)     conditions.push(`model     = '${model.replace(/'/g, "''")}'`);
+  if (apiKeyId)  conditions.push(`api_key_id = '${apiKeyId.replace(/'/g, "''")}'`);
+
+  const where = `WHERE ${conditions.join(" AND ")}`;
 
   const total = (db()
-    .query<{ cnt: number }, string>(`SELECT COUNT(*) as cnt FROM usage_log ${where}`)
-    .get(where) ?? { cnt: 0 }).cnt;
+    .query<{ cnt: number }, []>(`SELECT COUNT(*) as cnt FROM usage_log ${where}`)
+    .get() ?? { cnt: 0 }).cnt;
 
-  const offset = (page - 1) * limit;
   const rows = db()
     .query<{
       id: string; timestamp: string; endpoint: string; provider: string;

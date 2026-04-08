@@ -23,7 +23,7 @@ async function loadAllRoutes(dir: string): Promise<void> {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       await loadAllRoutes(full);
-    } else if (entry === "index.ts" || entry === "index.tsx") {
+    } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
       await import(`file://${full}`);
     }
   }

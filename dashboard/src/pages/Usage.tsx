@@ -1,16 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api.ts";
-import type { UsageStats } from "@/lib/types.ts";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Bar } from "react-chartjs-2";
+import type { UsageStats, UsageRecord, ApiKeyRecord } from "@/lib/types.ts";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -19,15 +11,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { NetworkGraph } from "@/components/NetworkGraph";
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+import { ChevronLeft, ChevronRight, ExternalLink, SlidersHorizontal, X } from "lucide-react";
 
 const PERIODS = ["24h", "7d", "30d", "all"] as const;
 type Period = (typeof PERIODS)[number];
 
-const cardStyle = "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
+const VIEW_OPTIONS = [
+  { value: "model", label: "Usage by Model" },
+  { value: "provider", label: "Usage by Provider" },
+  { value: "apikey", label: "Usage by API Key" },
+] as const;
+type ViewOption = (typeof VIEW_OPTIONS)[number]["value"];
+
+const cardStyle =
+  "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
@@ -35,29 +41,653 @@ function fmt(n: number): string {
   return String(n);
 }
 
-export default function Usage() {
-  const [period, setPeriod] = useState<Period>("24h");
-  const [stats, setStats] = useState<UsageStats | null>(null);
+function relTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const ok = status === "success" || status === "200";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+        ok
+          ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+          : "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`} />
+      {status}
+    </span>
+  );
+}
+
+// ─── Overview Tab ──────────────────────────────────────────────────────────────
+
+function OverviewTab({
+  period,
+  stats,
+  recentRows,
+  apiKeyMap,
+}: {
+  period: Period;
+  stats: UsageStats;
+  recentRows: UsageRecord[];
+  apiKeyMap: Map<string, string>;
+}) {
+  const s = stats;
+  const [view, setView] = useState<ViewOption>("model");
+
+  const tableRows = (() => {
+    if (view === "model")
+      return s.byModel.map((r) => ({
+        key: r.model,
+        label: r.model,
+        requests: r.requests,
+        tokens: r.tokens,
+        cost: r.cost,
+      }));
+    if (view === "provider")
+      return s.byProvider.map((r) => ({
+        key: r.provider,
+        label: r.provider,
+        requests: r.requests,
+        tokens: r.tokens ?? 0,
+        cost: r.cost,
+      }));
+    // apikey
+    return s.byApiKey.map((r) => ({
+      key: r.apiKeyId,
+      label: apiKeyMap.get(r.apiKeyId) ?? r.apiKeyId,
+      requests: r.requests,
+      tokens: 0,
+      cost: r.cost,
+    }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Stat Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className={cardStyle + " p-6"}>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
+            Total Requests
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            {fmt(s.totalRequests)}
+          </p>
+          <p className="text-xs text-[--on-surface-variant] mt-1">{period} window</p>
+        </div>
+        <div className={cardStyle + " p-6"}>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
+            Input Tokens
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--primary]">
+            {fmt(s.totalPromptTokens)}
+          </p>
+          <p className="text-xs text-[--on-surface-variant] mt-1">Prompt / context</p>
+        </div>
+        <div className={cardStyle + " p-6"}>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
+            Output Tokens
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            {fmt(s.totalCompletionTokens)}
+          </p>
+          <p className="text-xs text-[--on-surface-variant] mt-1">Generated output</p>
+        </div>
+        <div className={cardStyle + " p-6"}>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
+            Est. Cost
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            ~${s.totalCost.toFixed(2)}
+          </p>
+          <p className="text-xs text-[--on-surface-variant] mt-1">Estimated, not actual billing</p>
+        </div>
+      </div>
+
+      {/* Network Graph + Recent Requests */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Network Graph */}
+        <div className={cardStyle + " lg:col-span-3"}>
+          <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
+            <p className="text-sm font-semibold text-[--on-surface]">Token Traffic Orchestration</p>
+            <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
+              Aggregate usage across all active gateways
+            </p>
+          </div>
+          <NetworkGraph />
+        </div>
+
+        {/* Recent Requests */}
+        <div className={cardStyle + " lg:col-span-2 flex flex-col"}>
+          <div className="px-5 py-4 border-b border-[rgba(203,213,225,0.4)]">
+            <p className="text-sm font-semibold text-[--on-surface]">Recent Requests</p>
+            <p className="text-[11px] text-[--on-surface-variant] mt-0.5">Latest API activity</p>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-[rgba(203,213,225,0.25)] max-h-[380px]">
+            {recentRows.length === 0 ? (
+              <div className="p-6 text-center text-sm text-[--on-surface-variant]">
+                No recent requests
+              </div>
+            ) : (
+              recentRows.map((r) => (
+                <div
+                  key={r.id}
+                  className="px-5 py-3 hover:bg-[--surface-container-low]/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-mono font-medium text-[--on-surface] truncate">
+                        {r.model ?? "—"}
+                      </p>
+                      <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
+                        {r.provider ?? "—"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[12px] tabular-nums text-[--primary]">
+                        {r.promptTokens.toLocaleString()}↑{" "}
+                        <span className="text-[--on-surface-variant]">
+                          {r.completionTokens.toLocaleString()}↓
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
+                        {relTime(r.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Unified Usage Table with dropdown */}
+      <div className={cardStyle}>
+        <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-[--on-surface]">Usage Breakdown</p>
+            <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
+              Costs and requests grouped by dimension
+            </p>
+          </div>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as ViewOption)}
+            className="h-9 px-3 pr-8 text-[13px] font-medium rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary] cursor-pointer appearance-none"
+            style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+          >
+            {VIEW_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {tableRows.length === 0 ? (
+          <div className="p-10 text-center text-sm text-[--on-surface-variant]">No data for this period.</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
+                <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
+                  {view === "model" ? "Model" : view === "provider" ? "Provider" : "API Key"}
+                </TableHead>
+                <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                  Requests
+                </TableHead>
+                {view !== "apikey" && (
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                    Tokens
+                  </TableHead>
+                )}
+                <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right pr-6">
+                  Cost
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tableRows.map((r, i) => (
+                <TableRow
+                  key={r.key}
+                  className={
+                    "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors" +
+                    (i % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
+                  }
+                >
+                  <TableCell className="pl-6 py-3">
+                    <Badge variant="endpoint">{r.label}</Badge>
+                  </TableCell>
+                  <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                    {r.requests.toLocaleString()}
+                  </TableCell>
+                  {view !== "apikey" && (
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                      {fmt(r.tokens)}
+                    </TableCell>
+                  )}
+                  <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3 pr-6">
+                    ${r.cost.toFixed(4)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Details Tab ───────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20;
+
+function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
+  const [rows, setRows] = useState<UsageRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [selectedRow, setSelectedRow] = useState<UsageRecord | null>(null);
+
+  // Filters
+  const [provider, setProvider] = useState("");
+  const [apiKeyId, setApiKeyId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const load = useCallback(async (p: number) => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {
+        limit: String(PAGE_SIZE),
+        offset: String(p * PAGE_SIZE),
+      };
+      if (provider) params.provider = provider;
+      if (apiKeyId) params.apiKeyId = apiKeyId;
+      if (startDate) params.startDate = new Date(startDate).toISOString();
+      if (endDate) params.endDate = new Date(endDate).toISOString();
+
+      const data = (await api.usage.requestDetails(params)) as {
+        rows: UsageRecord[];
+        total: number;
+      };
+      setRows(data.rows ?? []);
+      setTotal(data.total ?? 0);
+    } catch {
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [provider, apiKeyId, startDate, endDate]);
+
+  useEffect(() => {
+    setPage(0);
+    load(0);
+  }, [load]);
+
+  function handlePage(next: number) {
+    setPage(next);
+    load(next);
+  }
+
+  function clearFilters() {
+    setProvider("");
+    setApiKeyId("");
+    setStartDate("");
+    setEndDate("");
+    setPage(0);
+  }
+
+  const hasFilters = provider || apiKeyId || startDate || endDate;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  return (
+    <div className="space-y-4">
+      {/* Filter Bar */}
+      <div className={cardStyle + " p-4"}>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1 min-w-[160px]">
+            <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
+              Provider
+            </label>
+            <input
+              type="text"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              placeholder="e.g. pro-x"
+              className="h-9 px-3 text-[13px] rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary] placeholder:text-[--on-surface-variant]/50"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-[180px]">
+            <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
+              API Key
+            </label>
+            <select
+              value={apiKeyId}
+              onChange={(e) => setApiKeyId(e.target.value)}
+              className="h-9 px-3 pr-8 text-[13px] rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary] appearance-none cursor-pointer"
+              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+            >
+              <option value="">All API Keys</option>
+              {Array.from(apiKeyMap.entries()).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
+              Start Date
+            </label>
+            <input
+              type="datetime-local"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-9 px-3 text-[13px] rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
+              End Date
+            </label>
+            <input
+              type="datetime-local"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="h-9 px-3 text-[13px] rounded-lg border border-[rgba(203,213,225,0.6)] bg-[--surface-container-low] text-[--on-surface] focus:outline-none focus:border-[--primary]"
+            />
+          </div>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="h-9 px-4 text-[13px] font-medium text-[--on-surface-variant] hover:text-[--on-surface] flex items-center gap-1.5 rounded-lg hover:bg-[--surface-container-low] transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Filters
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-[--on-surface-variant]" />
+            <span className="text-[13px] text-[--on-surface-variant]">
+              {total.toLocaleString()} records
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className={cardStyle}>
+        {loading ? (
+          <div className="p-12 text-center">
+            <p className="text-[--on-surface-variant] text-sm">Loading…</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-[--on-surface-variant] text-sm">No records found.</p>
+          </div>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
+                    Timestamp
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                    Model
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                    Provider
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                    API Key
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                    Input Tokens
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                    Output Tokens
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
+                    Cost
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                    Status
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3">
+                    Latency
+                  </TableHead>
+                  <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pr-6 text-right">
+                    Action
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r, i) => (
+                  <TableRow
+                    key={r.id}
+                    className={
+                      "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors cursor-pointer" +
+                      (i % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
+                    }
+                    onClick={() => setSelectedRow(r)}
+                  >
+                    <TableCell className="pl-6 py-3 text-[13px] text-[--on-surface-variant] whitespace-nowrap">
+                      {new Date(r.timestamp).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="endpoint">{r.model ?? "—"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-[13px] text-[--on-surface] py-3">
+                      {r.provider ?? "—"}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {r.apiKeyId ? (
+                        <Badge variant="secondary">
+                          {apiKeyMap.get(r.apiKeyId) ?? r.apiKeyId}
+                        </Badge>
+                      ) : (
+                        <span className="text-[13px] text-[--on-surface-variant]">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--primary] py-3">
+                      {r.promptTokens.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                      {r.completionTokens.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
+                      ${r.cost.toFixed(5)}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell className="text-[13px] text-[--on-surface-variant] py-3 whitespace-nowrap">
+                      {r.durationMs ? `${r.durationMs.toLocaleString()}ms` : "—"}
+                    </TableCell>
+                    <TableCell className="pr-6 text-right py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-3 text-[12px] font-medium rounded-md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedRow(r);
+                        }}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        Detail
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Pagination */}
+            <div className="px-6 py-3 border-t border-[rgba(203,213,225,0.4)] flex items-center justify-between">
+              <p className="text-[11px] text-[--on-surface-variant] font-medium tracking-wide">
+                SHOWING {page * PAGE_SIZE + 1}–
+                {Math.min((page + 1) * PAGE_SIZE, total)} OF{" "}
+                {total.toLocaleString()} RECORDS
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={page === 0}
+                  onClick={() => handlePage(page - 1)}
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[--on-surface-variant]" />
+                </button>
+                <span className="text-[12px] text-[--on-surface] font-medium px-2">
+                  {page + 1} / {totalPages || 1}
+                </span>
+                <button
+                  disabled={page + 1 >= totalPages}
+                  onClick={() => handlePage(page + 1)}
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4 text-[--on-surface-variant]" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Detail Dialog */}
+      <Dialog
+        open={!!selectedRow}
+        onOpenChange={(open) => !open && setSelectedRow(null)}
+      >
+        <DialogContent className="max-w-2xl bg-[--surface-container-lowest] border border-[rgba(203,213,225,0.6)]">
+          <DialogHeader>
+            <DialogTitle>Request Detail</DialogTitle>
+            <DialogDescription className="font-mono text-[12px]">
+              ID: {selectedRow?.id}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRow && (
+            <div className="space-y-4">
+              {/* Key-value grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["Timestamp", new Date(selectedRow.timestamp).toLocaleString()],
+                    ["Model", selectedRow.model ?? "—"],
+                    ["Provider", selectedRow.provider ?? "—"],
+                    [
+                      "API Key",
+                      selectedRow.apiKeyId
+                        ? apiKeyMap.get(selectedRow.apiKeyId) ?? selectedRow.apiKeyId
+                        : "—",
+                    ],
+                    ["Status", selectedRow.status],
+                    ["Duration", selectedRow.durationMs ? `${selectedRow.durationMs}ms` : "—"],
+                    ["Prompt Tokens", selectedRow.promptTokens.toLocaleString()],
+                    ["Completion Tokens", selectedRow.completionTokens.toLocaleString()],
+                    ["Reasoning Tokens", selectedRow.reasoningTokens?.toLocaleString() ?? "0"],
+                    ["Cached Tokens", selectedRow.cachedTokens?.toLocaleString() ?? "0"],
+                    ["Cost", `$${selectedRow.cost.toFixed(6)}`],
+                    ["Endpoint", selectedRow.endpoint ?? "—"],
+                  ] as [string, string][]
+                ).map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="bg-[--surface-container-low] rounded-lg p-3"
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant]">
+                      {label}
+                    </p>
+                    <p className="text-[13px] font-medium text-[--on-surface] mt-1 break-all">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Raw JSON */}
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[--on-surface-variant] mb-2">
+                  Raw JSON
+                </p>
+                <pre className="bg-[--surface-container-low] rounded-lg p-4 text-[11px] font-mono text-[--on-surface] overflow-auto max-h-56 whitespace-pre-wrap break-all">
+                  {JSON.stringify(selectedRow, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Root Component ────────────────────────────────────────────────────────────
+
+export default function Usage() {
+  const [period, setPeriod] = useState<Period>("7d");
+  const [stats, setStats] = useState<UsageStats | null>(null);
+  const [recentRows, setRecentRows] = useState<UsageRecord[]>([]);
+  const [apiKeyMap, setApiKeyMap] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
   const esRef = useRef<EventSource | null>(null);
 
-  const load = useCallback(async (p: Period) => {
+  const loadStats = useCallback(async (p: Period) => {
     setLoading(true);
     try {
       const data = (await api.usage.stats(p)) as UsageStats;
       setStats(data);
     } catch {
-      // silently fail, keep previous data
+      // silently fail
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const loadRecent = useCallback(async () => {
+    try {
+      const data = (await api.usage.requestDetails({ limit: "15", offset: "0" })) as {
+        rows: UsageRecord[];
+        total: number;
+      };
+      setRecentRows(data.rows ?? []);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  const loadApiKeys = useCallback(async () => {
+    try {
+      const data = (await api.keys.list()) as { keys: ApiKeyRecord[] };
+      const map = new Map<string, string>();
+      for (const k of data.keys ?? []) map.set(k.id, k.name);
+      setApiKeyMap(map);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
-    load(period);
-    const id = setInterval(() => load(period), 30_000);
+    loadStats(period);
+    const id = setInterval(() => loadStats(period), 30_000);
     return () => clearInterval(id);
-  }, [period, load]);
+  }, [period, loadStats]);
+
+  useEffect(() => {
+    loadRecent();
+    loadApiKeys();
+  }, [loadRecent, loadApiKeys]);
 
   useEffect(() => {
     const es = new EventSource("/api/usage/stream");
@@ -65,7 +695,8 @@ export default function Usage() {
     es.onmessage = (e) => {
       try {
         JSON.parse(e.data);
-        load(period);
+        loadStats(period);
+        loadRecent();
       } catch {
         /* heartbeat */
       }
@@ -74,14 +705,12 @@ export default function Usage() {
       es.close();
       esRef.current = null;
     };
-  }, [period, load]);
-
-  const s = stats;
+  }, [period, loadStats, loadRecent]);
 
   return (
     <div className="space-y-6">
-      {/* Header + Period Tabs */}
-      <div className="flex items-start justify-between">
+      {/* Page Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-headline text-3xl font-bold tracking-tight text-[--on-surface]">
             Usage
@@ -90,174 +719,60 @@ export default function Usage() {
             Monitor your API usage and token consumption
           </p>
         </div>
-        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <TabsList className="h-9 bg-[--surface-container-low] rounded-lg p-1">
-            {PERIODS.map((p) => (
-              <TabsTrigger
-                key={p}
-                value={p}
-                className="h-7 px-3 rounded text-[13px] font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
-              >
-                {p}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {/* Period selector — only relevant on Overview */}
+        {activeTab === "overview" && (
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <TabsList className="h-9 bg-[--surface-container-low] rounded-lg p-1">
+              {PERIODS.map((p) => (
+                <TabsTrigger
+                  key={p}
+                  value={p}
+                  className="h-7 px-3 rounded text-[13px] font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
+                >
+                  {p}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
-      {loading && !s && (
-        <div className="p-12 text-center">
-          <p className="text-[--on-surface-variant] text-sm">Loading…</p>
-        </div>
-      )}
+      {/* Overview / Details tab switcher */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="h-9 bg-[--surface-container-low] rounded-lg p-1">
+          <TabsTrigger
+            value="overview"
+            className="h-7 px-4 rounded text-[13px] font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="details"
+            className="h-7 px-4 rounded text-[13px] font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
+          >
+            Details
+          </TabsTrigger>
+        </TabsList>
 
-      {s && (
-        <>
-          {/* Summary Stat Cards */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className={cardStyle + " p-6"}>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
-                Requests
-              </p>
-              <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
-                {fmt(s.totalRequests)}
-              </p>
-              <p className="text-xs text-[--primary] mt-1">+12% vs last period</p>
+        <TabsContent value="overview" className="mt-6">
+          {loading && !stats ? (
+            <div className="p-12 text-center">
+              <p className="text-[--on-surface-variant] text-sm">Loading…</p>
             </div>
-            <div className={cardStyle + " p-6"}>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
-                Prompt Tokens
-              </p>
-              <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
-                {fmt(s.totalPromptTokens)}
-              </p>
-              <p className="text-xs text-[--on-surface-variant] mt-1">Input context</p>
-            </div>
-            <div className={cardStyle + " p-6"}>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
-                Completion Tokens
-              </p>
-              <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
-                {fmt(s.totalCompletionTokens)}
-              </p>
-              <p className="text-xs text-[--on-surface-variant] mt-1">Generated output</p>
-            </div>
-            <div className={cardStyle + " p-6"}>
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
-                Total Cost
-              </p>
-              <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
-                ${s.totalCost.toFixed(4)}
-              </p>
-              <p className="text-xs text-[--on-surface-variant] mt-1">Billed usage</p>
-            </div>
-          </div>
+          ) : stats ? (
+            <OverviewTab
+              period={period}
+              stats={stats}
+              recentRows={recentRows}
+              apiKeyMap={apiKeyMap}
+            />
+          ) : null}
+        </TabsContent>
 
-          {/* Network Graph */}
-          <div className={cardStyle}>
-            <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
-              <p className="text-sm font-semibold text-[--on-surface]">Token Traffic Orchestration</p>
-              <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
-                Aggregate usage across all active gateways
-              </p>
-            </div>
-            <div className="border-t">
-              <NetworkGraph />
-            </div>
-          </div>
-
-          {/* Cost by Provider Chart */}
-          {s.byProvider.length > 0 && (
-            <div className={cardStyle}>
-              <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
-                <p className="text-sm font-semibold text-[--on-surface]">Cost by Provider</p>
-                <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
-                  Breakdown of spend per provider
-                </p>
-              </div>
-              <div className="p-6">
-                <Bar
-                  data={{
-                    labels: s.byProvider.map((r) => r.provider),
-                    datasets: [
-                      {
-                        label: "Cost ($)",
-                        data: s.byProvider.map((r) => r.cost),
-                        backgroundColor: "#0053db",
-                        borderRadius: 6,
-                      },
-                    ],
-                  }}
-                  options={{
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      y: { beginAtZero: true },
-                      x: {
-                        grid: { display: false },
-                      },
-                    },
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* By-Model Table */}
-          {s.byModel.length > 0 && (
-            <div className={cardStyle}>
-              <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
-                <p className="text-sm font-semibold text-[--on-surface]">By Model</p>
-                <p className="text-[11px] text-[--on-surface-variant] mt-0.5">
-                  Usage statistics per model
-                </p>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
-                    <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6">
-                      Model
-                    </TableHead>
-                    <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
-                      Requests
-                    </TableHead>
-                    <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
-                      Tokens
-                    </TableHead>
-                    <TableHead className="uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 text-right">
-                      Cost
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {s.byModel.map((r, i) => (
-                    <TableRow
-                      key={r.model}
-                      className={
-                        "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors" +
-                        (i % 2 === 1 ? " bg-[--surface-container-low]/40" : "")
-                      }
-                    >
-                      <TableCell className="pl-6 py-3">
-                        <Badge variant="endpoint">{r.model}</Badge>
-                      </TableCell>
-                      <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
-                        {r.requests.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
-                        {fmt(r.tokens)}
-                      </TableCell>
-                      <TableCell className="text-[13px] text-right tabular-nums text-[--on-surface] py-3">
-                        ${r.cost.toFixed(4)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </>
-      )}
+        <TabsContent value="details" className="mt-6">
+          <DetailsTab apiKeyMap={apiKeyMap} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -9,12 +9,17 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const url = new URL(req.url);
+  const p = url.searchParams;
+
   const result = getUsageDetails({
-    page:     parseInt(url.searchParams.get("page")     ?? "1"),
-    limit:    parseInt(url.searchParams.get("limit")    ?? "50"),
-    provider: url.searchParams.get("provider")         ?? undefined,
-    model:    url.searchParams.get("model")            ?? undefined,
-    period:   url.searchParams.get("period")           ?? "24h",
+    limit:     parseInt(p.get("limit")     ?? "20"),
+    offset:    parseInt(p.get("offset")    ?? "0"),
+    provider:  p.get("provider")           ?? undefined,
+    model:     p.get("model")              ?? undefined,
+    apiKeyId:  p.get("apiKeyId")           ?? undefined,
+    startDate: p.get("startDate")          ?? undefined,
+    endDate:   p.get("endDate")            ?? undefined,
+    period:    p.get("period")             ?? undefined,
   });
 
   return Response.json(result, { headers: CORS_HEADERS });
