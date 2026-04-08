@@ -14,7 +14,7 @@ import {
 } from "./index.ts";
 import { KV_KEYS } from "./schema.ts";
 
-const dataDir = process.env.DATA_DIR ?? join(homedir(), ".9router");
+const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
 const dbJsonPath = join(dataDir, "db.json");
 
 const db = openDb();

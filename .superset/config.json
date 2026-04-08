@@ -1,0 +1,9 @@
+{
+  "setup": [
+    "bun install"
+  ],
+  "teardown": [
+    "pm2 delete pm2.config.js"
+  ],
+  "run": []
+}

@@ -11,7 +11,7 @@ let _db: Database | null = null;
 export function openDb(): Database {
   if (_db) return _db;
 
-  const dataDir = process.env.DATA_DIR ?? join(homedir(), ".9router");
+  const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
   const dbPath = join(dataDir, "router.db");
 
   _db = new Database(dbPath, { create: true });

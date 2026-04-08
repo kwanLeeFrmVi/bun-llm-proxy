@@ -1,4 +1,4 @@
-// Bun runtime entry point for 9router v1 API endpoints
+// Bun runtime entry point for v1 API endpoints
 import { initTranslators } from "./ai-bridge/translator/index.ts";
 import { openDb } from "./db/index.ts";
 import { initConsoleLogCapture } from "./lib/consoleLogBuffer.ts";

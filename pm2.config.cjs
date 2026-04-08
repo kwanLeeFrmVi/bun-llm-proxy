@@ -3,7 +3,7 @@ const isLinux = process.platform === "linux";
 module.exports = {
   apps: [
     {
-      name: "9router-bun",
+      name: "bunLLM-proxy",
       script: "index.ts",
       interpreter: "bun",
       exec_mode: "fork",
@@ -18,7 +18,7 @@ module.exports = {
       },
     },
     {
-      name: "9router-dashboard",
+      name: "bunLLM-dashboard",
       script: "node_modules/.bin/vite",
       args: "preview --port 20130",
       cwd: `${__dirname}/dashboard`,

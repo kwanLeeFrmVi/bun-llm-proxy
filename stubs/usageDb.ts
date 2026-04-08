@@ -16,7 +16,7 @@ function db(): Database {
   // biome-ignore end
   const { join } = require("node:path");
   const { homedir } = require("node:os");
-  const dataDir = process.env.DATA_DIR ?? join(homedir(), ".9router");
+  const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
   _db = new Database(join(dataDir, "router.db"));
   return _db;
 }
