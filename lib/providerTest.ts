@@ -466,7 +466,7 @@ async function testApiKeyConnection(
         valid = await testMiniMax(apiKey);
         error = valid ? null : "Invalid API key";
         break;
-      case "Claude-cn":
+      case "deepseek-cn":
         valid = await testClaudeCN(apiKey);
         error = valid ? null : "Invalid API key";
         break;
@@ -555,15 +555,51 @@ export async function testProviderConnection(id: string): Promise<TestResult> {
 
   let result: TestResult;
 
-  // For API key providers, test the key
-  if (connection.authType === "apikey" || connection.apiKey) {
+  // Check if connection has credentials to test
+  const hasApiKey = connection.authType === "apikey" || connection.apiKey;
+  const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
+  const hasOAuthToken = connection.accessToken || psd?.accessToken;
+
+  if (hasApiKey) {
+    // API key providers
     result = await testApiKeyConnection(connection);
+  } else if (hasOAuthToken) {
+    // OAuth providers - check if token exists and is not expired
+    const token = (connection.accessToken || psd?.accessToken) as string;
+    const expiresAt = (connection.expiresAt || psd?.expiresAt) as string | undefined;
+
+    // Check if token is expired
+    const isExpired = expiresAt ? new Date(expiresAt) <= new Date() : false;
+
+    if (isExpired) {
+      result = {
+        valid: false,
+        error: "Token expired. Please re-authorize.",
+        latencyMs: 0,
+        testedAt: new Date().toISOString(),
+      };
+    } else if (token) {
+      // For OAuth providers, we can't make API calls without proper OAuth test endpoints
+      // Just verify token exists and is not expired
+      result = {
+        valid: true,
+        error: null,
+        latencyMs: 0,
+        testedAt: new Date().toISOString(),
+      };
+    } else {
+      result = {
+        valid: false,
+        error: "No access token found. Please re-authorize.",
+        latencyMs: 0,
+        testedAt: new Date().toISOString(),
+      };
+    }
   } else {
-    // For OAuth providers, we can't test without the access token
-    // Just mark as unknown or skip
+    // No credentials to test
     result = {
       valid: false,
-      error: "OAuth providers cannot be tested via this endpoint",
+      error: "No credentials found. Please add an API key or authorize via OAuth.",
       latencyMs: 0,
       testedAt: new Date().toISOString(),
     };
