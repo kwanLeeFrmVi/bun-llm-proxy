@@ -1,4 +1,4 @@
-import { getApiKeyById, updateApiKey, deleteApiKey } from "@/lib/localDb";
+import { getApiKeyById, updateApiKey, deleteApiKey } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
@@ -29,6 +29,7 @@ export async function PUT(req: Request): Promise<Response> {
   const updated = await updateApiKey(id, {
     ...(body.name !== undefined && { name: body.name as string }),
     ...(body.isActive !== undefined && { isActive: body.isActive as boolean }),
+    ...(body.userId !== undefined && auth.role === "admin" && { userId: (body.userId as string | null) }),
   });
   return Response.json(updated, { headers: CORS_HEADERS });
 }

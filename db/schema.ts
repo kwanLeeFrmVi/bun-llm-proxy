@@ -39,7 +39,8 @@ export const CREATE_TABLES = `
     key        TEXT UNIQUE,
     machine_id TEXT,
     is_active  INTEGER DEFAULT 1,
-    created_at TEXT
+    created_at TEXT,
+    user_id    TEXT REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS kv (
@@ -51,6 +52,7 @@ export const CREATE_TABLES = `
     id            TEXT PRIMARY KEY,
     username      TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'admin',
     created_at    TEXT
   );
 

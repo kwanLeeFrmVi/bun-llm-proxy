@@ -504,6 +504,16 @@ export async function getUserById(id: string): Promise<User | null> {
   return { id: row.id, username: row.username, passwordHash: row.password_hash, role: (row.role ?? 'admin') as UserRole, createdAt: row.created_at };
 }
 
+export async function deleteUser(id: string): Promise<boolean> {
+  const db_ = db();
+  // Delete associated sessions and API keys first
+  db_.run("DELETE FROM sessions WHERE user_id = ?", [id]);
+  db_.run("UPDATE api_keys SET user_id = NULL WHERE user_id = ?", [id]); // or DELETE? Let's DELETE for full cleanup
+  db_.run("DELETE FROM api_keys WHERE user_id = ?", [id]);
+  const result = db_.run("DELETE FROM users WHERE id = ?", [id]);
+  return (result.changes ?? 0) > 0;
+}
+
 // ─── Sessions ──────────────────────────────────────────────────────────────────
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

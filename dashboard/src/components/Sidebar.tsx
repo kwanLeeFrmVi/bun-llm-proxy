@@ -1,15 +1,7 @@
 import { useAuth } from "@/lib/auth.tsx";
 import { NavLink } from "react-router-dom";
-import { Network, Key, BarChart2, Terminal, Box, LogOut } from "lucide-react";
+import { Network, Key, BarChart2, Terminal, Box, LogOut, Users, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const NAV = [
-  { to: "/providers", label: "Providers", Icon: Network },
-  { to: "/keys", label: "API Keys", Icon: Key },
-  { to: "/usage", label: "Usage", Icon: BarChart2 },
-  { to: "/logs", label: "Console", Icon: Terminal },
-  { to: "/models", label: "Models", Icon: Box },
-];
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,7 +9,17 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { username, logout } = useAuth();
+  const { username, role, logout } = useAuth();
+  const isAdmin = role === "admin";
+
+  const NAV = [
+    ...(isAdmin ? [{ to: "/providers", label: "Providers", Icon: Network }] : []),
+    { to: "/keys", label: "API Keys", Icon: Key },
+    { to: "/usage", label: "Usage", Icon: BarChart2 },
+    { to: "/logs", label: "Console", Icon: Terminal },
+    { to: "/models", label: "Models", Icon: Box },
+    ...(isAdmin ? [{ to: "/users", label: "Users", Icon: Users }] : []),
+  ];
 
   return (
     <aside
@@ -88,9 +90,39 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Footer */}
       <div className='pt-4 mt-4 bg-card/30 rounded-lg p-3'>
-        <div className='mb-1 px-1 text-xs text-muted-foreground truncate'>
-          {username && username !== "undefined" ? username : "Admin"}
+        <div className='mb-1 px-1 flex items-center gap-1.5'>
+          <span className='text-xs text-muted-foreground truncate'>
+            {username && username !== "undefined" ? username : "Admin"}
+          </span>
+          {role && (
+            <span className={cn(
+              "text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider",
+              role === "admin"
+                ? "bg-amber-100 text-amber-700"
+                : "bg-blue-100 text-blue-700"
+            )}>
+              {role}
+            </span>
+          )}
         </div>
+        {/* Change Password (base users only) */}
+        {role === "user" && (
+          <NavLink
+            to="/change-password"
+            onClick={() => { if (window.innerWidth < 1024) onClose(); }}
+            className={({ isActive }) =>
+              cn(
+                "flex w-full items-center gap-2 px-2 py-2 text-sm font-medium rounded-md transition-colors mb-1",
+                isActive
+                  ? "text-primary bg-card"
+                  : "text-muted-foreground hover:text-foreground"
+              )
+            }
+          >
+            <KeyRound className='h-4 w-4' />
+            Change Password
+          </NavLink>
+        )}
         <button
           onClick={logout}
           className='flex w-full items-center gap-2 px-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md transition-colors'

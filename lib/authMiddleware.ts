@@ -42,7 +42,7 @@ export async function checkAuth(request: Request): Promise<AuthResult> {
 }
 
 export type AdminAuthResult =
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; role: 'admin' | 'user' }
   | { ok: false; response: Response };
 
 /**
@@ -67,6 +67,6 @@ export async function checkAdminAuth(request: Request): Promise<AdminAuthResult>
     return { ok: false, response: Response.json({ error: "User not found" }, { status: 401 }) };
   }
 
-  log.debug("AUTH", `Session valid for user: ${user.username}`);
-  return { ok: true, userId: session.userId };
+  log.debug("AUTH", `Session valid for user: ${user.username} (role: ${user.role})`);
+  return { ok: true, userId: session.userId, role: user.role };
 }

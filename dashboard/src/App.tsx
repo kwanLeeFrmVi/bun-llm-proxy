@@ -4,15 +4,19 @@ import { useAuth } from "@/lib/auth.tsx";
 import Sidebar from "@/components/Sidebar.tsx";
 import Login from "@/pages/Login.tsx";
 import Providers from "@/pages/Providers.tsx";
+import ProviderDetail from "@/pages/ProviderDetail.tsx";
 import ApiKeys from "@/pages/ApiKeys.tsx";
 import Usage from "@/pages/Usage.tsx";
 import Logs from "@/pages/Logs.tsx";
 import Models from "@/pages/Models.tsx";
+import Users from "@/pages/Users.tsx";
+import ChangePassword from "@/pages/ChangePassword.tsx";
 import { Loader } from "@/components/Loader.tsx";
 
 function ProtectedLayout() {
-  const { token, loading } = useAuth();
+  const { token, role, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isAdmin = role === "admin";
 
   if (loading) return <Loader />;
   if (!token) return <Navigate to='/login' replace />;
@@ -52,12 +56,21 @@ function ProtectedLayout() {
           }}
         >
           <Routes>
-            <Route path='/' element={<Navigate to='/providers' replace />} />
-            <Route path='/providers' element={<Providers />} />
+            <Route path='/' element={<Navigate to={isAdmin ? '/providers' : '/keys'} replace />} />
+            {/* Admin-only routes */}
+            {isAdmin && <>
+              <Route path='/providers' element={<Providers />} />
+              <Route path='/providers/:providerId' element={<ProviderDetail />} />
+              <Route path='/users' element={<Users />} />
+            </>}
+            {/* Shared routes */}
             <Route path='/keys' element={<ApiKeys />} />
             <Route path='/usage' element={<Usage />} />
             <Route path='/logs' element={<Logs />} />
             <Route path='/models' element={<Models />} />
+            <Route path='/change-password' element={<ChangePassword />} />
+            {/* Catch-all: redirect to appropriate home */}
+            <Route path='*' element={<Navigate to={isAdmin ? '/providers' : '/keys'} replace />} />
           </Routes>
         </main>
       </div>

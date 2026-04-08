@@ -122,6 +122,7 @@ export const api = {
       }),
     changePassword: (id: string, password: string) =>
       request(`/api/users/${id}/password`, { method: "PUT", body: JSON.stringify({ password }) }),
+    remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
   },
 
   // ─── Usage ────────────────────────────────────────────────────────────────
