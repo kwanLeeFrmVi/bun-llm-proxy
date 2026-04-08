@@ -49,24 +49,24 @@ export function PaginationControls({
   }
 
   return (
-    <div className="px-6 py-3 border-t border-[rgba(203,213,225,0.4)] flex flex-col sm:flex-row items-center justify-between gap-3">
-      <p className="text-[11px] text-[--on-surface-variant] font-medium tracking-wide">
+    <div className='px-6 py-3 border-t border-[rgba(203,213,225,0.4)] flex flex-col sm:flex-row items-center justify-between gap-3'>
+      <p className='text-xs text-[--on-surface-variant] font-medium tracking-wide'>
         SHOWING {start}–{end} OF {total.toLocaleString()} {label}
       </p>
-      <div className="flex items-center gap-1">
+      <div className='flex items-center gap-1'>
         <button
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
-          className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className='h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
         >
-          <ChevronLeft className="w-4 h-4 text-[--on-surface-variant]" />
+          <ChevronLeft className='w-4 h-4 text-[--on-surface-variant]' />
         </button>
 
         {getPageNumbers().map((p, idx) =>
           p === "ellipsis" ? (
             <span
               key={`ellipsis-${idx}`}
-              className="h-7 w-7 flex items-center justify-center text-[12px] text-[--on-surface-variant]"
+              className='h-7 w-7 flex items-center justify-center text-xs text-[--on-surface-variant]'
             >
               …
             </span>
@@ -74,7 +74,7 @@ export function PaginationControls({
             <button
               key={p}
               onClick={() => onPageChange(p)}
-              className={`h-7 min-w-[28px] px-1 flex items-center justify-center rounded-md text-[12px] font-medium transition-colors ${
+              className={`h-7 min-w-[28px] px-1 flex items-center justify-center rounded-md text-xs font-medium transition-colors ${
                 p === page
                   ? "bg-[--primary] text-white"
                   : "text-[--on-surface-variant] hover:bg-[--surface-container-low]"
@@ -88,9 +88,9 @@ export function PaginationControls({
         <button
           disabled={page + 1 >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className='h-7 w-7 flex items-center justify-center rounded-md hover:bg-[--surface-container-low] disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
         >
-          <ChevronRight className="w-4 h-4 text-[--on-surface-variant]" />
+          <ChevronRight className='w-4 h-4 text-[--on-surface-variant]' />
         </button>
       </div>
     </div>

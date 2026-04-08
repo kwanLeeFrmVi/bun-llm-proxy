@@ -11,11 +11,42 @@ const NAV = [
   { to: "/models", label: "Models", Icon: Box },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { username, logout } = useAuth();
 
   return (
-    <aside className='flex w-64 flex-col bg-muted p-4'>
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-muted p-4 transition-transform duration-300 lg:relative lg:translate-x-0",
+        isOpen ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
+      {/* Close Button (Mobile) */}
+      <button
+        onClick={onClose}
+        className='lg:hidden absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground'
+      >
+        <svg
+          xmlns='http://www.w3.org/2000/svg'
+          width='20'
+          height='20'
+          viewBox='0 0 24 24'
+          fill='none'
+          stroke='currentColor'
+          strokeWidth='2'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+        >
+          <line x1='18' y1='6' x2='6' y2='18'></line>
+          <line x1='6' y1='6' x2='18' y2='18'></line>
+        </svg>
+      </button>
+
       {/* Logo */}
       <div className='flex items-center gap-3 px-2 mb-8'>
         <div className='flex items-center justify-center rounded-lg bg-blue-400/30 p-1 text-on-primary'>
@@ -25,7 +56,7 @@ export default function Sidebar() {
           <h1 className='font-headline font-bold text-lg text-foreground'>
             LLM Gateway
           </h1>
-          <p className='text-[10px] text-muted-foreground font-medium tracking-widest uppercase'>
+          <p className='text-xs text-muted-foreground font-medium tracking-widest uppercase'>
             Management Console
           </p>
         </div>
@@ -37,6 +68,9 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={() => {
+              if (window.innerWidth < 1024) onClose();
+            }}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
@@ -55,7 +89,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className='pt-4 mt-4 bg-card/30 rounded-lg p-3'>
         <div className='mb-1 px-1 text-xs text-muted-foreground truncate'>
-          {username ?? "Admin"}
+          {username && username !== "undefined" ? username : "Admin"}
         </div>
         <button
           onClick={logout}

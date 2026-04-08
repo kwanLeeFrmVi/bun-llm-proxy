@@ -7,30 +7,25 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-primary-container text-on-primary-container",
-        secondary:
-          "bg-secondary-container text-on-secondary-container",
-        destructive:
-          "bg-error-container text-on-error-container",
-        outline:
-          "ghost-border text-foreground",
+        default: "bg-primary-container text-on-primary-container",
+        secondary: "bg-secondary-container text-on-secondary-container",
+        destructive: "bg-error-container text-on-error-container",
+        outline: "ghost-border text-foreground",
         endpoint:
-          "bg-tertiary-container/10 text-tertiary-dim font-mono text-[10px] rounded-md px-2 py-1",
-        success:
-          "bg-tertiary-fixed-dim/10 text-tertiary-fixed-dim",
-        warning:
-          "bg-secondary-container text-secondary-dim",
+          "bg-tertiary-container/10 text-tertiary-dim font-mono text-xs rounded-md px-2 py-1",
+        success: "bg-tertiary-fixed-dim/10 text-tertiary-fixed-dim",
+        warning: "bg-secondary-container text-secondary-dim",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  }
+  },
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
