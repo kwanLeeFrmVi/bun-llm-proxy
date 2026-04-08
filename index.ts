@@ -55,7 +55,15 @@ const server = Bun.serve({
 
     // Serve dashboard SPA for all non-API routes
     if (!url.pathname.startsWith("/api") && !url.pathname.startsWith("/v1")) {
-      return new Response("hello world");
+      // Check for static files in dist root (logo.svg, etc.)
+      const staticFile = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
+      if (await staticFile.exists()) return new Response(staticFile);
+
+      // Fall back to index.html for SPA routing
+      const file = Bun.file(join(process.cwd(), "dashboard/dist/index.html"));
+      return new Response(file, {
+        headers: { "Content-Type": "text/html" }
+      });
     }
 
     return new Response("Not found", { status: 404 });

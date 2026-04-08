@@ -51,7 +51,7 @@ function ProviderAvatar({ provider }: { provider: string }) {
   const color = getProviderColor(provider);
   return (
     <span
-      className='inline-flex items-center justify-center w-7 h-7 rounded font-bold text-[10px] text-white shrink-0'
+      className='inline-flex items-center justify-center w-7 h-7 rounded font-bold text-xs text-white shrink-0'
       style={{ backgroundColor: color }}
     >
       {getInitials(provider)}
@@ -62,20 +62,20 @@ function ProviderAvatar({ provider }: { provider: string }) {
 function PriorityBadge({ priority }: { priority: number }) {
   if (priority <= 1) {
     return (
-      <span className='inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600'>
+      <span className='inline-flex items-center gap-1 text-xs font-semibold text-amber-600'>
         <Star className='w-3 h-3 fill-amber-500 text-amber-500' /> Primary
       </span>
     );
   }
   if (priority <= 10) {
     return (
-      <span className='text-[11px] text-[--on-surface-variant] font-medium'>
+      <span className='text-sm text-[--on-surface-variant] font-medium'>
         Secondary
       </span>
     );
   }
   return (
-    <span className='text-[11px] text-[--on-surface-variant] font-medium'>
+    <span className='text-sm text-[--on-surface-variant] font-medium'>
       Failover
     </span>
   );
@@ -85,7 +85,7 @@ const cardStyle =
   "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 const cardHeaderStyle = "px-6 py-4 border-b border-[rgba(203,213,225,0.4)]";
 const primaryBtnStyle =
-  "h-10 px-5 rounded font-semibold text-[14px] tracking-wide bg-[#0F172A] text-white hover:bg-[#1e293b] transition-colors duration-150";
+  "h-10 px-5 rounded font-semibold text-sm tracking-wide bg-[#0F172A] text-white hover:bg-[#1e293b] transition-colors duration-150";
 
 export default function Providers() {
   const [connections, setConnections] = useState<ProviderConnection[]>([]);
@@ -205,19 +205,19 @@ export default function Providers() {
     <div className='space-y-6'>
       {/* Header */}
       <div>
-        <h1 className='font-headline text-3xl font-bold tracking-tight text-[--on-surface]'>
+        <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
           Providers
         </h1>
-        <p className='text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1.5 font-medium'>
+        <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium'>
           Manage and orchestrate LLM endpoint connections across your
           infrastructure.
         </p>
       </div>
 
       {/* Stat Cards */}
-      <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
         <div className={cardStyle + " p-6"}>
-          <p className='text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
+          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
             Total Providers
           </p>
           <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
@@ -226,7 +226,7 @@ export default function Providers() {
           <p className='text-xs text-[--primary] mt-1'>+2 this month</p>
         </div>
         <div className={cardStyle + " p-6"}>
-          <p className='text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
+          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
             Active Providers
           </p>
           <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
@@ -236,8 +236,8 @@ export default function Providers() {
             {total > 0 ? Math.round((active / total) * 100) : 0}% utilization
           </p>
         </div>
-        <div className={cardStyle + " p-6"}>
-          <p className='text-[11px] uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
+        <div className={cardStyle + " p-6 sm:col-span-2 lg:col-span-1"}>
+          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold'>
             System Health
           </p>
           <p className='text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]'>
@@ -310,22 +310,22 @@ export default function Providers() {
             <Table stickyHeader>
               <TableHeader>
                 <TableRow className='border-b border-[rgba(203,213,225,0.4)]'>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pl-6'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pl-6'>
                     Provider
                   </TableHead>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell'>
                     Endpoint
                   </TableHead>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden lg:table-cell'>
                     API Key
                   </TableHead>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3'>
                     Priority
                   </TableHead>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3'>
                     Status
                   </TableHead>
-                  <TableHead className='uppercase text-[11px] tracking-[0.1em] font-semibold text-[--on-surface-variant] py-3 pr-6 text-right'>
+                  <TableHead className='uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pr-6 text-right'>
                     Actions
                   </TableHead>
                 </TableRow>
@@ -349,7 +349,7 @@ export default function Providers() {
                           <p className='text-sm font-semibold text-[--on-surface] capitalize'>
                             {c.provider}
                           </p>
-                          <p className='text-[11px] text-[--on-surface-variant] mt-0.5 md:hidden'>
+                          <p className='text-xs text-[--on-surface-variant] mt-0.5 md:hidden'>
                             {c.baseUrl
                               ? String(c.baseUrl)
                                   .replace(/^https?:\/\//, "")
@@ -362,7 +362,7 @@ export default function Providers() {
 
                     {/* Endpoint — hidden on mobile */}
                     <TableCell className='hidden md:table-cell'>
-                      <Badge className='bg-[--primary-fixed-dim] text-[--on-primary-fixed] font-normal text-[12px] px-2.5 py-0.5 rounded-full'>
+                      <Badge className='bg-[--primary-fixed-dim] text-[--on-primary-fixed] font-normal text-xs px-2.5 py-0.5 rounded-full'>
                         {String(c.baseUrl ?? c.provider ?? "")
                           .replace(/^https?:\/\//, "")
                           .split("/")[0] || c.provider}
@@ -372,11 +372,11 @@ export default function Providers() {
                     {/* API Key — hidden on smaller screens */}
                     <TableCell className='hidden lg:table-cell'>
                       {c.apiKey ? (
-                        <span className='font-mono text-[12px] text-[--on-surface-variant]'>
+                        <span className='font-mono text-xs text-[--on-surface-variant]'>
                           {"sk_••••••" + String(c.apiKey).slice(-4)}
                         </span>
                       ) : (
-                        <span className='inline-flex items-center gap-1 text-[12px] text-red-500 font-medium'>
+                        <span className='inline-flex items-center gap-1 text-xs text-red-500 font-medium'>
                           <span className='w-1.5 h-1.5 rounded-full bg-red-500 inline-block' />
                           Expired
                         </span>
@@ -440,12 +440,12 @@ export default function Providers() {
             <p className='text-sm font-semibold text-[--on-surface]'>
               Quick Integration
             </p>
-            <p className='text-[11px] text-[--on-surface-variant] mt-0.5'>
+            <p className='text-xs text-[--on-surface-variant] mt-0.5'>
               Start using this provider in minutes
             </p>
           </div>
           <div className='p-4'>
-            <div className='bg-[#0F172A] text-green-400 rounded-lg p-4 font-mono text-[12px] leading-relaxed'>
+            <div className='bg-[#0F172A] text-green-400 rounded-lg p-4 font-mono text-xs leading-relaxed'>
               <div className='flex items-center justify-between mb-2'>
                 <span className='text-blue-400'>bash</span>
                 <Button
@@ -453,8 +453,10 @@ export default function Providers() {
                   size='icon'
                   className='h-6 w-6'
                   onClick={() => {
+                    const domain =
+                      import.meta.env.VITE_DOMAIN ?? "gateway.example.com";
                     navigator.clipboard.writeText(
-                      `curl -X POST https://gateway.example.com/v1/chat/completions \\\n  -H "Authorization: Bearer ${connections[0]?.apiKey ?? "<YOUR_KEY>"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`,
+                      `curl -X POST https://${domain}/v1/chat/completions \\\n  -H "Authorization: Bearer ${connections[0]?.apiKey ?? "<YOUR_KEY>"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`,
                     );
                     toast.success("Copied to clipboard");
                   }}
@@ -463,7 +465,7 @@ export default function Providers() {
                 </Button>
               </div>
               <pre className='text-[--on-surface-variant] whitespace-pre-wrap'>
-                {`curl -X POST https://gateway.example.com/v1/chat/completions \\
+                {`curl -X POST https://${import.meta.env.VITE_DOMAIN ?? "gateway.example.com"}/v1/chat/completions \\
   -H "Authorization: Bearer <YOUR_KEY>" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`}
@@ -478,7 +480,7 @@ export default function Providers() {
             <p className='text-sm font-semibold text-[--on-surface]'>
               Automated Routing
             </p>
-            <p className='text-[11px] text-[--on-surface-variant] mt-0.5'>
+            <p className='text-xs text-[--on-surface-variant] mt-0.5'>
               Intelligent traffic distribution
             </p>
           </div>
@@ -515,7 +517,7 @@ export default function Providers() {
 
           <div className='space-y-4 py-2'>
             <div className='space-y-1.5'>
-              <Label className='text-[11px] uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
                 Provider
               </Label>
               <Input
@@ -528,7 +530,7 @@ export default function Providers() {
               />
             </div>
             <div className='space-y-1.5'>
-              <Label className='text-[11px] uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
                 API Key
               </Label>
               <Input
@@ -542,7 +544,7 @@ export default function Providers() {
               />
             </div>
             <div className='space-y-1.5'>
-              <Label className='text-[11px] uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
                 Base URL{" "}
                 <span className='font-normal normal-case tracking-normal text-[--on-surface-variant]'>
                   (optional)
@@ -558,7 +560,7 @@ export default function Providers() {
               />
             </div>
             <div className='space-y-1.5'>
-              <Label className='text-[11px] uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+              <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
                 Priority
               </Label>
               <Input
