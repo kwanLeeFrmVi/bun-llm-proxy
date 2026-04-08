@@ -5,11 +5,16 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot index.ts",
-    "start": "bun index.ts",
-    "migrate": "bun db/migrate.ts",
     "dev:dashboard": "bun --cwd dashboard dev",
+    "start": "bun index.ts",
+    "start:dashboard": "bun --cwd dashboard preview",
+    "migrate": "bun db/migrate.ts",
     "build:dashboard": "bun --cwd dashboard build",
-    "preview:dashboard": "bun --cwd dashboard preview"
+    "pm2:start": "pm2 start pm2.config.cjs",
+    "pm2:stop": "pm2 stop pm2.config.cjs",
+    "pm2:restart": "pm2 restart pm2.config.cjs",
+    "pm2:delete": "pm2 delete pm2.config.cjs",
+    "pm2:logs": "pm2 logs"
   },
   "dependencies": {
     "react": "^19.2.4",

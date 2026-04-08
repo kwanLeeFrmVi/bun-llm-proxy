@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { CREATE_TABLES, KV_KEYS, DEFAULT_SETTINGS } from "./schema.ts";
 
@@ -12,6 +13,7 @@ export function openDb(): Database {
   if (_db) return _db;
 
   const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
+  mkdirSync(dataDir, { recursive: true });
   const dbPath = join(dataDir, "router.db");
 
   _db = new Database(dbPath, { create: true });
