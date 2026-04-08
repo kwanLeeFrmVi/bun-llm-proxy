@@ -44,7 +44,7 @@ export async function getProviderCredentials(
     const providerId = resolveProviderId(provider);
     const connections = await getProviderConnections({ provider: providerId, isActive: true });
 
-    log.debug("AUTH", `${provider} | total connections: ${connections.length}, excludeIds: ${excludeSet.size > 0 ? [...excludeSet].join(",") : "none"}, model: ${model ?? "any"}`);
+    log.info("AUTH", `${provider} | total connections: ${connections.length}, excludeIds: ${excludeSet.size > 0 ? [...excludeSet].join(",") : "none"}, model: ${model ?? "any"}`);
 
     if (connections.length === 0) {
       log.warn("AUTH", `No credentials for ${provider}`);
@@ -57,7 +57,7 @@ export async function getProviderCredentials(
       return true;
     });
 
-    log.debug("AUTH", `${provider} | available: ${availableConnections.length}/${connections.length}`);
+    log.info("AUTH", `${provider} | available: ${availableConnections.length}/${connections.length}`);
     connections.forEach((c: Record<string, unknown>) => {
       const excluded = excludeSet.has(c.id as string);
       const locked = isModelLockActive(c, model);

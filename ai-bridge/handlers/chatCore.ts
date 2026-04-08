@@ -83,7 +83,11 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
 
   const headers = buildUpstreamHeaders(provider, credentials);
 
+  // Calculate message count for upstream logging
+  const messages = (body.messages as unknown[] | undefined)?.length ?? (body.input as unknown[] | undefined)?.length ?? 0;
+
   log?.debug?.("CHAT", `${provider.toUpperCase()} → ${upstreamUrl}`);
+  log?.info?.("REQUEST", `${provider.toUpperCase()} | ${model} | ${messages} msgs`);
 
   try {
     const upstream = await fetch(upstreamUrl, {

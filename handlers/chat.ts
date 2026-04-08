@@ -19,6 +19,9 @@ import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { getProjectIdForConnection } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
+import { FORMATS } from "../ai-bridge/translator/formats.ts";
+import { detectFormat } from "../ai-bridge/handlers/provider.ts";
+import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 
 /**
  * Handle chat completion request.
@@ -76,7 +79,13 @@ export async function handleChat(
     return handleComboModelFallback({
       body,
       models: comboModels,
-      handleSingleModel: (b: Record<string, unknown>, m: string) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
+      handleSingleModel: async (b: Record<string, unknown>, m: string) => {
+        const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey);
+        if (resp.ok) {
+          log.info("COMBO", `Model ${m} succeeded`);
+        }
+        return resp;
+      },
       log,
       comboName: modelStr,
       comboStrategy,
@@ -111,7 +120,13 @@ async function handleSingleModelChat(
       return handleComboModelFallback({
         body,
         models: comboModels,
-        handleSingleModel: (b: Record<string, unknown>, m: string) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId),
+        handleSingleModel: async (b: Record<string, unknown>, m: string) => {
+          const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId);
+          if (resp.ok) {
+            log.info("COMBO", `Model ${m} succeeded`);
+          }
+          return resp;
+        },
         log,
         comboName: modelStr,
         comboStrategy,
@@ -137,6 +152,7 @@ async function handleSingleModelChat(
     model,
     apiKeyId: apiKeyId ?? undefined,
   });
+  log.pending(provider, model);
 
   const userAgent = request?.headers?.get("user-agent") ?? "";
 
@@ -181,6 +197,16 @@ async function handleSingleModelChat(
 
     const chatSettings = await getSettings();
     const isStreaming = body.stream !== false;
+
+    // Log format detection
+    const sourceFormat = detectFormat(body);
+    const targetFormat = getTargetFormat(provider);
+    const isPassthrough = sourceFormat === targetFormat;
+    log.formatDetect(sourceFormat, targetFormat, isStreaming);
+    if (isPassthrough) {
+      log.passthrough(sourceFormat, targetFormat, "native lossless");
+    }
+
     const result = await handleChatCore({
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },
@@ -343,8 +369,9 @@ async function handleComboModelFallback(opts: ComboOptions): Promise<Response> {
 
   // fallback: try each model in order
   let lastError: string | null = null;
+  let attemptNumber = 1;
   for (const model of models) {
-    log.info("COMBO", `Fallback: trying ${model}`);
+    log.info("COMBO", `Trying model ${attemptNumber}/${models.length}: ${model}`);
     try {
       const resp = await handleSingleModel(body, model);
       if (resp.ok) return resp;
@@ -352,6 +379,7 @@ async function handleComboModelFallback(opts: ComboOptions): Promise<Response> {
     } catch (e) {
       lastError = `${model}: ${e instanceof Error ? e.message : String(e)}`;
     }
+    attemptNumber++;
   }
 
   return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {

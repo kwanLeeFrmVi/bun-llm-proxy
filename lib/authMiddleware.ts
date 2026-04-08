@@ -20,7 +20,7 @@ export async function checkAuth(request: Request): Promise<AuthResult> {
     const keyRecord = await getApiKeyByKey(apiKey);
     apiKeyId = (keyRecord?.id as string | undefined) ?? null;
     const keyName = (keyRecord?.name as string | undefined) ?? "unnamed";
-    log.debug("AUTH", `API Key: ${log.maskKey(apiKey)} (${keyName})`);
+    log.info("AUTH", `API Key: ${log.maskKey(apiKey)} (${keyName})`);
   } else {
     log.debug("AUTH", "No API key provided (local mode)");
   }

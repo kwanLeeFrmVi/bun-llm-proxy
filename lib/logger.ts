@@ -68,6 +68,18 @@ export function stream(event: string, data?: unknown): void {
   console.log(`[${formatTime()}] 🌊 [STREAM] ${event}${dataStr}`);
 }
 
+export function passthrough(from: string, to: string, mode: string): void {
+  console.log(`[${formatTime()}] 🔍 [PASSTHROUGH] ${from} → ${to} | ${mode}`);
+}
+
+export function pending(provider: string, model: string): void {
+  console.log(`[${formatTime()}] [PENDING] START | provider=${provider} | model=${model}`);
+}
+
+export function formatDetect(from: string, to: string, stream: boolean): void {
+  console.log(`[${formatTime()}] 🔍 [FORMAT] ${from} → ${to} | stream=${stream}`);
+}
+
 export function maskKey(key: string): string {
   if (!key || key.length < 8) return "***";
   return `${key.slice(0, 4)}...${key.slice(-4)}`;
