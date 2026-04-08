@@ -239,7 +239,7 @@ export async function clearAccountError(
  */
 export function extractApiKey(request: Request): string | null {
   const authHeader = request.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
     return authHeader.slice(7);
   }
   const xApiKey = request.headers.get("x-api-key");
