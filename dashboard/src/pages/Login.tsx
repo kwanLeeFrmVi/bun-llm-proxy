@@ -134,20 +134,8 @@ export default function Login() {
         >
           {/* Brand */}
           <div style={{ textAlign: "center", marginBottom: "40px" }}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "52px",
-                height: "52px",
-                borderRadius: "10px",
-                background: "#0F172A",
-                marginBottom: "20px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              }}
-            >
-              <Network style={{ color: "white", width: 26, height: 26 }} />
+            <div className='inline-flex items-center justify-center w-[52px] h-[52px] rounded-[10px] bg-[#0F172A] mb-5 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'>
+              <img src='/logo.svg' alt='LLM Gateway' className='h-14 w-14' />
             </div>
             <h1
               style={{

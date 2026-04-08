@@ -18,7 +18,13 @@ function ProtectedLayout() {
   return (
     <div className='flex h-screen bg-surface'>
       <Sidebar />
-      <main className='flex-1 overflow-auto p-8 bg-surface-container-low'>
+      <main
+        className="flex-1 overflow-auto p-8"
+        style={{
+          backgroundImage: "radial-gradient(circle at 2px 2px, #dde3e9 1px, transparent 0)",
+          backgroundSize: "32px 32px",
+        }}
+      >
         <Routes>
           <Route path='/' element={<Navigate to='/providers' replace />} />
           <Route path='/providers' element={<Providers />} />

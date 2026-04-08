@@ -18,8 +18,8 @@ export default function Sidebar() {
     <aside className='flex w-64 flex-col bg-muted p-4'>
       {/* Logo */}
       <div className='flex items-center gap-3 px-2 mb-8'>
-        <div className='flex h-10 w-10 items-center justify-center rounded-lg btn-gradient text-on-primary'>
-          <Network className='h-5 w-5' />
+        <div className='flex items-center justify-center rounded-lg bg-blue-400/30 p-1 text-on-primary'>
+          <img src='/logo.svg' alt='LLM Gateway' className='h-14 w-14' />
         </div>
         <div>
           <h1 className='font-headline font-bold text-lg text-foreground'>
