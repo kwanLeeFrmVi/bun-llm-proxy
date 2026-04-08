@@ -615,6 +615,7 @@ function ModelTile({
   onTest,
   isTesting,
   testStatus,
+  onDelete,
 }: {
   modelId: string;
   alias?: string;
@@ -623,6 +624,7 @@ function ModelTile({
   onTest?: () => void;
   isTesting?: boolean;
   testStatus?: TestStatus;
+  onDelete?: () => void;
 }) {
   const borderColor =
     testStatus === "ok"
@@ -680,6 +682,15 @@ function ModelTile({
           ) : (
             <Play className='w-3.5 h-3.5' />
           )}
+        </button>
+      )}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className='shrink-0 text-[--on-surface-variant] hover:text-red-500'
+          title='Delete model'
+        >
+          <Trash2 className='w-3.5 h-3.5' />
         </button>
       )}
       <button
@@ -995,24 +1006,24 @@ export default function ProviderDetail() {
       }
 
       // Construct full model path with provider alias (e.g., "nvidia/glm-5")
+      // Only add prefix if modelId doesn't already start with it
       const providerAlias = getProviderAlias(decodedId);
-      const fullModel = `${providerAlias}/${modelId}`;
+      const fullModel = modelId.startsWith(`${providerAlias}/`)
+        ? modelId
+        : `${providerAlias}/${modelId}`;
 
       const start = Date.now();
-      const res = await fetch(
-        `${window.location.origin}/api/v1/chat/completions`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model: fullModel,
-            max_tokens: 1,
-            stream: false,
-            messages: [{ role: "user", content: "hi" }],
-          }),
-          signal: AbortSignal.timeout(15000),
-        },
-      );
+      const res = await fetch(`${window.location.origin}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: fullModel,
+          max_tokens: 1,
+          stream: false,
+          messages: [{ role: "user", content: "hi" }],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
       const latencyMs = Date.now() - start;
 
       const data = await res.json().catch(() => null);
@@ -1042,6 +1053,13 @@ export default function ProviderDetail() {
     localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
     setShowAddModel(false);
     toast.success(`Model ${modelId} added`);
+  }
+
+  function handleDeleteCustomModel(modelId: string) {
+    const updated = customModels.filter((m) => m !== modelId);
+    setCustomModels(updated);
+    localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
+    toast.success(`Model ${modelId} deleted`);
   }
 
   if (loading) {
@@ -1326,6 +1344,7 @@ export default function ProviderDetail() {
                         }
                         isTesting={testingModelId === m}
                         testStatus={modelTestResults[m]}
+                        onDelete={() => handleDeleteCustomModel(m)}
                       />
                     ))}
                   </div>

@@ -43,7 +43,11 @@ export function detectFormat(body: Record<string, unknown> | null): string {
       }
       // Check for Claude image format
       const hasClaudeImage = (firstMsg.content as Array<Record<string, unknown>>).some(
-        c => c.type === "image" && (c as Record<string, unknown>).source?.type === "base64"
+        (c) => {
+          const content = c as Record<string, unknown>;
+          const source = content.source as Record<string, unknown> | undefined;
+          return content.type === "image" && source?.type === "base64";
+        }
       );
       if (hasClaudeImage) return FORMATS.CLAUDE;
       // Check for Claude tool format
@@ -119,6 +123,9 @@ export function buildUpstreamUrl(
     case "kilocode":
     case "kimi-coding":
       return `https://api.kimi.com/coding/v1/messages`;
+
+    case "nvidia":
+      return "https://integrate.api.nvidia.com/v1/chat/completions";
 
     default: {
       // Handle openai-compatible-* and anthropic-compatible-* providers
