@@ -19,7 +19,7 @@ async function request<T>(
 
   if (res.status === 401) {
     localStorage.removeItem("auth_token");
-    window.location.hash = "#/login";
+    window.location.href = "/login";
     throw new Error("Unauthorized");
   }
 

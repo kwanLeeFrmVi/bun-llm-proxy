@@ -19,8 +19,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("auth_token"));
-  const [username, setUsername] = useState<string | null>(() => localStorage.getItem("auth_username"));
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("auth_token"),
+  );
+  const [username, setUsername] = useState<string | null>(() =>
+    localStorage.getItem("auth_username"),
+  );
   const [loading, setLoading] = useState(false);
 
   const login = useCallback(async (u: string, p: string) => {
@@ -31,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("auth_username", res.username);
       setToken(res.token);
       setUsername(res.username);
-      window.location.hash = "#/";
+      window.location.href = "/";
     } finally {
       setLoading(false);
     }
@@ -43,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("auth_username");
     setToken(null);
     setUsername(null);
-    window.location.hash = "#/login";
+    window.location.href = "/login";
   }, []);
 
   return (

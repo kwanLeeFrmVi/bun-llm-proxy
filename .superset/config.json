@@ -6,7 +6,6 @@
     "pm2 delete pm2.config.cjs"
   ],
   "run": [
-    "bun run dev",
-    "bun run dev:dashboard"
+    "bun run dev"
   ]
 }

@@ -1,82 +1,245 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss";
 
+/* DESIGN.md: Orchestrator's Console Theme */
 @theme {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  /* Surface hierarchy (tonal layering, no borders) */
+  --color-background: var(--surface);
+  --color-foreground: var(--on-surface);
+  --color-card: var(--surface-container-lowest);
+  --color-card-foreground: var(--on-surface);
+  --color-popover: var(--surface-container-lowest);
+  --color-popover-foreground: var(--on-surface);
+
+  /* Primary - with gradient support */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+
+  /* Secondary */
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--on-secondary);
+
+  /* Muted (surface-container-low for zebra striping) */
+  --color-muted: var(--surface-container-low);
+  --color-muted-foreground: var(--on-surface-variant);
+
+  /* Accent */
+  --color-accent: var(--surface-container-high);
+  --color-accent-foreground: var(--on-surface);
+
+  /* Destructive */
+  --color-destructive: var(--error);
+  --color-destructive-foreground: var(--on-error);
+
+  /* Border & Input - use ghost borders (15% outline-variant) */
+  --color-border: var(--outline-variant);
+  --color-input: var(--surface-container-high);
+  --color-ring: var(--primary);
+
+  /* Radius - minimal (0.25rem default) */
+  --radius-lg: 0.5rem;
+  --radius-md: 0.25rem;
+  --radius-sm: 0.125rem;
+  --radius-full: 0.75rem;
+
+  /* Typography */
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
-    --radius: 0.5rem;
+    /* Surface colors (from template.html) */
+    --surface: #f7f9fb;
+    --surface-dim: #cfdce3;
+    --surface-bright: #f7f9fb;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #f0f4f7;
+    --surface-container: #e8eff3;
+    --surface-container-high: #e1e9ee;
+    --surface-container-highest: #d9e4ea;
+    --surface-tint: #0053db;
+    --surface-variant: #d9e4ea;
+
+    /* On-surface colors */
+    --on-surface: #2a3439;
+    --on-surface-variant: #566166;
+    --inverse-surface: #0b0f10;
+    --inverse-on-surface: #9a9d9f;
+
+    /* Primary */
+    --primary: #0053db;
+    --primary-dim: #0048c1;
+    --on-primary: #f8f7ff;
+    --primary-container: #dbe1ff;
+    --on-primary-container: #0048bf;
+    --primary-fixed: #dbe1ff;
+    --primary-fixed-dim: #c7d3ff;
+    --on-primary-fixed: #003798;
+    --on-primary-fixed-variant: #0050d4;
+
+    /* Secondary */
+    --secondary: #526074;
+    --secondary-dim: #465468;
+    --on-secondary: #f8f8ff;
+    --secondary-container: #d5e3fc;
+    --on-secondary-container: #455367;
+    --secondary-fixed: #d5e3fc;
+    --secondary-fixed-dim: #c7d5ed;
+    --on-secondary-fixed: #324053;
+    --on-secondary-fixed-variant: #4e5c71;
+
+    /* Tertiary */
+    --tertiary: #006592;
+    --tertiary-dim: #005980;
+    --on-tertiary: #f8f9ff;
+    --tertiary-container: #34b5fa;
+    --on-tertiary-container: #003047;
+    --tertiary-fixed: #34b5fa;
+    --tertiary-fixed-dim: #17a8ec;
+    --on-tertiary-fixed: #00121e;
+    --on-tertiary-fixed-variant: #003954;
+
+    /* Error */
+    --error: #9f403d;
+    --error-dim: #4e0309;
+    --on-error: #fff7f6;
+    --error-container: #fe8983;
+    --on-error-container: #752121;
+
+    /* Outline */
+    --outline: #717c82;
+    --outline-variant: #a9b4b9;
+
+    /* Background */
+    --background: #f7f9fb;
+    --on-background: #2a3439;
+
+    /* Inverse */
+    --inverse-primary: #618bff;
   }
 
   .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 7%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 217 91% 60%;
+    /* Dark mode - inverted surfaces */
+    --surface: #0b0f10;
+    --surface-dim: #0b0f10;
+    --surface-bright: #2a3439;
+    --surface-container-lowest: #151a1c;
+    --surface-container-low: #1a2022;
+    --surface-container: #1e2528;
+    --surface-container-high: #232a2d;
+    --surface-container-highest: #2a3439;
+    --surface-tint: #618bff;
+    --surface-variant: #2a3439;
+
+    --on-surface: #d9e4ea;
+    --on-surface-variant: #a9b4b9;
+    --inverse-surface: #f7f9fb;
+    --inverse-on-surface: #2a3439;
+
+    --primary: #618bff;
+    --primary-dim: #4a6fd9;
+    --on-primary: #001d5e;
+    --primary-container: #003d99;
+    --on-primary-container: #dbe1ff;
+
+    --secondary: #b8c5d9;
+    --on-secondary: #232d3b;
+    --secondary-container: #3a4654;
+    --on-secondary-container: #d5e3fc;
+
+    --tertiary: #17a8ec;
+    --on-tertiary: #00121e;
+    --tertiary-container: #004d6e;
+    --on-tertiary-container: #c2e8ff;
+
+    --error: #fe8983;
+    --on-error: #4e0309;
+    --error-container: #7f2d2a;
+    --on-error-container: #fe8983;
+
+    --outline: #8a959b;
+    --outline-variant: #566166;
+
+    --background: #0b0f10;
+    --on-background: #d9e4ea;
+
+    --inverse-primary: #0053db;
   }
 
   * {
-    border-color: hsl(var(--border));
+    border-color: color-mix(in srgb, var(--outline-variant) 15%, transparent);
   }
+
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--surface);
+    color: var(--on-surface);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headlines use Space Grotesk */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-headline);
+  }
+
+  /* Code/mono elements */
+  code,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Glassmorphism utility */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .glass-dark {
+    background: rgba(11, 15, 16, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Ghost border for focus states */
+  .ghost-border {
+    outline: 1px solid
+      color-mix(in srgb, var(--outline-variant) 15%, transparent);
+  }
+
+  .ghost-border-focus:focus {
+    outline: 1px solid var(--primary);
+    outline-offset: 0;
+  }
+
+  /* Ambient shadow for dropdowns */
+  .ambient-shadow {
+    box-shadow: 0 10px 30px rgba(42, 52, 57, 0.06);
+  }
+
+  /* Primary gradient button */
+  .btn-gradient {
+    background: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      var(--primary-dim) 100%
+    );
+  }
+
+  /* Inner glow for active states */
+  .inner-glow {
+    box-shadow: inset 0 0 0 2px
+      color-mix(in srgb, var(--primary-container) 50%, transparent);
   }
 }
