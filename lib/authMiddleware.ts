@@ -5,7 +5,7 @@ import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "./logger.ts";
 
 export type AuthResult =
-  | { ok: true; apiKey: string | null }
+  | { ok: true; apiKey: string | null; apiKeyId: string | null }
   | { ok: false; response: Response };
 
 /**
@@ -15,8 +15,10 @@ export type AuthResult =
 export async function checkAuth(request: Request): Promise<AuthResult> {
   const apiKey = extractApiKey(request);
 
+  let apiKeyId: string | null = null;
   if (request.headers.get("Authorization") && apiKey) {
     const keyRecord = await getApiKeyByKey(apiKey);
+    apiKeyId = (keyRecord?.id as string | undefined) ?? null;
     const keyName = (keyRecord?.name as string | undefined) ?? "unnamed";
     log.debug("AUTH", `API Key: ${log.maskKey(apiKey)} (${keyName})`);
   } else {
@@ -36,7 +38,7 @@ export async function checkAuth(request: Request): Promise<AuthResult> {
     }
   }
 
-  return { ok: true, apiKey };
+  return { ok: true, apiKey, apiKeyId };
 }
 
 export type AdminAuthResult =

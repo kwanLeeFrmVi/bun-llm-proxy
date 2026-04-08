@@ -18,7 +18,7 @@ import { detectFormatByEndpoint } from "../ai-bridge/translator/formats.ts";
 import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { getProjectIdForConnection } from "../services/tokenRefresh.ts";
-import { statsEmitter } from "../stubs/usageDb.ts";
+import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
 
 /**
  * Handle chat completion request.
@@ -57,6 +57,7 @@ export async function handleChat(
   const auth = await checkAuth(request);
   if (!auth.ok) return auth.response;
   const apiKey = auth.apiKey;
+  const apiKeyId = auth.apiKeyId;
 
   const settings = await getSettings();
 
@@ -82,7 +83,7 @@ export async function handleChat(
     });
   }
 
-  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, apiKeyId);
 }
 
 /**
@@ -93,7 +94,8 @@ async function handleSingleModelChat(
   modelStr: string,
   clientRawRequest: Record<string, unknown> | null = null,
   request: Request | null = null,
-  apiKey: string | null = null
+  apiKey: string | null = null,
+  apiKeyId: string | null = null
 ): Promise<Response> {
   const modelInfo = await getModelInfo(modelStr);
 
@@ -109,7 +111,7 @@ async function handleSingleModelChat(
       return handleComboModelFallback({
         body,
         models: comboModels,
-        handleSingleModel: (b: Record<string, unknown>, m: string) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
+        handleSingleModel: (b: Record<string, unknown>, m: string) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId),
         log,
         comboName: modelStr,
         comboStrategy,
@@ -127,6 +129,15 @@ async function handleSingleModelChat(
     log.info("ROUTING", `Provider: ${provider}, Model: ${model}`);
   }
 
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  trackPendingRequest(requestId, {
+    endpoint: request?.url ? new URL(request.url).pathname : undefined,
+    provider,
+    model,
+    apiKeyId: apiKeyId ?? undefined,
+  });
+
   const userAgent = request?.headers?.get("user-agent") ?? "";
 
   const excludeConnectionIds = new Set<string>();
@@ -142,13 +153,16 @@ async function handleSingleModelChat(
         const errorMsg = lastError ?? (creds.lastError as string | undefined) ?? "Unavailable";
         const status = lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
         log.warn("CHAT", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
+        appendRequestLog(requestId, "rate_limited");
         return unavailableResponse(status, `[${provider}/${model}] ${errorMsg}`, creds.retryAfter as string, creds.retryAfterHuman as string) as Response;
       }
       if (excludeConnectionIds.size === 0) {
         log.warn("AUTH", `No active credentials for provider: ${provider}`);
+        appendRequestLog(requestId, "no_credentials");
         return errorResponse(HTTP_STATUS.NOT_FOUND, `No active credentials for provider: ${provider}`) as Response;
       }
       log.warn("CHAT", "No more accounts available", { provider });
+      appendRequestLog(requestId, "unavailable");
       return errorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable") as Response;
     }
 
@@ -166,6 +180,7 @@ async function handleSingleModelChat(
     }
 
     const chatSettings = await getSettings();
+    const isStreaming = body.stream !== false;
     const result = await handleChatCore({
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },
@@ -187,11 +202,26 @@ async function handleSingleModelChat(
       },
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model);
-        statsEmitter.emit("usage", { provider, model, connectionId: creds.connectionId });
+      },
+      onUsage: async (usage) => {
+        if (!isStreaming) {
+          // For non-streaming, save usage immediately
+          await saveRequestUsage(requestId, {
+            ...usage,
+            provider,
+            model,
+          }, Date.now() - startTime);
+        }
+        // For streaming, usage is saved by wrapStreamingResponse after the stream ends
       },
     }) as { success: boolean; response: Response; status: number; error: string };
 
-    if (result.success) return result.response;
+    if (result.success) {
+      if (isStreaming) {
+        return wrapStreamingResponse(result.response, requestId, provider, model, startTime);
+      }
+      return result.response;
+    }
 
     const { shouldFallback } = await markAccountUnavailable(
       creds.connectionId as string,
@@ -209,8 +239,79 @@ async function handleSingleModelChat(
       continue;
     }
 
+    appendRequestLog(requestId, `error_${result.status}`);
     return result.response;
   }
+}
+
+/**
+ * Wrap a streaming Response to intercept SSE chunks, parse usage data,
+ * and call saveRequestUsage when the stream completes or errors.
+ */
+function wrapStreamingResponse(
+  response: Response,
+  requestId: string,
+  provider: string,
+  model: string,
+  startTime: number
+): Response {
+  if (!response.body) return response;
+
+  const originalBody = response.body;
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = originalBody.getReader();
+      let finalUsage: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        reasoning_tokens?: number;
+        cached_tokens?: number;
+      } | null = null;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // Parse SSE chunks for usage data
+          const text = new TextDecoder().decode(value);
+          for (const line of text.split("\n")) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.usage) {
+                  finalUsage = {
+                    prompt_tokens: data.usage.prompt_tokens ?? data.usage.input_tokens,
+                    completion_tokens: data.usage.completion_tokens ?? data.usage.output_tokens,
+                    reasoning_tokens: data.usage.reasoning_tokens ?? data.usage.thinking_tokens,
+                    cached_tokens: data.usage.prompt_tokens_details?.cached_tokens,
+                  };
+                }
+              } catch { /* skip non-JSON SSE lines */ }
+            }
+          }
+
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      } finally {
+        reader.releaseLock();
+        const durationMs = Date.now() - startTime;
+        saveRequestUsage(requestId, {
+          ...(finalUsage ?? {}),
+          provider,
+          model,
+        }, durationMs).catch(() => {});
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: response.status,
+    headers: response.headers,
+  });
 }
 
 // ─── Combo model fallback ───────────────────────────────────────────────────────

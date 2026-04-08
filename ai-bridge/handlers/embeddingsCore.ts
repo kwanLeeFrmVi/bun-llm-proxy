@@ -14,6 +14,10 @@ export interface EmbeddingsCoreOptions {
   };
   onCredentialsRefreshed?: (creds: Record<string, unknown>) => Promise<void>;
   onRequestSuccess?: () => Promise<void>;
+  onUsage?: (usage: {
+    prompt_tokens?: number;
+    cached_tokens?: number;
+  }) => Promise<void>;
 }
 
 export interface EmbeddingsCoreResult {
@@ -60,8 +64,15 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
     }
 
     const responseBody = await upstream.text();
+    let embeddingsUsage: { prompt_tokens?: number; cached_tokens?: number } = {};
     try {
-      JSON.parse(responseBody);
+      const parsed = JSON.parse(responseBody);
+      if (parsed.usage) {
+        embeddingsUsage = {
+          prompt_tokens: parsed.usage.prompt_tokens ?? parsed.usage.total_tokens,
+          cached_tokens: parsed.usage.prompt_tokens_details?.cached_tokens,
+        };
+      }
     } catch {
       log?.error?.("EMBED", "Provider response is not valid JSON");
       return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: "Provider response is not valid JSON" };
@@ -72,6 +83,7 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
     });
 
     opts.onRequestSuccess?.().catch(() => {});
+    opts.onUsage?.(embeddingsUsage).catch(() => {});
     return { success: true, response };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -14,6 +14,7 @@ import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts"
 import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
+import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
 
 /**
  * Handle embeddings request.
@@ -35,6 +36,7 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
 
   const auth = await checkAuth(request);
   if (!auth.ok) return auth.response;
+  const apiKeyId = auth.apiKeyId;
 
   if (!modelStr) {
     log.warn("EMBEDDINGS", "Missing model");
@@ -53,6 +55,15 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
   }
 
   const { provider, model } = modelInfo as { provider: string; model: string };
+
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  trackPendingRequest(requestId, {
+    endpoint: url.pathname,
+    provider,
+    model,
+    apiKeyId: apiKeyId ?? undefined,
+  });
 
   if (modelStr !== `${provider}/${model}`) {
     log.info("ROUTING", `${modelStr} → ${provider}/${model}`);
@@ -73,13 +84,16 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
         const errorMsg = lastError ?? (creds.lastError as string | undefined) ?? "Unavailable";
         const status = lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
         log.warn("EMBEDDINGS", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
+        appendRequestLog(requestId, "rate_limited");
         return unavailableResponse(status, `[${provider}/${model}] ${errorMsg}`, creds.retryAfter as string, creds.retryAfterHuman as string) as Response;
       }
       if (excludeConnectionIds.size === 0) {
         log.error("AUTH", `No credentials for provider: ${provider}`);
+        appendRequestLog(requestId, "no_credentials");
         return errorResponse(HTTP_STATUS.BAD_REQUEST, `No credentials for provider: ${provider}`) as Response;
       }
       log.warn("EMBEDDINGS", "No more accounts available", { provider });
+      appendRequestLog(requestId, "unavailable");
       return errorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable") as Response;
     }
 
@@ -104,6 +118,13 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model);
       },
+      onUsage: async (usage) => {
+        await saveRequestUsage(requestId, {
+          ...usage,
+          provider,
+          model,
+        }, Date.now() - startTime);
+      },
     }) as { success: boolean; response: Response; status: number; error: string };
 
     if (result.success) return result.response;
@@ -124,6 +145,7 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       continue;
     }
 
+    appendRequestLog(requestId, `error_${result.status}`);
     return result.response;
   }
 }

@@ -25,6 +25,12 @@ export interface ChatCoreOptions {
   onCredentialsRefreshed?: (creds: Record<string, unknown>) => Promise<void>;
   onRequestSuccess?: () => Promise<void>;
   onDisconnect?: (reason: string) => void;
+  onUsage?: (usage: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    reasoning_tokens?: number;
+    cached_tokens?: number;
+  }) => Promise<void>;
 }
 
 export interface ChatCoreResult {
@@ -32,6 +38,12 @@ export interface ChatCoreResult {
   response?: Response;
   status?: number;
   error?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    reasoning_tokens?: number;
+    cached_tokens?: number;
+  };
 }
 
 const STREAM_PROVIDERS = new Set(["openai", "codex"]);
@@ -98,12 +110,32 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         ? ResponseNonStream(targetFormat, sourceFormat, null, model, translatedBytes, translatedBytes, new TextEncoder().encode(responseBody))
         : new TextEncoder().encode(responseBody);
 
+      // Extract usage from non-streaming response
+      let usageData: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        reasoning_tokens?: number;
+        cached_tokens?: number;
+      } = {};
+      try {
+        const parsed = JSON.parse(responseBody);
+        if (parsed.usage) {
+          usageData = {
+            prompt_tokens: parsed.usage.prompt_tokens ?? parsed.usage.input_tokens,
+            completion_tokens: parsed.usage.completion_tokens ?? parsed.usage.output_tokens,
+            reasoning_tokens: parsed.usage.reasoning_tokens ?? parsed.usage.thinking_tokens,
+            cached_tokens: parsed.usage.prompt_tokens_details?.cached_tokens,
+          };
+        }
+      } catch { /* non-JSON response, skip usage */ }
+
       const response = new globalThis.Response(translated, {
         status: upstream.status || 200,
         headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       });
 
       opts.onRequestSuccess?.().catch(() => {});
+      opts.onUsage?.(usageData).catch(() => {});
       return { success: true, response };
     }
   } catch (err) {
