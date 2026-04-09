@@ -149,7 +149,7 @@ export function ModelTable({
               >
                 <TableCell style={{ padding: "12px 24px" }}>
                   <Badge variant='endpoint'>{m.model}</Badge>
-                  {share > 15 && (
+                  {share > 1 && (
                     <div
                       style={{
                         marginTop: "6px",

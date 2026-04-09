@@ -1,19 +1,19 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/lib/auth.tsx";
-import Sidebar from "@/components/Sidebar.tsx";
-import Login from "@/pages/Login.tsx";
-import Providers from "@/pages/Providers.tsx";
+import { useAuth } from "@/lib/auth";
+import Sidebar from "@/components/Sidebar";
+import Login from "@/pages/Login";
+import Providers from "@/pages/Providers";
 import ProviderDetail from "@/pages/ProviderDetail";
-import ApiKeys from "@/pages/ApiKeys.tsx";
-import Usage from "@/pages/Usage.tsx";
-import MavisUsage from "@/pages/MavisUsage.tsx";
-import Logs from "@/pages/Logs.tsx";
-import Models from "@/pages/Models.tsx";
-import Users from "@/pages/Users.tsx";
-import ChangePassword from "@/pages/ChangePassword.tsx";
-import OAuthCallback from "@/pages/OAuthCallback.tsx";
-import { Loader } from "@/components/Loader.tsx";
+import ApiKeys from "@/pages/ApiKeys";
+import Usage from "@/pages/Usage";
+import MavisUsage from "@/pages/MavisUsage";
+import Logs from "@/pages/Logs";
+import Models from "@/pages/Models";
+import Users from "@/pages/Users";
+import ChangePassword from "@/pages/ChangePassword";
+import OAuthCallback from "@/pages/OAuthCallback";
+import { Loader } from "@/components/Loader";
 
 function ProtectedLayout() {
   const { token, role, loading } = useAuth();
