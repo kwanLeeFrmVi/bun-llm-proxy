@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import type { MavisUsageResponse } from "@/lib/mavisTypes.ts";
-import { MAVIS_QUOTA_DIVISOR } from "@/lib/mavisTypes.ts";
 import { RANGES, type Range } from "./utils/constants.ts";
-import { buildPricingMap } from "./utils/pricing.ts";
+import { buildPricingMap, estimateCost } from "./utils/pricing.ts";
 import { fmt } from "@/lib/formatters.ts";
 import { BudgetCard } from "@/components/BudgetCard.tsx";
 import { QuotaCard } from "@/components/QuotaCard.tsx";
@@ -178,7 +177,23 @@ export default function MavisUsage() {
             />
             <QuotaCard
               label='Total Cost'
-              value={"$" + ((usage?.period_used_quota ?? 0) / MAVIS_QUOTA_DIVISOR).toFixed(2)}
+              value={
+                "$" +
+                (usage!.models.length > 0
+                  ? usage!.models
+                      .reduce(
+                        (sum, m) =>
+                          sum +
+                          estimateCost(
+                            m.input_tokens,
+                            m.output_tokens,
+                            pricing[m.model],
+                          ),
+                        0,
+                      )
+                      .toFixed(2)
+                  : "0.00")
+              }
               sub='Spend'
               color='#f97316'
             />
