@@ -108,7 +108,7 @@ describe("convertKiroResponseToOpenAI (streaming)", () => {
     expect(chunks.length).toBeGreaterThan(0);
 
     const allDecoded = decodeSSEChunks(chunks);
-    const finishChunk = allDecoded.find((c) => c.choices?.[0]?.finish_reason === "stop");
+    const finishChunk = allDecoded.find((c) => (c.choices as Array<Record<string, unknown>> | undefined)?.[0]?.finish_reason === "stop");
     expect(finishChunk).toBeDefined();
     expect(finishChunk!.usage).toEqual({ prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 });
   });
@@ -234,7 +234,7 @@ describe("convertAntigravityResponseToOpenAI (streaming)", () => {
     const chunks = convertAntigravityResponseToOpenAI(undefined, "gemini", new Uint8Array(), new Uint8Array(), raw, undefined);
 
     const allDecoded = decodeSSEChunks(chunks);
-    const finishChunk = allDecoded.find((c) => c.choices?.[0]?.finish_reason === "stop");
+    const finishChunk = allDecoded.find((c) => (c.choices as Array<Record<string, unknown>> | undefined)?.[0]?.finish_reason === "stop");
     expect(finishChunk).toBeDefined();
     const choices = finishChunk!.choices as Array<Record<string, unknown>>;
     const delta = choices[0]?.delta as Record<string, unknown>;
@@ -282,7 +282,7 @@ describe("convertAntigravityResponseToOpenAI (streaming)", () => {
     const chunks2 = convertAntigravityResponseToOpenAI(undefined, "gemini", new Uint8Array(), new Uint8Array(), raw2, stateAfterFirst);
 
     const allDecoded = decodeSSEChunks(chunks2);
-    const finishChunk = allDecoded.find((c) => c.choices?.[0]?.finish_reason);
+    const finishChunk = allDecoded.find((c) => (c.choices as Array<Record<string, unknown>> | undefined)?.[0]?.finish_reason);
     expect(finishChunk).toBeDefined();
     const choices = finishChunk!.choices as Array<Record<string, unknown>>;
     const delta = choices[0]?.delta as Record<string, unknown>;
