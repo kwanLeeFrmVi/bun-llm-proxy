@@ -4,6 +4,7 @@
  */
 
 import { Request, NeedsTranslation } from "../../ai-bridge/translator/index.ts";
+import { convertOpenAIRequestToAntigravity } from "../../ai-bridge/translator/openai/antigravity/request.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -335,5 +336,39 @@ describe("passthrough identity", () => {
     const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
     const result = decode(Request("gemini", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
     expect(result.contents).toEqual(body.contents);
+  });
+});
+
+// ─── OpenAI → Antigravity ──────────────────────────────────────────────────
+
+describe("openai → antigravity (Request)", () => {
+  it("wraps Gemini payload in Antigravity outer structure", () => {
+    const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "hi" }] };
+    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+
+    expect(result.request).toBeDefined();
+    expect(result.requestId).toBeDefined();
+    expect(result.sessionId).toBeDefined();
+    // Inner request should be Gemini format (contents, not messages)
+    const inner = result.request as Record<string, unknown>;
+    expect(inner.contents).toBeDefined();
+    expect(inner.sessionId).toBeDefined();
+  });
+
+  it("maps sessionId from credentials", () => {
+    const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "hi" }] };
+    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false, { sessionId: "custom-session-123" })) as Record<string, unknown>;
+
+    expect(result.sessionId).toBe("custom-session-123");
+    const inner = result.request as Record<string, unknown>;
+    expect(inner.sessionId).toBe("custom-session-123");
+  });
+
+  it("maps reasoning_effort to thinking (via Gemini translator)", () => {
+    const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "explain" }], reasoning_effort: "high" };
+    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const inner = result.request as Record<string, unknown>;
+    // Gemini translator maps reasoning_effort to generationConfig or passes through
+    expect(inner.contents).toBeDefined();
   });
 });

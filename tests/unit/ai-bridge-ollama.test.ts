@@ -43,8 +43,8 @@ describe("convertClaudeRequestToOllama", () => {
     expect(options.temperature).toBe(0.7);
 
     const messages = result.messages as Array<Record<string, unknown>>;
-    expect(messages[0].role).toBe("system");
-    expect(messages[1].role).toBe("user");
+    expect(messages[0]?.role).toBe("system");
+    expect(messages[1]?.role).toBe("user");
   });
 
   it("converts stop_sequences to stop", () => {
@@ -72,8 +72,8 @@ describe("convertClaudeRequestToOllama", () => {
       }],
     }), true));
     const messages = result.messages as Array<Record<string, unknown>>;
-    expect(messages[0].content).toContain("TOOL_CALL");
-    expect(messages[0].content).toContain("search");
+    expect(messages[0]?.content).toContain("TOOL_CALL");
+    expect(messages[0]?.content).toContain("search");
   });
 
   it("converts tool_result content to text", () => {
@@ -84,7 +84,7 @@ describe("convertClaudeRequestToOllama", () => {
       }],
     }), true));
     const messages = result.messages as Array<Record<string, unknown>>;
-    expect(messages[0].content).toContain("TOOL_RESULT");
+    expect(messages[0]?.content).toContain("TOOL_RESULT");
   });
 
   it("converts tools to text description appended to system", () => {
@@ -95,8 +95,8 @@ describe("convertClaudeRequestToOllama", () => {
     }), true));
     const messages = result.messages as Array<Record<string, unknown>>;
     const systemMsg = messages[0];
-    expect((systemMsg.content as string)).toContain("search");
-    expect((systemMsg.content as string)).toContain("Search the web");
+    expect((systemMsg?.content as string)).toContain("search");
+    expect((systemMsg?.content as string)).toContain("Search the web");
   });
 
   it("converts Claude image to placeholder text", () => {
@@ -110,7 +110,7 @@ describe("convertClaudeRequestToOllama", () => {
       }],
     }), true));
     const messages = result.messages as Array<Record<string, unknown>>;
-    expect(messages[0].content).toContain("[image:");
+    expect(messages[0]?.content).toContain("[image:");
   });
 });
 
@@ -132,7 +132,7 @@ describe("convertOllamaRequestToClaude", () => {
     expect(result.stream).toBe(true);
     expect(result.system).toBe("Be helpful");
     const messages = result.messages as Array<Record<string, unknown>>;
-    expect(messages[0].role).toBe("user");
+    expect(messages[0]?.role).toBe("user");
   });
 
   it("converts stop to stop_sequences", () => {
@@ -239,8 +239,8 @@ describe("convertOllamaResponseToClaudeNonStream", () => {
     expect(result.type).toBe("message");
     expect(result.role).toBe("assistant");
     const content = result.content as Array<Record<string, unknown>>;
-    expect(content[0].type).toBe("text");
-    expect(content[0].text).toBe("Hello world");
+    expect(content[0]?.type).toBe("text");
+    expect(content[0]?.text).toBe("Hello world");
     expect(result.stop_reason).toBe("end_turn");
   });
 

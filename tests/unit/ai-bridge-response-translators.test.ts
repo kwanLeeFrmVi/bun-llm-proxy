@@ -15,6 +15,7 @@ import { convertGeminiResponseToOpenAI } from "../../ai-bridge/translator/gemini
 import { convertClaudeResponseToOpenAINonStream } from "../../ai-bridge/translator/openai/claude/response.ts";
 import { convertOpenAIResponseToClaudeNonStream } from "../../ai-bridge/translator/claude/openai/response.ts";
 import { convertGeminiResponseToOpenAINonStream } from "../../ai-bridge/translator/gemini/openai/response.ts";
+import { convertOpenAIResponseToGemini, convertOpenAIResponseToGeminiNonStream } from "../../ai-bridge/translator/openai/gemini/response.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -343,6 +344,177 @@ describe("convertGeminiResponseToOpenAINonStream (gemini → openai non-streamin
   it("returns raw on invalid JSON", () => {
     const raw = encode("not json");
     const result = convertGeminiResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    expect(new TextDecoder().decode(result)).toBe("not json");
+  });
+});
+
+// ─── Streaming: openai → gemini ──────────────────────────────────────────────
+
+describe("convertOpenAIResponseToGemini (streaming)", () => {
+  it("emits Gemini SSE chunk for content delta", () => {
+    const raw = encode('data: {"id":"chat_123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"content":"hello"},"finish_reason":null}]}\n\n');
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain("data: ");
+    expect(out).toContain('"text":"hello"');
+    expect(out).toContain('"role":"model"');
+    expect(out).toContain('"candidates"');
+  });
+
+  it("emits finish_reason STOP on finish_reason=stop", () => {
+    const raw = encode('data: {"id":"chat_123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3}}\n\n');
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain('"finishReason":"STOP"');
+    expect(out).toContain("data: [DONE]");
+  });
+
+  it("maps finish_reason length → MAX_TOKENS", () => {
+    const raw = encode('data: {"id":"chat_123","choices":[{"index":0,"delta":{},"finish_reason":"length"}]}\n\n');
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain('"finishReason":"MAX_TOKENS"');
+  });
+
+  it("maps finish_reason content_filter → SAFETY", () => {
+    const raw = encode('data: {"id":"chat_123","choices":[{"index":0,"delta":{},"finish_reason":"content_filter"}]}\n\n');
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain('"finishReason":"SAFETY"');
+  });
+
+  it("emits [DONE] sentinel on data: [DONE] input", () => {
+    const raw = encode("data: [DONE]");
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain("data: [DONE]");
+  });
+
+  it("handles tool_calls delta", () => {
+    const raw = encode('data: {"id":"chat_123","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"search","arguments":"{\\"q\\":\\"x\\"}"}}]},"finish_reason":null}]}\n\n');
+    const chunks = decodeAll(convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined));
+    const out = chunks.join("");
+    expect(out).toContain('"functionCall"');
+    expect(out).toContain('"name":"search"');
+  });
+
+  it("accumulates content across chunks via state", () => {
+    const state = { messageId: "", model: "", roleSet: false, contentAccumulator: "", messageStopSent: false };
+    const chunk1 = encode('data: {"choices":[{"index":0,"delta":{"content":"hel"},"finish_reason":null}]}\n\n');
+    convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, chunk1, state);
+    expect(state.contentAccumulator).toBe("hel");
+    const chunk2 = encode('data: {"choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":null}]}\n\n');
+    convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, chunk2, state);
+    expect(state.contentAccumulator).toBe("hello");
+  });
+
+  it("returns empty for empty input", () => {
+    const raw = encode("");
+    const chunks = convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined);
+    expect(chunks).toHaveLength(0);
+  });
+
+  it("returns empty for non-JSON", () => {
+    const raw = encode("not json");
+    const chunks = convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined);
+    expect(chunks).toHaveLength(0);
+  });
+});
+
+// ─── Non-streaming: openai → gemini ─────────────────────────────────────────
+
+describe("convertOpenAIResponseToGeminiNonStream (non-streaming)", () => {
+  it("transforms OpenAI chat.completion to Gemini format", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_test",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hello world" },
+        finish_reason: "stop",
+      }],
+      usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+    }));
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.candidates).toBeDefined();
+    expect(out.candidates[0].content.parts[0].text).toBe("hello world");
+    expect(out.candidates[0].content.role).toBe("model");
+    expect(out.candidates[0].finishReason).toBe("STOP");
+    expect(out.usageMetadata.promptTokenCount).toBe(5);
+    expect(out.usageMetadata.candidatesTokenCount).toBe(3);
+    expect(out.usageMetadata.totalTokenCount).toBe(8);
+  });
+
+  it("maps tool_calls to functionCall", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_tool",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{
+        index: 0,
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [{
+            id: "call_abc",
+            type: "function",
+            function: { name: "search", arguments: '{"q":"test"}' },
+          }],
+        },
+        finish_reason: "tool_calls",
+      }],
+    }));
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    const parts = out.candidates[0].content.parts;
+    const fcPart = parts.find((p: Record<string, unknown>) => p.functionCall);
+    expect(fcPart).toBeDefined();
+    expect(fcPart.functionCall.name).toBe("search");
+  });
+
+  it("maps finish_reason stop → STOP", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_1",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{ index: 0, message: { content: "hi" }, finish_reason: "stop" }],
+    }));
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.candidates[0].finishReason).toBe("STOP");
+  });
+
+  it("maps finish_reason length → MAX_TOKENS", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_2",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{ index: 0, message: { content: "truncated" }, finish_reason: "length" }],
+    }));
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.candidates[0].finishReason).toBe("MAX_TOKENS");
+  });
+
+  it("handles empty content", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_3",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{ index: 0, message: { content: null }, finish_reason: "stop" }],
+    }));
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.candidates[0].content.parts).toHaveLength(0);
+  });
+
+  it("returns raw on parse error", () => {
+    const raw = encode("not json");
+    const result = convertOpenAIResponseToGeminiNonStream(null, "", NO_RAW, NO_RAW, raw);
     expect(new TextDecoder().decode(result)).toBe("not json");
   });
 });

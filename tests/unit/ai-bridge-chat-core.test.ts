@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { handleChatCore } from "../../ai-bridge/handlers/chatCore.ts";
+import type { BodyInit } from "bun";
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

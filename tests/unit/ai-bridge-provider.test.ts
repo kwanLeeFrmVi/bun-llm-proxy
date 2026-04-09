@@ -140,8 +140,8 @@ describe("getTargetFormat", () => {
     expect(getTargetFormat("gemini")).toBe(FORMATS.GEMINI);
   });
 
-  it("returns GEMINI for gemini-cli provider", () => {
-    expect(getTargetFormat("gemini-cli")).toBe(FORMATS.GEMINI);
+  it("returns GEMINI_CLI for gemini-cli provider", () => {
+    expect(getTargetFormat("gemini-cli")).toBe(FORMATS.GEMINI_CLI);
   });
 
   it("returns OLLAMA for ollama provider", () => {
@@ -170,14 +170,16 @@ describe("buildUpstreamUrl", () => {
     expect(url).toContain("chat/completions");
   });
 
-  it("returns OpenAI URL for openrouter provider", () => {
+  it("returns OpenAI-compatible URL for openrouter provider", () => {
     const url = buildUpstreamUrl("openrouter", "gpt-4o", true, { apiKey: "sk-test" });
-    expect(url).toContain("api.openai.com");
+    expect(url).toContain("openrouter.ai");
+    expect(url).toContain("chat/completions");
   });
 
-  it("returns OpenAI URL for anthropic provider", () => {
+  it("returns Anthropic URL for anthropic provider", () => {
     const url = buildUpstreamUrl("anthropic", "claude-3", true, { apiKey: "sk-test" });
-    expect(url).toContain("api.openai.com");
+    expect(url).toContain("api.anthropic.com");
+    expect(url).toContain("messages");
   });
 
   it("returns Gemini streamGenerateContent URL for gemini provider with streaming", () => {
@@ -198,9 +200,10 @@ describe("buildUpstreamUrl", () => {
     expect(url).toBeNull();
   });
 
-  it("returns Gemini URL for claude provider (uses Gemini API)", () => {
+  it("returns Anthropic URL for claude provider", () => {
     const url = buildUpstreamUrl("claude", "claude-sonnet-4", true, { apiKey: "test" });
-    expect(url).toContain("generativelanguage.googleapis.com");
+    expect(url).toContain("api.anthropic.com");
+    expect(url).toContain("messages");
   });
 
   it("returns Gemini stream URL for gemini-cli with accessToken", () => {
@@ -208,27 +211,30 @@ describe("buildUpstreamUrl", () => {
     expect(url).toContain("streamGenerateContent");
   });
 
-  it("returns null for gemini-cli without accessToken", () => {
+  it("returns gemini-cli base URL without accessToken", () => {
     const url = buildUpstreamUrl("gemini-cli", "gemini-2.0-flash", true, {});
-    expect(url).toBeNull();
+    expect(url).not.toBeNull();
+    expect(url).toContain("cloudcode-pa.googleapis.com");
+    expect(url).toContain("streamGenerateContent");
   });
 
   it("returns Ollama URL for ollama provider", () => {
     const url = buildUpstreamUrl("ollama", "llama3", true, {});
-    expect(url).toContain("localhost:11434");
+    expect(url).toContain("ollama.com");
     expect(url).toContain("api/chat");
   });
 
-  it("returns custom Ollama URL from providerSpecificData", () => {
-    const url = buildUpstreamUrl("ollama", "llama3", true, {
+  it("returns custom Ollama URL for ollama-local provider", () => {
+    const url = buildUpstreamUrl("ollama-local", "llama3", true, {
       providerSpecificData: { baseUrl: "http://my-ollama:8080" },
     });
     expect(url).toContain("my-ollama:8080");
+    expect(url).toContain("api/chat");
   });
 
-  it("returns kimi URL for kilocode provider", () => {
+  it("returns kilocode URL for kilocode provider", () => {
     const url = buildUpstreamUrl("kilocode", "model", true, { apiKey: "test" });
-    expect(url).toContain("kimi.com");
+    expect(url).toContain("kilo.ai");
   });
 
   it("returns kimi URL for kimi-coding provider", () => {
