@@ -6,6 +6,7 @@ import { Request, NeedsTranslation, ResponseNonStream } from "../translator/inde
 import { HTTP_STATUS } from "../config/runtimeConfig.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "./provider.js";
+import { errorResponse } from "../utils/error.ts";
 
 export interface ChatCoreOptions {
   body: Record<string, unknown>;
@@ -78,7 +79,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   // Build upstream URL and headers
   const upstreamUrl = buildUpstreamUrl(provider, model, stream !== false, credentials);
   if (!upstreamUrl) {
-    return { success: false, status: HTTP_STATUS.BAD_REQUEST, error: `Unknown provider: ${provider}` };
+    const errorMsg = `Unknown provider: ${provider}`;
+    return { success: false, status: HTTP_STATUS.BAD_REQUEST, error: errorMsg, response: errorResponse(HTTP_STATUS.BAD_REQUEST, errorMsg) };
   }
 
   const headers = buildUpstreamHeaders(provider, credentials);
@@ -89,19 +91,26 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   log?.debug?.("CHAT", `${provider.toUpperCase()} → ${upstreamUrl}`);
   log?.info?.("REQUEST", `${provider.toUpperCase()} | ${model} | ${messages} msgs`);
 
+  // NVIDIA NIM models can be very slow — allow 5 minutes before timing out
+  const TIMEOUT_MS = provider === "nvidia" ? 300_000 : 120_000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
   try {
     const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers,
-      body: new TextDecoder().decode(translatedBytes),
+      body: new TextEncoder().encode(JSON.stringify(translatedBody)),
+      signal: controller.signal,
     });
 
     if (!upstream.ok) {
       const errorText = await upstream.text().catch(() => "");
-      const errResult = handleUpstreamError(upstream.status, errorText);
+      const errResult = handleUpstreamError(upstream.status, errorText, provider);
       if (errResult) return errResult;
       // For other non-ok statuses, return a generic error (don't continue to read body again)
-      return { success: false, status: upstream.status, error: errorText || `Upstream error: ${upstream.status}` };
+      const errorMsg = errorText || `Upstream error: ${upstream.status}`;
+      return { success: false, status: upstream.status, error: errorMsg, response: errorResponse(upstream.status, `Provider ${provider} returned ${upstream.status}: ${errorMsg}`) };
     }
 
     if (stream) {
@@ -144,8 +153,16 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Detect abort (timeout) vs. other errors
+    if (msg === "The operation was aborted" || msg === "aborted") {
+      log?.error?.("CHAT", `Request timed out after ${TIMEOUT_MS / 1000}s`);
+      const timeoutMsg = `Request timed out after ${TIMEOUT_MS / 1000}s`;
+      return { success: false, status: HTTP_STATUS.GATEWAY_TIMEOUT, error: timeoutMsg, response: errorResponse(HTTP_STATUS.GATEWAY_TIMEOUT, timeoutMsg) };
+    }
     log?.error?.("CHAT", `Upstream error: ${msg}`);
-    return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: msg };
+    return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: msg, response: errorResponse(HTTP_STATUS.BAD_GATEWAY, msg) };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -237,15 +254,18 @@ function translateChunk(
 
 // ─── Error handling ─────────────────────────────────────────────────────────────
 
-function handleUpstreamError(status: number, errorText: string): ChatCoreResult | null {
+function handleUpstreamError(status: number, errorText: string, provider: string): ChatCoreResult | null {
   if (status === 401 || status === 403) {
-    return { success: false, status, error: "Authentication failed" };
+    const errorMsg = "Authentication failed";
+    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
   }
   if (status === 429) {
-    return { success: false, status, error: `Rate limited: ${errorText}` };
+    const errorMsg = `Rate limited: ${errorText}`;
+    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
   }
   if (status >= 500) {
-    return { success: false, status, error: `Upstream error: ${status}` };
+    const errorMsg = `Upstream error: ${status}`;
+    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
   }
   return null;
 }

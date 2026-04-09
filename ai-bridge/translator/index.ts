@@ -10,11 +10,17 @@ import { convertClaudeRequestToOllama } from "./claude/ollama/request.ts";
 import { convertOllamaRequestToClaude } from "./ollama/claude/request.ts";
 import { convertOllamaResponseToClaude, convertOllamaResponseToClaudeNonStream } from "./ollama/claude/response.ts";
 import { convertOllamaRequestToOpenAI } from "./ollama/openai/request.ts";
+import { convertOllamaResponseToOpenAI, convertOllamaResponseToOpenAINonStream } from "./ollama/openai/response.ts";
 import { convertOpenAIRequestToOllama } from "./openai/ollama/request.ts";
 import { convertGeminiRequestToOpenAI } from "./gemini/openai/request.ts";
 import { convertGeminiResponseToOpenAI, convertGeminiResponseToOpenAINonStream } from "./gemini/openai/response.ts";
 import { convertOpenAIRequestToGemini } from "./openai/gemini/request.ts";
 import { convertOpenAIResponseToGemini, convertOpenAIResponseToGeminiNonStream } from "./openai/gemini/response.ts";
+import { convertOpenAIRequestToKiro } from "./openai/kiro/request.ts";
+import { convertKiroResponseToOpenAI, convertKiroResponseToOpenAINonStream } from "./kiro/openai/response.ts";
+import { convertOpenAIRequestToAntigravity } from "./openai/antigravity/request.ts";
+import { convertAntigravityResponseToOpenAI, convertAntigravityResponseToOpenAINonStream } from "./antigravity/openai/response.ts";
+import { convertOpenAIRequestToVertex } from "./openai/vertex/request.ts";
 
 // ─── Function signatures ────────────────────────────────────────────────────────
 
@@ -89,25 +95,36 @@ function init(): void {
   register(FORMATS.CLAUDE, FORMATS.OLLAMA, convertClaudeRequestToOllama, identityResponse, identityResponseNS);
   register(FORMATS.OLLAMA, FORMATS.CLAUDE, convertOllamaRequestToClaude, convertOllamaResponseToClaude as ResponseTranslatorFn, convertOllamaResponseToClaudeNonStream as ResponseNonStreamFn);
 
-  // Ollama ↔ OpenAI (both are OpenAI-compatible; minimal translation needed)
-  register(FORMATS.OLLAMA, FORMATS.OPENAI, convertOllamaRequestToOpenAI, identityResponse, identityResponseNS);
+  // Ollama <-> OpenAI (request formats are similar, but response needs translation)
+  register(FORMATS.OLLAMA, FORMATS.OPENAI, convertOllamaRequestToOpenAI, convertOllamaResponseToOpenAI as ResponseTranslatorFn, convertOllamaResponseToOpenAINonStream as ResponseNonStreamFn);
   register(FORMATS.OPENAI, FORMATS.OLLAMA, convertOpenAIRequestToOllama, identityResponse, identityResponseNS);
 
   // Gemini ↔ OpenAI
   register(FORMATS.GEMINI, FORMATS.OPENAI, convertGeminiRequestToOpenAI, convertGeminiResponseToOpenAI as ResponseTranslatorFn, convertGeminiResponseToOpenAINonStream as ResponseNonStreamFn);
   register(FORMATS.OPENAI, FORMATS.GEMINI, convertOpenAIRequestToGemini, convertOpenAIResponseToGemini as ResponseTranslatorFn, convertOpenAIResponseToGeminiNonStream as ResponseNonStreamFn);
 
+  // Kiro → OpenAI (AWS CodeWhisperer format)
+  register(FORMATS.KIRO, FORMATS.OPENAI, null, convertKiroResponseToOpenAI as ResponseTranslatorFn, convertKiroResponseToOpenAINonStream as ResponseNonStreamFn);
+  register(FORMATS.OPENAI, FORMATS.KIRO, convertOpenAIRequestToKiro, null, null);
+
+  // Antigravity → OpenAI (Gemini-like format with outer wrapper)
+  register(FORMATS.ANTIGRAVITY, FORMATS.OPENAI, null, convertAntigravityResponseToOpenAI as ResponseTranslatorFn, convertAntigravityResponseToOpenAINonStream as ResponseNonStreamFn);
+  register(FORMATS.OPENAI, FORMATS.ANTIGRAVITY, convertOpenAIRequestToAntigravity, null, null);
+
+  // Vertex → OpenAI (Gemini format with stripped fields)
+  register(FORMATS.OPENAI, FORMATS.VERTEX, convertOpenAIRequestToVertex, null, null);
+  // Vertex responses use Gemini format, so VERTEX -> OPENAI uses Gemini translator
+  register(FORMATS.VERTEX, FORMATS.OPENAI, null, convertGeminiResponseToOpenAI as ResponseTranslatorFn, convertGeminiResponseToOpenAINonStream as ResponseNonStreamFn);
+
   // Identity (pass-through) pairs
   registerIdentity(FORMATS.OPENAI);
   registerIdentity(FORMATS.OPENAI_RESPONSES);
   registerIdentity(FORMATS.CLAUDE);
   registerIdentity(FORMATS.GEMINI);
-  registerIdentity(FORMATS.GEMINI_CLI);
-  registerIdentity(FORMATS.VERTEX);
-  registerIdentity(FORMATS.CODEX);
-  registerIdentity(FORMATS.ANTIGRAVITY);
-  registerIdentity(FORMATS.KIRO);
-  registerIdentity(FORMATS.CURSOR);
+  registerIdentity(FORMATS.GEMINI_CLI);  // Same as GEMINI
+  registerIdentity(FORMATS.VERTEX);  // Response same as GEMINI
+  registerIdentity(FORMATS.CODEX);   // OpenAI-compatible
+  registerIdentity(FORMATS.CURSOR);  // OpenAI-compatible
   registerIdentity(FORMATS.OLLAMA);
 }
 
