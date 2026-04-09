@@ -36,6 +36,7 @@ import { AddCustomModelModal } from "./AddCustomModelModal";
 import { ModelTile } from "./ModelTile";
 import { getLogoPath } from "./utils";
 import type { ProviderModel, TestStatus } from "./types";
+import { EditProviderModal } from "@/components/EditProviderModal";
 
 export default function ProviderDetail() {
   const { providerId } = useParams<{ providerId: string }>();
@@ -59,6 +60,8 @@ export default function ProviderDetail() {
   const [oauthMeta, setOauthMeta] = useState<Record<string, unknown>>({});
   const [showKiroAuth, setShowKiroAuth] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditProvider, setShowEditProvider] = useState(false);
+  const [editingNode, setEditingNode] = useState<ProviderNode | null>(null);
   const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(
     null,
   );
@@ -522,6 +525,12 @@ export default function ProviderDetail() {
     }
   }
 
+  async function handleUpdateProvider(updatedNode: ProviderNode) {
+    setShowEditProvider(false);
+    setEditingNode(null);
+    await fetchData();
+  }
+
   if (loading) {
     return (
       <div className='space-y-6 animate-pulse'>
@@ -552,23 +561,38 @@ export default function ProviderDetail() {
       </Link>
 
       {/* Provider header */}
-      <div className='flex items-center gap-4'>
-        <ProviderIcon
-          src={getLogoPath(decodedId, node)}
-          alt={displayName}
-          size={48}
-          className='rounded-lg'
-          fallbackText={textIcon}
-          fallbackColor={color}
-        />
-        <div>
-          <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
-            {displayName}
-          </h1>
-          <p className='text-sm text-[--on-surface-variant] mt-0.5'>
-            {connections.length} connection{connections.length !== 1 ? "s" : ""}
-          </p>
+      <div className='flex items-center justify-between'>
+        <div className='flex items-center gap-4'>
+          <ProviderIcon
+            src={getLogoPath(decodedId, node)}
+            alt={displayName}
+            size={48}
+            className='rounded-lg'
+            fallbackText={textIcon}
+            fallbackColor={color}
+          />
+          <div>
+            <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
+              {displayName}
+            </h1>
+            <p className='text-sm text-[--on-surface-variant] mt-0.5'>
+              {connections.length} connection{connections.length !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
+        {isCompatible && isAdmin && node && (
+          <Button
+            variant='outline'
+            size='sm'
+            className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]'
+            onClick={() => {
+              setEditingNode(node);
+              setShowEditProvider(true);
+            }}
+          >
+            Edit Provider
+          </Button>
+        )}
       </div>
 
       {/* Notice/info banner */}
@@ -921,6 +945,16 @@ export default function ProviderDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditProviderModal
+        isOpen={showEditProvider}
+        node={editingNode}
+        onClose={() => {
+          setShowEditProvider(false);
+          setEditingNode(null);
+        }}
+        onUpdated={handleUpdateProvider}
+      />
     </div>
   );
 }

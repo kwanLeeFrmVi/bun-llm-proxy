@@ -140,6 +140,8 @@ export const api = {
   // ─── Provider Nodes ─────────────────────────────────────────────────────────
   nodes: {
     validate: (data: unknown) => request("/api/provider-nodes/validate", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; baseUrl?: string; prefix?: string; apiType?: string }) =>
+      request<{ node: ProviderNode }>(`/api/provider-nodes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   },
 
   // ─── API Keys ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { getProviderConnectionById, updateProviderConnection } from "@/lib/localDb";
+import { getProviderConnectionById, updateProviderConnection, getProviderNodeById } from "@/lib/localDb";
 import {
   isOpenAICompatibleProvider,
   isAnthropicCompatibleProvider,
@@ -324,9 +324,35 @@ async function testOpenAICompatible(
   if (!baseUrl) return { valid: false, error: "Missing base URL" };
   try {
     const url = baseUrl.replace(/\/$/, "");
-    const res = await fetch(`${url}/models`, {
+
+    // Try /models endpoint first
+    let res = await fetch(`${url}/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
+
+    // If /models fails, try /chat/completions with a minimal request
+    if (!res.ok) {
+      res = await fetch(`${url}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "test" }],
+        }),
+      });
+    }
+
+    // If /chat/completions fails, try /status
+    if (!res.ok) {
+      res = await fetch(`${url.split("/v1")[0]}/api/user/status`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+    }
+
     return { valid: res.ok, error: res.ok ? null : "Invalid API key or base URL" };
   } catch (err) {
     return {
@@ -344,13 +370,45 @@ async function testAnthropicCompatible(
   try {
     let url = baseUrl.replace(/\/$/, "");
     if (url.endsWith("/messages")) url = url.slice(0, -9);
-    const res = await fetch(`${url}/models`, {
+
+    // Try /models endpoint first
+    let res = await fetch(`${url}/models`, {
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         Authorization: `Bearer ${apiKey}`,
       },
     });
+
+    // If /models fails, try /messages with a minimal request
+    if (!res.ok) {
+      res = await fetch(`${url}/messages`, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "test" }],
+        }),
+      });
+    }
+
+    // If /messages fails, try /status
+    if (!res.ok) {
+      res = await fetch(`${url.split("/v1")[0]}/api/user/status`, {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+    }
+
     return { valid: res.ok, error: res.ok ? null : "Invalid API key or base URL" };
   } catch (err) {
     return {
@@ -367,7 +425,17 @@ async function testApiKeyConnection(
 ): Promise<TestResult> {
   const { provider, apiKey } = connection;
   const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
-  const baseUrl = (psd?.baseUrl ?? connection.baseUrl ?? "") as string;
+  let baseUrl = (psd?.baseUrl ?? connection.baseUrl ?? "") as string;
+
+  // For compatible providers, if baseUrl is not in connection, look up the provider node
+  const isCompatible = isOpenAICompatibleProvider(provider) || isAnthropicCompatibleProvider(provider);
+  if (!baseUrl && isCompatible) {
+    const node = await getProviderNodeById(provider);
+    if (node?.baseUrl) {
+      console.log(`[PROVIDER_TEST] Using baseUrl from provider node ${provider}`);
+      baseUrl = node.baseUrl;
+    }
+  }
 
   if (!apiKey) {
     return {
@@ -547,6 +615,7 @@ async function testApiKeyConnection(
 export async function testProviderConnection(id: string): Promise<TestResult> {
   const connection = await getProviderConnectionById(id);
   if (!connection) {
+    console.log(`[PROVIDER_TEST] Connection ${id} not found`);
     return {
       valid: false,
       error: "Connection not found",
@@ -554,6 +623,8 @@ export async function testProviderConnection(id: string): Promise<TestResult> {
       testedAt: new Date().toISOString(),
     };
   }
+
+  console.log(`[PROVIDER_TEST] Testing connection ${id} (${connection.provider})`);
 
   let result: TestResult;
 
@@ -614,6 +685,13 @@ export async function testProviderConnection(id: string): Promise<TestResult> {
     lastErrorAt: result.valid ? null : new Date().toISOString(),
     lastTested: result.testedAt,
   });
+
+  // Log test result
+  if (result.valid) {
+    console.log(`[PROVIDER_TEST] Connection ${id} (${connection.provider}) PASSED (${result.latencyMs}ms)`);
+  } else {
+    console.log(`[PROVIDER_TEST] Connection ${id} (${connection.provider}) FAILED - ${result.error}`);
+  }
 
   return result;
 }
