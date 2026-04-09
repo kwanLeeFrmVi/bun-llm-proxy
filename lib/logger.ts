@@ -72,8 +72,10 @@ export function passthrough(from: string, to: string, mode: string): void {
   console.log(`[${formatTime()}] 🔍 [PASSTHROUGH] ${from} → ${to} | ${mode}`);
 }
 
-export function pending(provider: string, model: string): void {
-  console.log(`[${formatTime()}] [PENDING] START | provider=${provider} | model=${model}`);
+export async function pending(provider: string, model: string): Promise<void> {
+  const { getProviderDisplayName } = await import("./providers.ts");
+  const providerName = await getProviderDisplayName(provider);
+  console.log(`[${formatTime()}] [PENDING] START | provider=${providerName} | model=${model}`);
 }
 
 export function formatDetect(from: string, to: string, stream: boolean): void {

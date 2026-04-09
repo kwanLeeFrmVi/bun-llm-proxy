@@ -27,3 +27,38 @@ export function resolveProviderId(aliasOrId: string): string {
 export function getProviderAlias(providerId: string): string {
   return (PROVIDER_ID_TO_ALIAS as Record<string, string>)[providerId] ?? providerId;
 }
+
+// In-memory cache for provider display names
+const providerDisplayNameCache = new Map<string, string>();
+
+/**
+ * Get human-readable provider display name.
+ * For custom providers (anthropic-compatible-*, openai-compatible-*), fetches the node name from DB.
+ * Otherwise falls back to alias or ID.
+ * Results are cached in-memory for performance.
+ */
+export async function getProviderDisplayName(providerId: string): Promise<string> {
+  // Check cache first
+  if (providerDisplayNameCache.has(providerId)) {
+    return providerDisplayNameCache.get(providerId)!;
+  }
+
+  const isCustom = providerId.startsWith("anthropic-compatible-") || providerId.startsWith("openai-compatible-");
+
+  if (isCustom) {
+    try {
+      const { getProviderNodeById } = await import("../db/index.ts");
+      const node = await getProviderNodeById(providerId);
+      if (node?.name) {
+        providerDisplayNameCache.set(providerId, node.name);
+        return node.name;
+      }
+    } catch {
+      // Fall through to fallback
+    }
+  }
+
+  const fallback = getProviderAlias(providerId);
+  providerDisplayNameCache.set(providerId, fallback);
+  return fallback;
+}

@@ -5,7 +5,7 @@
 
 import { getProviderConnections, updateProviderConnection, validateApiKey, getProviderNodeById } from "../db/index.ts";
 import { resolveConnectionProxyConfig } from "../lib/connectionProxy.ts";
-import { resolveProviderId, isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "../lib/providers.ts";
+import { resolveProviderId, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, getProviderDisplayName } from "../lib/providers.ts";
 import {
   formatRetryAfter,
   checkFallbackError,
@@ -43,11 +43,12 @@ export async function getProviderCredentials(
 
     const providerId = resolveProviderId(provider);
     const connections = await getProviderConnections({ provider: providerId, isActive: true });
+    const providerName = await getProviderDisplayName(providerId);
 
-    log.info("AUTH", `${provider} | total connections: ${connections.length}, excludeIds: ${excludeSet.size > 0 ? [...excludeSet].join(",") : "none"}, model: ${model ?? "any"}`);
+    log.info("AUTH", `${providerName} | total connections: ${connections.length}, excludeIds: ${excludeSet.size > 0 ? [...excludeSet].join(",") : "none"}, model: ${model ?? "any"}`);
 
     if (connections.length === 0) {
-      log.warn("AUTH", `No credentials for ${provider}`);
+      log.warn("AUTH", `No credentials for ${providerName}`);
       return null;
     }
 
@@ -57,7 +58,7 @@ export async function getProviderCredentials(
       return true;
     });
 
-    log.info("AUTH", `${provider} | available: ${availableConnections.length}/${connections.length}`);
+    log.info("AUTH", `${providerName} | available: ${availableConnections.length}/${connections.length}`);
     connections.forEach((c: Record<string, unknown>) => {
       const excluded = excludeSet.has(c.id as string);
       const locked = isModelLockActive(c, model);
@@ -73,7 +74,7 @@ export async function getProviderCredentials(
       const earliest = expiries.sort()[0] ?? null;
       if (earliest) {
         const earliestConn = lockedConns[0] as Record<string, unknown>;
-        log.warn("AUTH", `${provider} | all ${connections.length} accounts locked for ${model ?? "all"} (${formatRetryAfter(earliest)}) | lastError=${(earliestConn?.lastError as string)?.slice(0, 50)}`);
+        log.warn("AUTH", `${providerName} | all ${connections.length} accounts locked for ${model ?? "all"} (${formatRetryAfter(earliest)}) | lastError=${(earliestConn?.lastError as string)?.slice(0, 50)}`);
         return {
           allRateLimited: true,
           retryAfter: earliest,
@@ -82,7 +83,7 @@ export async function getProviderCredentials(
           lastErrorCode: earliestConn?.errorCode ?? null,
         };
       }
-      log.warn("AUTH", `${provider} | all ${connections.length} accounts unavailable`);
+      log.warn("AUTH", `${providerName} | all ${connections.length} accounts unavailable`);
       return null;
     }
 

@@ -22,6 +22,7 @@ import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stub
 import { FORMATS } from "../ai-bridge/translator/formats.ts";
 import { detectFormat } from "../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
+import { getProviderDisplayName } from "../lib/providers.ts";
 
 type ClientRawRequest = {
   endpoint: string;
@@ -158,7 +159,7 @@ async function handleSingleModelChat(
     model,
     apiKeyId: apiKeyId ?? undefined,
   });
-  log.pending(provider, model);
+  await log.pending(provider, model);
 
   const userAgent = request?.headers?.get("user-agent") ?? "";
 
@@ -189,7 +190,8 @@ async function handleSingleModelChat(
     }
 
     const creds = credentials as Record<string, unknown>;
-    log.info("AUTH", `\x1b[32mUsing ${provider} account: ${creds.connectionName}\x1b[0m`);
+    const providerName = await getProviderDisplayName(provider);
+    log.info("AUTH", `\x1b[32mUsing ${providerName} account: ${creds.connectionName}\x1b[0m`);
 
     const refreshedCredentials = await checkAndRefreshToken(provider, creds);
 

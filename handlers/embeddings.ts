@@ -15,6 +15,7 @@ import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
+import { getProviderDisplayName } from "../lib/providers.ts";
 
 /**
  * Handle embeddings request.
@@ -98,7 +99,8 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
     }
 
     const creds = credentials as Record<string, unknown>;
-    log.info("AUTH", `\x1b[32mUsing ${provider} account: ${creds.connectionName}\x1b[0m`);
+    const providerName = await getProviderDisplayName(provider);
+    log.info("AUTH", `\x1b[32mUsing ${providerName} account: ${creds.connectionName}\x1b[0m`);
 
     const refreshedCredentials = await checkAndRefreshToken(provider, creds);
 
