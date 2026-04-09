@@ -3,12 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import type { ProxStatus, ProxSummary, ProxRecent } from "@/lib/proxTypes.ts";
-import { ProxBudgetCard } from "./components/ProxBudgetCard.tsx";
+import type { ProxStatus, ProxSummary, ProxChart, ProxRecent } from "@/lib/proxTypes.ts";
+import { BudgetCard } from "@/components/BudgetCard.tsx";
+import { QuotaCard } from "@/components/QuotaCard.tsx";
+import { fmt } from "@/lib/formatters.ts";
 import { ProxModelTable } from "./components/ProxModelTable.tsx";
 import { ProxRecentTable } from "./components/ProxRecentTable.tsx";
-import { QuotaCard } from "@/pages/MavisUsage/components/QuotaCard.tsx";
-import { fmt } from "./utils/formatters.ts";
+import { ProxTimeseriesChart } from "./components/ProxTimeseriesChart.tsx";
 
 const DAYS_OPTIONS = [
   { label: "7d", value: 7 },
@@ -21,10 +22,12 @@ export default function ProxUsage() {
   const [keys, setKeys] = useState<{ id: string; maskedName: string }[]>([]);
   const [status, setStatus] = useState<ProxStatus | null>(null);
   const [summary, setSummary] = useState<ProxSummary | null>(null);
+  const [chart, setChart] = useState<ProxChart | null>(null);
   const [recent, setRecent] = useState<ProxRecent | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const selectedKey = searchParams.get("key") ?? "";
   const days = parseInt(searchParams.get("days") ?? "30", 10);
@@ -45,22 +48,18 @@ export default function ProxUsage() {
 
     (async () => {
       try {
-        const [s, sm, r] = await Promise.all([
+        const [s, sm, sc, r] = await Promise.all([
           api.prox.getStatus(selectedKey || undefined) as Promise<ProxStatus>,
-          api.prox.getSummary(
-            days,
-            selectedKey || undefined,
-          ) as Promise<ProxSummary>,
-          api.prox.getRecent(
-            1,
-            15,
-            selectedKey || undefined,
-          ) as Promise<ProxRecent>,
+          api.prox.getSummary(days, selectedKey || undefined) as Promise<ProxSummary>,
+          api.prox.getChart(days, selectedKey || undefined) as Promise<ProxChart>,
+          api.prox.getRecent(1, 15, selectedKey || undefined) as Promise<ProxRecent>,
         ]);
         if (!cancelled) {
           setStatus(s);
           setSummary(sm);
+          setChart(sc);
           setRecent(r);
+          setLastUpdated(new Date());
         }
       } catch (err) {
         if (!cancelled) {
@@ -83,21 +82,17 @@ export default function ProxUsage() {
     try {
       const data = await api.prox.listKeys();
       setKeys(data.keys);
-      const [s, sm, r] = await Promise.all([
+      const [s, sm, sc, r] = await Promise.all([
         api.prox.getStatus(selectedKey || undefined) as Promise<ProxStatus>,
-        api.prox.getSummary(
-          days,
-          selectedKey || undefined,
-        ) as Promise<ProxSummary>,
-        api.prox.getRecent(
-          1,
-          15,
-          selectedKey || undefined,
-        ) as Promise<ProxRecent>,
+        api.prox.getSummary(days, selectedKey || undefined) as Promise<ProxSummary>,
+        api.prox.getChart(days, selectedKey || undefined) as Promise<ProxChart>,
+        api.prox.getRecent(1, 15, selectedKey || undefined) as Promise<ProxRecent>,
       ]);
       setStatus(s);
       setSummary(sm);
+      setChart(sc);
       setRecent(r);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load Pro-X data",
@@ -192,6 +187,12 @@ export default function ProxUsage() {
         </div>
       </div>
 
+      {lastUpdated && (
+        <p className='-mt-2 text-[11px] text-[var(--on-surface-variant)]'>
+          Last updated: {lastUpdated.toLocaleTimeString()}
+        </p>
+      )}
+
       {error && (
         <div className='flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(203,213,225,0.6)]'>
           <AlertCircle className='shrink-0 w-5 h-5 text-[#ef4444]' />
@@ -225,7 +226,7 @@ export default function ProxUsage() {
         </div>
       )}
 
-      {loading && !status ? (
+      {(!status || loading) ? (
         <div className='px-12 py-12 text-center'>
           <div className='inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent' />
           <p className='mt-3 text-[13px] text-[var(--on-surface-variant)]'>
@@ -234,7 +235,19 @@ export default function ProxUsage() {
         </div>
       ) : (
         <>
-          <ProxBudgetCard status={status} />
+          <BudgetCard
+            source={{
+              type: "prox",
+              planType: status.plan_type,
+              rateLimitAmount: status.rate_limit_amount,
+              rateLimitSpent: status.rate_limit_window_spent,
+              rateLimitHours: status.rate_limit_interval_hours,
+              rateLimitResetsAt: status.rate_limit_window_resets_at,
+              expiry: status.expiry,
+              daysRemaining: status.days_remaining,
+              totalSpent: status.total_spent,
+            }}
+          />
 
           {/* Quota cards */}
           <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4'>
@@ -264,6 +277,7 @@ export default function ProxUsage() {
           <ProxModelTable summary={summary?.summary ?? []} />
 
           <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
+            <ProxTimeseriesChart chart={chart} />
             <ProxRecentTable
               recent={recent}
               loading={loading}

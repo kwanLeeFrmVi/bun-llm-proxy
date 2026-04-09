@@ -10,7 +10,7 @@ import {
   Legend,
 } from "chart.js";
 import { Chart } from "react-chartjs-2";
-import type { MavisUsageResponse } from "@/lib/mavisTypes.ts";
+import type { ProxChart } from "@/lib/proxTypes.ts";
 import { SectionHeader } from "@/components/SectionHeader.tsx";
 import { fmt } from "@/lib/formatters.ts";
 
@@ -27,14 +27,10 @@ ChartJS.register(
 
 const cardClass = "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
-export function TimeseriesChart({
-  usage,
-}: {
-  usage: MavisUsageResponse | null;
-}) {
-  const ts = usage?.timeseries ?? [];
+export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
+  const points = chart?.chart ?? [];
 
-  if (ts.length === 0) {
+  if (points.length === 0) {
     return (
       <div className={cardClass}>
         <SectionHeader
@@ -48,7 +44,7 @@ export function TimeseriesChart({
     );
   }
 
-  const labels = ts.map((d) => d.time.slice(5));
+  const labels = points.map((d) => d.date.slice(5));
 
   const chartData = {
     labels,
@@ -56,7 +52,7 @@ export function TimeseriesChart({
       {
         type: "bar" as const,
         label: "Tokens",
-        data: ts.map((d) => d.tokens),
+        data: points.map((d) => d.input_tokens + d.output_tokens),
         backgroundColor: "rgba(0, 83, 219, 0.75)",
         borderRadius: 4,
         yAxisID: "y",
@@ -65,7 +61,7 @@ export function TimeseriesChart({
       {
         type: "line" as const,
         label: "Requests",
-        data: ts.map((d) => d.requests),
+        data: points.map((d) => d.requests),
         borderColor: "rgba(34, 197, 94, 0.9)",
         backgroundColor: "rgba(34, 197, 94, 0.08)",
         fill: true,

@@ -22,34 +22,21 @@ export function CountdownCard({
       const now = Date.now();
       const diff = targetDate - now;
 
-      if (diff <= 0) {
-        return "Reset now";
-      }
+      if (diff <= 0) return "Reset now";
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-      );
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      if (days > 0) {
-        return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-      }
-      if (hours > 0) {
-        return `${hours}h ${minutes}m ${seconds}s`;
-      }
-      if (minutes > 0) {
-        return `${minutes}m ${seconds}s`;
-      }
+      if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+      if (minutes > 0) return `${minutes}m ${seconds}s`;
       return `${seconds}s`;
     };
 
     setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
     return () => clearInterval(timer);
   }, [target]);
 
@@ -69,11 +56,7 @@ export function CountdownCard({
       <p className="mt-1 font-headline text-[28px] font-700 text-[var(--on-surface)]">
         {timeLeft}
       </p>
-      {sub && (
-        <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
-          {sub}
-        </p>
-      )}
+      {sub && <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{sub}</p>}
     </div>
   );
 }

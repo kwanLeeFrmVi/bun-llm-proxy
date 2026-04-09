@@ -14,14 +14,11 @@ export function QuotaCard({
       <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-600">
         {label}
       </p>
-      <p className={`mt-1 font-headline text-[28px] font-700 ${color ?? "text-[var(--on-surface)]"}`}>
+      <p className={`mt-1 font-headline text-[28px] font-700 ${color ? "" : "text-[var(--on-surface)]"}`}
+         style={color ? { color } : undefined}>
         {value}
       </p>
-      {sub && (
-        <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
-          {sub}
-        </p>
-      )}
+      {sub && <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{sub}</p>}
     </div>
   );
 }

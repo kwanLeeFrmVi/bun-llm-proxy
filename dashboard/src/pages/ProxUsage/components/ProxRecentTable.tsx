@@ -1,6 +1,5 @@
 import type { ProxRecent } from "@/lib/proxTypes.ts";
-import { fmt } from "../utils/formatters.ts";
-import { fmtDate } from "@/pages/MavisUsage/utils/formatters.ts";
+import { fmt, fmtDate } from "@/lib/formatters.ts";
 
 interface ProxRecentTableProps {
   recent: ProxRecent | null;

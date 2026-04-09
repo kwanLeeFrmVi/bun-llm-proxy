@@ -179,3 +179,18 @@ export const PROVIDER_ID_TO_ALIAS: Record<string, string> = {
 export function getProviderAlias(providerId: string): string {
   return PROVIDER_ID_TO_ALIAS[providerId] ?? providerId;
 }
+
+/**
+ * Get effective alias for a provider.
+ * For compatible providers (openai-compatible-*, anthropic-compatible-*), this looks up the prefix from the nodes array.
+ * Falls back to the standard alias for predefined providers.
+ */
+export function getEffectiveProviderAlias(providerId: string, nodes: { id?: string; prefix?: string }[]): string {
+  // Check if it's a compatible provider
+  if (isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId)) {
+    const node = nodes.find(n => n.id === providerId);
+    if (node?.prefix) return node.prefix;
+  }
+  // Fall back to standard alias lookup
+  return getProviderAlias(providerId);
+}

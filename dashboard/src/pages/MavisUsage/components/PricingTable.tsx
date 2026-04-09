@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { MavisUsageResponse } from "@/lib/mavisTypes.ts";
-import { SectionHeader } from "./SectionHeader.tsx";
+import { SectionHeader } from "@/components/SectionHeader.tsx";
 
 const TOP_MODELS_COUNT = 4;
 

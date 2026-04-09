@@ -3,32 +3,31 @@ import { api } from "@/lib/api.ts";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import type { MavisUsageResponse, MavisUserProfile } from "@/lib/mavisTypes.ts";
+import type { MavisUsageResponse } from "@/lib/mavisTypes.ts";
+import { MAVIS_QUOTA_DIVISOR } from "@/lib/mavisTypes.ts";
 import { RANGES, type Range } from "./utils/constants.ts";
 import { buildPricingMap } from "./utils/pricing.ts";
-import { QuotaCards } from "./components/QuotaCards.tsx";
-import { BudgetCard } from "./components/BudgetCard.tsx";
+import { fmt } from "@/lib/formatters.ts";
+import { BudgetCard } from "@/components/BudgetCard.tsx";
+import { QuotaCard } from "@/components/QuotaCard.tsx";
 import { ModelTable } from "./components/ModelTable.tsx";
 import { TimeseriesChart } from "./components/TimeseriesChart.tsx";
 import { PricingTable } from "./components/PricingTable.tsx";
 
 export default function MavisUsage() {
   const [range, setRange] = useState<Range>("24h");
-  const [profile, setProfile] = useState<MavisUserProfile | null>(null);
   const [usage, setUsage] = useState<MavisUsageResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
+    setUsage(null); // clear stale data immediately
+    setIsLoading(true);
     try {
-      const [profileData, usageData] = await Promise.all([
-        api.mavis.getMe() as Promise<MavisUserProfile>,
-        api.mavis.getUsage(range) as Promise<MavisUsageResponse>,
-      ]);
-      setProfile(profileData);
+      const usageData = await api.mavis.getUsage(range) as MavisUsageResponse;
       setUsage(usageData);
       setLastUpdated(new Date());
     } catch (err) {
@@ -36,7 +35,7 @@ export default function MavisUsage() {
         err instanceof Error ? err.message : "Failed to load from Mavis",
       );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, [range]);
 
@@ -53,7 +52,6 @@ export default function MavisUsage() {
   };
 
   useEffect(() => {
-    setLoading(true);
     load();
   }, [load]);
 
@@ -142,7 +140,7 @@ export default function MavisUsage() {
         </div>
       )}
 
-      {loading && !usage ? (
+      {!usage || isLoading ? (
         <div className='px-12 py-12 text-center'>
           <div className='inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent' />
           <p className='mt-3 text-[13px] text-[var(--on-surface-variant)]'>
@@ -151,9 +149,39 @@ export default function MavisUsage() {
         </div>
       ) : (
         <>
-          <BudgetCard profile={profile} usage={usage} />
+          <BudgetCard
+            source={{
+              type: "mavis",
+              planAllowance: usage.plan_allowance,
+              periodUsedQuota: usage.period_used_quota,
+              planPeriod: usage.plan_period,
+              planName: usage.plan_name,
+              periodResetAt: usage.period_reset_at,
+            }}
+          />
+          {/* Quota cards */}
           <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4'>
-            <QuotaCards profile={profile} usage={usage} />
+            <QuotaCard
+              label='Requests'
+              value={fmt(usage?.summary?.total_requests ?? 0)}
+              sub='Total requests'
+            />
+            <QuotaCard
+              label='Input Tokens'
+              value={fmt(usage?.summary?.total_tokens ?? 0)}
+              sub='Prompt tokens'
+            />
+            <QuotaCard
+              label='Output Tokens'
+              value={fmt(usage?.summary?.total_tokens ?? 0)}
+              sub='Completion tokens'
+            />
+            <QuotaCard
+              label='Total Cost'
+              value={"$" + ((usage?.period_used_quota ?? 0) / MAVIS_QUOTA_DIVISOR).toFixed(2)}
+              sub='Spend'
+              color='#f97316'
+            />
           </div>
           <ModelTable usage={usage} pricing={pricing} />
           <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
