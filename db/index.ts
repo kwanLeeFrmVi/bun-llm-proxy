@@ -144,6 +144,11 @@ export async function updateProviderConnection(id: string, data: Record<string, 
   for (const [k, v] of Object.entries(data)) {
     if (v === null) {
       delete merged[k];
+    } else if (k === "providerSpecificData") {
+      // Deep merge providerSpecificData to preserve existing fields
+      const existingPsd = (merged.providerSpecificData as Record<string, unknown>) ?? {};
+      const newPsd = v as Record<string, unknown>;
+      merged.providerSpecificData = { ...existingPsd, ...newPsd };
     } else {
       merged[k] = v;
     }
