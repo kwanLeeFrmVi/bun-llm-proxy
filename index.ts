@@ -9,6 +9,10 @@ import { join } from "node:path";
 // Initialize DB (creates tables, opens WAL connection)
 openDb();
 
+// Start background OAuth token refresh (every 2min, refreshes tokens expiring within 15min)
+import { startBackgroundTokenRefresh } from "./services/tokenRefresh.ts";
+startBackgroundTokenRefresh();
+
 // Capture server-side console logs for the dashboard log panel
 initConsoleLogCapture();
 
