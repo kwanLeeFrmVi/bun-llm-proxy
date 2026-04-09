@@ -189,6 +189,13 @@ export const api = {
     list: () => request<{ data: { id: string; created: number; owned_by?: string; combo_models?: string[] }[] }>("/v1/models"),
   },
 
+  // ─── Mavis (upstream mavis.io.vn) ─────────────────────────────────────────
+  mavis: {
+    getMe:    () => request<unknown>("/api/mavis/me"),
+    getUsage: (range: string) => request<unknown>(`/api/mavis/usage?range=${range}`),
+    refresh:  () => request("/api/mavis/refresh", { method: "POST" }),
+  },
+
   // ─── Combos ───────────────────────────────────────────────────────────────
   combos: {
     list:    () => request<{ combos: { id: string; name: string; models: string[]; createdAt?: string; updatedAt?: string }[] }>("/api/combos"),
