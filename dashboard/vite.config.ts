@@ -12,6 +12,10 @@ export default defineConfig({
       "/v1":  "http://localhost:20129",
     },
   },
+  preview: {
+    port: 20128,
+    allowedHosts: ["ai.mylast.io.vn", "localhost"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
