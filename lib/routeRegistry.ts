@@ -25,6 +25,7 @@ export function register(path: string, handlers: Partial<Record<HttpMethod, Hand
 /**
  * Returns the built route config and clears the registry.
  * Safe to call multiple times (re-builds from whatever has been registered so far).
+ * Also registers duplicate routes with /v1/v1/ prefix for clients that include /v1/ in base URL.
  */
 export function buildRoutes(): RouteConfig {
   console.log(`[routeLoader] Discovered ${registry.size} routes`);
@@ -32,8 +33,19 @@ export function buildRoutes(): RouteConfig {
     console.log(`  ${path}: ${Object.keys(methods).join(", ")}`);
   }
 
-  // Return current snapshot and keep registry for subsequent builds
-  return Object.fromEntries(
+  // Build routes map
+  const routes: RouteConfig = Object.fromEntries(
     [...registry.entries()].sort(([a], [b]) => a.localeCompare(b))
   );
+
+  // Register duplicate routes for /v1/v1/ prefix (for clients with /v1/ in base URL)
+  for (const [path, methods] of [...registry.entries()].sort()) {
+    if (path.startsWith("/v1/")) {
+      const doubleV1Path = path.replace("/v1/", "/v1/v1/");
+      routes[doubleV1Path] = methods;
+      console.log(`  ${doubleV1Path}: -> ${path} (alias)`);
+    }
+  }
+
+  return routes;
 }

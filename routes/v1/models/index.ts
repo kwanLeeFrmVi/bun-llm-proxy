@@ -72,12 +72,11 @@ export async function GET(_req: Request): Promise<Response> {
         id: combo.name,
         object: "model",
         created: timestamp,
-        owned_by: "combo",
+        owned_by: "anthropic", // Changed from "combo" to "anthropic" for Claude Code compatibility
         permission: [],
         root: combo.name,
         parent: null,
-        combo_id: combo.id,
-        combo_models: combo.models ?? [],
+        // Removed combo_id and combo_models to avoid confusing Claude Code
       });
     }
 
