@@ -24,7 +24,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ProviderIcon } from "@/components/ProviderIcon";
-import { Plus, ArrowLeft, ExternalLink, Play, Loader2 } from "lucide-react";
+import {
+  Plus,
+  ArrowLeft,
+  ExternalLink,
+  Play,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import OAuthModal from "@/components/OAuthModal";
 import KiroAuthModal from "@/components/KiroAuthModal";
 import { toast } from "sonner";
@@ -62,6 +69,9 @@ export default function ProviderDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditProvider, setShowEditProvider] = useState(false);
   const [editingNode, setEditingNode] = useState<ProviderNode | null>(null);
+  const [showDeleteProviderConfirm, setShowDeleteProviderConfirm] =
+    useState(false);
+  const [deletingProvider, setDeletingProvider] = useState(false);
   const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(
     null,
   );
@@ -339,7 +349,9 @@ export default function ProviderDetail() {
       // Construct full model path with provider alias (e.g., "nvidia/glm-5")
       // Only add prefix if modelId doesn't already start with it
       // For compatible providers, use node prefix instead of provider alias
-      const providerPrefix = isCompatible ? (node?.prefix ?? decodedId) : getProviderAlias(decodedId);
+      const providerPrefix = isCompatible
+        ? (node?.prefix ?? decodedId)
+        : getProviderAlias(decodedId);
       const fullModel = modelId.startsWith(`${providerPrefix}/`)
         ? modelId
         : `${providerPrefix}/${modelId}`;
@@ -469,7 +481,7 @@ export default function ProviderDetail() {
     setFetchingModels(true);
     try {
       const result = await api.providers.fetchModels(decodedId);
-      const fetched = result.models.map(m => ({
+      const fetched = result.models.map((m) => ({
         id: m.id,
         name: m.name,
       }));
@@ -486,9 +498,12 @@ export default function ProviderDetail() {
     if (predefinedModels.length === 0) return;
     try {
       setPredefinedModels([]);
-      const activeConn = connections.find(c => c.isActive !== false);
+      const activeConn = connections.find((c) => c.isActive !== false);
       if (activeConn) {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
+        const psd =
+          (activeConn.providerSpecificData as
+            | Record<string, unknown>
+            | undefined) ?? {};
         await api.providers.update(activeConn.id, {
           providerSpecificData: { ...psd, enabledModels: [] },
         });
@@ -503,17 +518,22 @@ export default function ProviderDetail() {
   async function handleDeletePredefinedModel(modelId: string) {
     try {
       // Remove from local state immediately
-      setPredefinedModels(prev => prev.filter(m => m.id !== modelId));
+      setPredefinedModels((prev) => prev.filter((m) => m.id !== modelId));
 
       // Update enabledModels in DB: remove the model ID (strip prefix if present)
-      const activeConn = connections.find(c => c.isActive !== false);
+      const activeConn = connections.find((c) => c.isActive !== false);
       if (activeConn) {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
+        const psd =
+          (activeConn.providerSpecificData as
+            | Record<string, unknown>
+            | undefined) ?? {};
         const enabledModels = (psd.enabledModels as string[]) ?? [];
         // modelId may be like "mvo/gpt-4o" strip prefix to get raw ID
         const prefix = (psd.prefix as string | undefined) ?? decodedId;
-        const rawId = modelId.startsWith(`${prefix}/`) ? modelId.slice(prefix.length + 1) : modelId;
-        const updated = enabledModels.filter(m => m !== rawId);
+        const rawId = modelId.startsWith(`${prefix}/`)
+          ? modelId.slice(prefix.length + 1)
+          : modelId;
+        const updated = enabledModels.filter((m) => m !== rawId);
         await api.providers.update(activeConn.id, {
           providerSpecificData: { ...psd, enabledModels: updated },
         });
@@ -530,6 +550,21 @@ export default function ProviderDetail() {
     setShowEditProvider(false);
     setEditingNode(null);
     await fetchData();
+  }
+
+  async function handleDeleteProvider() {
+    if (!node) return;
+    setDeletingProvider(true);
+    try {
+      await api.nodes.remove(node.id);
+      toast.success("Provider deleted");
+      window.location.href = "/providers";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete provider");
+    } finally {
+      setDeletingProvider(false);
+      setShowDeleteProviderConfirm(false);
+    }
   }
 
   if (loading) {
@@ -577,22 +612,34 @@ export default function ProviderDetail() {
               {displayName}
             </h1>
             <p className='text-sm text-[--on-surface-variant] mt-0.5'>
-              {connections.length} connection{connections.length !== 1 ? "s" : ""}
+              {connections.length} connection
+              {connections.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
         {isCompatible && isAdmin && node && (
-          <Button
-            variant='outline'
-            size='sm'
-            className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]'
-            onClick={() => {
-              setEditingNode(node);
-              setShowEditProvider(true);
-            }}
-          >
-            Edit Provider
-          </Button>
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]'
+              onClick={() => {
+                setEditingNode(node);
+                setShowEditProvider(true);
+              }}
+            >
+              Edit Provider
+            </Button>
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-8 px-3 text-xs font-medium border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700'
+              onClick={() => setShowDeleteProviderConfirm(true)}
+            >
+              <Trash2 className='w-3.5 h-3.5 mr-1' />
+              Delete
+            </Button>
+          </div>
         )}
       </div>
 
@@ -845,7 +892,9 @@ export default function ProviderDetail() {
                   <div className='flex flex-wrap gap-2'>
                     {customModels.map((m) => {
                       // Use node prefix for compatible providers, otherwise use provider alias
-                      const providerPrefix = isCompatible ? (node?.prefix ?? decodedId) : getProviderAlias(decodedId);
+                      const providerPrefix = isCompatible
+                        ? (node?.prefix ?? decodedId)
+                        : getProviderAlias(decodedId);
                       const alias = m.startsWith(`${providerPrefix}/`)
                         ? m
                         : `${providerPrefix}/${m}`;
@@ -957,6 +1006,50 @@ export default function ProviderDetail() {
         }}
         onUpdated={handleUpdateProvider}
       />
+
+      {/* Delete Provider Confirmation Dialog */}
+      <Dialog
+        open={showDeleteProviderConfirm}
+        onOpenChange={setShowDeleteProviderConfirm}
+      >
+        <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
+          <DialogHeader>
+            <DialogTitle className='font-headline text-lg font-bold'>
+              Delete Provider
+            </DialogTitle>
+            <DialogDescription className='text-sm text-[--on-surface-variant]'>
+              Are you sure you want to delete{" "}
+              <span className='font-medium text-[--on-surface]'>
+                "{displayName}"
+              </span>
+              ? This will also delete all connections and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className='gap-2'>
+            <Button
+              variant='outline'
+              onClick={() => setShowDeleteProviderConfirm(false)}
+              disabled={deletingProvider}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteProvider}
+              disabled={deletingProvider}
+              className='bg-red-600 text-white hover:bg-red-700'
+            >
+              {deletingProvider ? (
+                <>
+                  <Loader2 className='w-3.5 h-3.5 mr-1 animate-spin' />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Provider"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

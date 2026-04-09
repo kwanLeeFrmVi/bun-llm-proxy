@@ -142,6 +142,7 @@ export const api = {
     validate: (data: unknown) => request("/api/provider-nodes/validate", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: { name?: string; baseUrl?: string; prefix?: string; apiType?: string }) =>
       request<{ node: ProviderNode }>(`/api/provider-nodes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: string) => request<{ success: boolean }>(`/api/provider-nodes/${id}`, { method: "DELETE" }),
   },
 
   // ─── API Keys ─────────────────────────────────────────────────────────────
