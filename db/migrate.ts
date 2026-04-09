@@ -1,7 +1,9 @@
 /**
  * Migration: ~/.bunLLM/db.json → SQLite (router.db)
  * Idempotent: skips if provider_connections already has data.
- * Run: bun db/migrate.ts
+ * Run: bun db/migrate.ts [path/to/db.json] [--force]
+ *      bun db/migrate.ts                              # defaults to ~/.bunLLM/db.json
+ *      bun db/migrate.ts /path/to/db.json --force     # force re-migration even if SQLite has data
  */
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -14,16 +16,29 @@ import {
 } from "./index.ts";
 import { KV_KEYS } from "./schema.ts";
 
-const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
-const dbJsonPath = join(dataDir, "db.json");
+// Allow overriding the db.json path via CLI argument
+const args = process.argv.slice(2);
+const forceFlag = args.includes("--force");
+const dbJsonPath = args.find(a => a !== "--force") ?? join(process.env.DATA_DIR ?? join(homedir(), ".bunLLM"), "db.json");
 
 const db = openDb();
 
-// Check if already migrated
+// Check if already migrated (unless --force)
 const count = db.query<{ count: number }, []>("SELECT COUNT(*) as count FROM provider_connections").get();
-if ((count?.count ?? 0) > 0) {
+if ((count?.count ?? 0) > 0 && !forceFlag) {
   console.log("[migrate] SQLite already populated, skipping.");
+  console.log("[migrate] Use --force to re-run migration.");
   process.exit(0);
+}
+
+if (forceFlag && (count?.count ?? 0) > 0) {
+  console.log("[migrate] --force detected, clearing existing data before re-migrating...");
+  db.run("DELETE FROM provider_connections");
+  db.run("DELETE FROM provider_nodes");
+  db.run("DELETE FROM proxy_pools");
+  db.run("DELETE FROM combos");
+  db.run("DELETE FROM api_keys");
+  db.run("DELETE FROM kv");
 }
 
 // Read db.json
@@ -35,44 +50,88 @@ if (!(await file.exists())) {
 
 const data = await file.json() as Record<string, unknown>;
 console.log(`[migrate] Reading ${dbJsonPath}`);
+console.log(`[migrate] Top-level keys found: ${Object.keys(data).join(", ")}`);
 
-// Migrate provider connections
-const connections = (data.providerConnections as Record<string, unknown>[]) ?? [];
+// Helper: try multiple key name variants (old db.json used inconsistent naming)
+function pickArray(data: Record<string, unknown>, ...keys: string[]): Record<string, unknown>[] {
+  for (const k of keys) {
+    const v = data[k];
+    if (Array.isArray(v)) return v as Record<string, unknown>[];
+  }
+  return [];
+}
+
+// Migrate provider connections (key was "providersConnections" in some db.json versions)
+const connections = pickArray(data, "providersConnections", "providerConnections");
+if (connections.length === 0 && (data.providerConnections || data.providersConnections)) {
+  console.warn(`[migrate] Found provider connection key but value is not an array`);
+}
 for (const conn of connections) {
   await createProviderConnection(conn);
 }
 console.log(`[migrate] Migrated ${connections.length} provider connections`);
 
 // Migrate provider nodes
-const nodes = (data.providerNodes as Record<string, unknown>[]) ?? [];
+// Build a map of providerId -> first connection's providerSpecificData.baseUrl
+// so we can backfill baseUrl on nodes that don't have it
+const baseUrlByProviderId = new Map<string, string>();
+for (const conn of connections) {
+  const providerId = conn.provider as string;
+  if (!providerId) continue;
+  const psd = conn.providerSpecificData as Record<string, unknown> | undefined;
+  const url = (psd?.baseUrl ?? psd?.base_url ?? "") as string;
+  if (url && !baseUrlByProviderId.has(providerId)) {
+    baseUrlByProviderId.set(providerId, url);
+  }
+}
+
+const nodes = pickArray(data, "providerNodes", "providersNodes");
 for (const node of nodes) {
+  // Support both camelCase and snake_case field names
+  let baseUrl = (node.baseUrl ?? node.base_url ?? "") as string;
+  const apiType = (node.apiType ?? node.api_type ?? "") as string;
+  const name = (node.name ?? "") as string;
+  const prefix = (node.prefix ?? "") as string;
+  const type = (node.type ?? "") as string;
+
+  // Backfill baseUrl from connections if node doesn't have one
+  if (!baseUrl) {
+    const inferred = baseUrlByProviderId.get(node.id as string);
+    if (inferred) {
+      baseUrl = inferred;
+      console.log(`[migrate] Provider node "${name || node.id}" — inferred baseUrl from connection: ${baseUrl}`);
+    } else {
+      console.warn(`[migrate] Provider node "${name || node.id}" has no baseUrl and no connection to infer from — it will need to be updated manually.`);
+    }
+  }
+
   await createProviderNode({
     id: node.id as string,
-    type: node.type as string,
-    name: node.name as string,
-    prefix: node.prefix as string,
-    apiType: (node.apiType ?? node.type) as string,
-    baseUrl: node.baseUrl as string,
+    type,
+    name,
+    prefix,
+    apiType,
+    baseUrl,
   });
 }
 console.log(`[migrate] Migrated ${nodes.length} provider nodes`);
 
 // Migrate proxy pools
-const pools = (data.proxyPools as Record<string, unknown>[]) ?? [];
+const pools = pickArray(data, "proxyPools", "proxiesPools");
 for (const pool of pools) {
   await createProxyPool(pool);
 }
 console.log(`[migrate] Migrated ${pools.length} proxy pools`);
 
 // Migrate combos
-const combos = (data.combos as Array<{ name: string; models: string[] }>) ?? [];
+const combos = (pickArray(data, "combos") as Array<{ name: string; models: string[] }>) ?? [];
 for (const combo of combos) {
   await createCombo({ name: combo.name, models: combo.models ?? [] });
 }
 console.log(`[migrate] Migrated ${combos.length} combos`);
 
 // Migrate API keys
-const apiKeys = (data.apiKeys as Array<{ id: string; name: string; key: string; machineId?: string; isActive?: boolean; createdAt?: string }>) ?? [];
+const apiKeys = (pickArray(data, "apiKeys") as Array<{ id: string; name: string; key: string; machineId?: string; isActive?: boolean; createdAt?: string }>) ?? [];
 for (const k of apiKeys) {
   db.run(
     "INSERT OR IGNORE INTO api_keys (id, name, key, machine_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)",

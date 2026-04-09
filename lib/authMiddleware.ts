@@ -67,6 +67,5 @@ export async function checkAdminAuth(request: Request): Promise<AdminAuthResult>
     return { ok: false, response: Response.json({ error: "User not found" }, { status: 401 }) };
   }
 
-  log.debug("AUTH", `Session valid for user: ${user.username} (role: ${user.role})`);
   return { ok: true, userId: session.userId, role: user.role };
 }

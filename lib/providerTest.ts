@@ -16,7 +16,7 @@ interface ConnectionForTest {
   provider: string;
   apiKey?: string;
   authType?: string;
-  baseUrl?: string;
+  providerSpecificData?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -365,7 +365,9 @@ async function testAnthropicCompatible(
 async function testApiKeyConnection(
   connection: ConnectionForTest
 ): Promise<TestResult> {
-  const { provider, apiKey, baseUrl } = connection;
+  const { provider, apiKey } = connection;
+  const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
+  const baseUrl = (psd?.baseUrl ?? connection.baseUrl ?? "") as string;
 
   if (!apiKey) {
     return {

@@ -88,12 +88,19 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Build the connection record
+  // For compatible providers, baseUrl must go inside providerSpecificData
+  // (all consumers read from providerSpecificData.baseUrl, not from top-level)
+  const providerSpecificData: Record<string, unknown> = {};
+  if (isCompatible && baseUrl && typeof baseUrl === "string") {
+    providerSpecificData.baseUrl = baseUrl.trim();
+  }
+
   const conn = await createProviderConnection({
     provider,
     authType: "apikey",
     name: (name as string).trim(),
     apiKey: apiKey ? (apiKey as string).trim() : undefined,
-    baseUrl: baseUrl ? (baseUrl as string).trim() : undefined,
+    providerSpecificData,
     priority: typeof priority === "number" ? priority : 1,
     isActive: true,
     testStatus: "unknown",

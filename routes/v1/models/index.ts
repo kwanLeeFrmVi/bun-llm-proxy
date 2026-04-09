@@ -88,6 +88,8 @@ export async function GET(_req: Request): Promise<Response> {
         permission: [],
         root: combo.name,
         parent: null,
+        combo_id: combo.id,
+        combo_models: combo.models ?? [],
       });
     }
 
