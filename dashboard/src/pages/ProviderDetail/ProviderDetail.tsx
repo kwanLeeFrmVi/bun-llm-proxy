@@ -151,13 +151,16 @@ export default function ProviderDetail() {
     try {
       const response = await api.providers.getModels(decodedId);
       setPredefinedModels(response.models);
+      // Also update customModels from localStorage to match what's in the DB
+      // This keeps the custom models list in sync
+      loadCustomModels();
     } catch (e) {
       console.error("Failed to fetch predefined models:", e);
       setPredefinedModels([]);
     } finally {
       setLoadingModels(false);
     }
-  }, [decodedId]);
+  }, [decodedId, loadCustomModels]);
 
   useEffect(() => {
     fetchData();
@@ -458,18 +461,70 @@ export default function ProviderDetail() {
     }
   }
 
-  function handleAddModel(modelId: string) {
+  async function handleAddModel(modelId: string) {
+    // Update local state immediately for responsiveness
     const updated = [...customModels, modelId];
     setCustomModels(updated);
+
+    // Also persist to localStorage for backup
     localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
+
+    // Persist to database: add to providerSpecificData.enabledModels
+    const activeConn = connections.find((c) => c.isActive !== false);
+    if (activeConn) {
+      try {
+        const psd =
+          (activeConn.providerSpecificData as
+            | Record<string, unknown>
+            | undefined) ?? {};
+        const enabledModels = (psd.enabledModels as string[]) ?? [];
+        // Add model if not already present
+        if (!enabledModels.includes(modelId)) {
+          const updated = [...enabledModels, modelId];
+          await api.providers.update(activeConn.id, {
+            providerSpecificData: { ...psd, enabledModels: updated },
+          });
+        }
+      } catch (e) {
+        console.error("Failed to persist model to database:", e);
+        toast.error("Model added locally but failed to sync to database");
+        setShowAddModel(false);
+        return;
+      }
+    }
+
     setShowAddModel(false);
     toast.success(`Model ${modelId} added`);
   }
 
-  function handleDeleteCustomModel(modelId: string) {
+  async function handleDeleteCustomModel(modelId: string) {
+    // Update local state immediately for responsiveness
     const updated = customModels.filter((m) => m !== modelId);
     setCustomModels(updated);
+
+    // Also update localStorage
     localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
+
+    // Persist to database: remove from providerSpecificData.enabledModels
+    const activeConn = connections.find((c) => c.isActive !== false);
+    if (activeConn) {
+      try {
+        const psd =
+          (activeConn.providerSpecificData as
+            | Record<string, unknown>
+            | undefined) ?? {};
+        const enabledModels = (psd.enabledModels as string[]) ?? [];
+        const updated = enabledModels.filter((m) => m !== modelId);
+        await api.providers.update(activeConn.id, {
+          providerSpecificData: { ...psd, enabledModels: updated },
+        });
+      } catch (e) {
+        console.error("Failed to remove model from database:", e);
+        toast.error("Model removed locally but failed to sync to database");
+        return;
+      }
+    }
+
     toast.success(`Model ${modelId} deleted`);
   }
 
