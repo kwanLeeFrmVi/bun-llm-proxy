@@ -1,4 +1,23 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+// Determine API base URL:
+// - Dev: Use Vite proxy (relative URL)
+// - Prod build with VITE_API_URL set: Use that URL
+// - Prod build without VITE_API_URL: Use same origin (assumes reverse proxy)
+function getApiBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    // Development: use Vite proxy (empty string = relative URL)
+    return import.meta.env.VITE_API_URL ?? "";
+  }
+
+  // Production: check if VITE_API_URL was set during build
+  const buildTimeUrl = import.meta.env.VITE_API_URL;
+  if (buildTimeUrl) return buildTimeUrl;
+
+  // Production: use same origin (empty string = relative URL)
+  // This works when both dashboard and API are behind the same domain/reverse proxy
+  return "";
+}
+
+const BASE_URL = getApiBaseUrl();
 
 // ─── Shared types ────────────────────────────────────────────────────────────────
 
