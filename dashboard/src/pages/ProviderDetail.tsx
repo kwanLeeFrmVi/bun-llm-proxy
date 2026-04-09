@@ -1026,12 +1026,82 @@ export default function ProviderDetail() {
       });
       const latencyMs = Date.now() - start;
 
-      const data = await res.json().catch(() => null);
+      // Handle both streaming (SSE) and non-streaming (JSON) responses
+      // For STREAM_PROVIDERS (openai, codex), backend always streams regardless of stream:false
+      const contentType = res.headers.get("content-type") ?? "";
+      const isStreaming = contentType.includes("text/event-stream");
 
-      if (!res.ok || data?.error || !data?.choices?.length) {
+      let success = false;
+      let errorMsg = "";
+
+      if (!res.ok) {
+        // Try to parse error from response
+        try {
+          const errData = await res.json();
+          errorMsg = errData?.error?.message ?? `HTTP ${res.status}`;
+        } catch {
+          errorMsg = `HTTP ${res.status}`;
+        }
+      } else if (isStreaming) {
+        // Parse SSE stream - look for any valid chunk with content
+        try {
+          const reader = res.body?.getReader();
+          if (reader) {
+            const decoder = new TextDecoder();
+            let foundContent = false;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const text = decoder.decode(value);
+              // Check for error in SSE
+              if (text.includes('"error"')) {
+                const match = text.match(/"error":\s*({[^}]+})/);
+                if (match) {
+                  try {
+                    const errObj = JSON.parse(match[1]!);
+                    errorMsg = errObj?.message ?? "Stream error";
+                  } catch {
+                    /* ignore */
+                  }
+                }
+                break;
+              }
+              // Check for valid content chunk
+              if (
+                text.includes('"choices"') &&
+                (text.includes('"content"') || text.includes('"delta"'))
+              ) {
+                foundContent = true;
+              }
+              // Check for [DONE] marker
+              if (text.includes("[DONE]")) {
+                break;
+              }
+            }
+            success = foundContent;
+            if (!foundContent && !errorMsg) {
+              errorMsg = "No content in stream";
+            }
+          }
+        } catch (e) {
+          errorMsg = e instanceof Error ? e.message : "Stream parse error";
+        }
+      } else {
+        // Non-streaming JSON response
+        const data = await res.json().catch(() => null);
+        if (data?.error) {
+          errorMsg = data.error.message ?? "Unknown error";
+        } else if (data?.choices?.length) {
+          success = true;
+        } else {
+          errorMsg = "No choices in response";
+        }
+      }
+
+      if (!success) {
         setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
         toast.error(
-          `Model ${modelId} test failed${data?.error?.message ? `: ${data.error.message}` : ""}`,
+          `Model ${modelId} test failed${errorMsg ? `: ${errorMsg}` : ""}`,
         );
       } else {
         setModelTestResults((prev) => ({ ...prev, [modelId]: "ok" }));
@@ -1331,22 +1401,29 @@ export default function ProviderDetail() {
                     Custom Models
                   </p>
                   <div className='flex flex-wrap gap-2'>
-                    {customModels.map((m) => (
-                      <ModelTile
-                        key={m}
-                        modelId={m}
-                        onCopy={handleCopy}
-                        copied={copied}
-                        onTest={
-                          connections.length > 0
-                            ? () => handleTestModel(m)
-                            : undefined
-                        }
-                        isTesting={testingModelId === m}
-                        testStatus={modelTestResults[m]}
-                        onDelete={() => handleDeleteCustomModel(m)}
-                      />
-                    ))}
+                    {customModels.map((m) => {
+                      const providerAlias = getProviderAlias(decodedId);
+                      const alias = m.startsWith(`${providerAlias}/`)
+                        ? m
+                        : `${providerAlias}/${m}`;
+                      return (
+                        <ModelTile
+                          key={m}
+                          modelId={m}
+                          alias={alias}
+                          onCopy={handleCopy}
+                          copied={copied}
+                          onTest={
+                            connections.length > 0
+                              ? () => handleTestModel(m)
+                              : undefined
+                          }
+                          isTesting={testingModelId === m}
+                          testStatus={modelTestResults[m]}
+                          onDelete={() => handleDeleteCustomModel(m)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}

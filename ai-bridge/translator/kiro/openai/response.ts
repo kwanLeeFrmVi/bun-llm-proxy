@@ -67,6 +67,11 @@ export function convertKiroResponseToOpenAI(
 
   // If already in OpenAI format
   if (data.object === "chat.completion.chunk" && data.choices) {
+    // rawText may already include "data: " prefix — don't re-wrap in that case
+    const alreadyPrefixed = rawText.startsWith("data: ");
+    if (alreadyPrefixed) {
+      return [new TextEncoder().encode(`${rawText}\n`)];
+    }
     return [
       new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`),
     ];

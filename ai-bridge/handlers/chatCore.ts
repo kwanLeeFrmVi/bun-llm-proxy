@@ -193,7 +193,7 @@ async function handleStreamingResponse(
           if (done) break;
 
           const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
-          const translated = translateChunk(sourceFormat, targetFormat, model, translatedBytes, raw, state);
+          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, raw, state);
           state = translated.state;
 
           for (const chunk of translated.chunks) {
@@ -202,7 +202,8 @@ async function handleStreamingResponse(
         }
 
         // Flush any remaining state (stop events)
-        const doneChunks = translateChunk(sourceFormat, targetFormat, model, translatedBytes, encoder.encode("[DONE]"), state);
+        // Use SSE "data: " prefix so translator functions that strip it can detect [DONE]
+        const doneChunks = translateChunk(targetFormat, sourceFormat, model, translatedBytes, encoder.encode("data: [DONE]"), state);
         for (const chunk of doneChunks.chunks) {
           controller.enqueue(chunk);
         }

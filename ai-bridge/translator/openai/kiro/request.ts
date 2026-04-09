@@ -281,6 +281,9 @@ export function convertOpenAIRequestToKiro(
           content: finalContent,
           modelId: modelName,
           origin: "AI_EDITOR",
+          ...(currentMessage?.userInputMessage?.images
+            ? { images: currentMessage.userInputMessage.images }
+            : {}),
           ...(currentMessage?.userInputMessage?.userInputMessageContext
             ? { userInputMessageContext: currentMessage.userInputMessage.userInputMessageContext }
             : {}),
@@ -292,7 +295,10 @@ export function convertOpenAIRequestToKiro(
 
   if (profileArn) payload.profileArn = profileArn;
 
-  const inferenceConfig: Record<string, unknown> = { maxTokens: 32000 };
+  const inferenceConfig: Record<string, unknown> = {};
+  const maxTokens = raw.max_tokens as number | undefined;
+  if (maxTokens !== undefined) inferenceConfig.maxTokens = maxTokens;
+  else inferenceConfig.maxTokens = 32000;
   if (temperature !== undefined) inferenceConfig.temperature = temperature;
   if (topP !== undefined) inferenceConfig.topP = topP;
   payload.inferenceConfig = inferenceConfig;

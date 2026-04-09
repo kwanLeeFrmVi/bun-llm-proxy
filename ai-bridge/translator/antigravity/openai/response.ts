@@ -5,7 +5,7 @@
 export interface AntigravityOpenAIState {
   responseId: string;
   modelVersion: string;
-  toolCallAccum: Record<number, { id: string; name: string; arguments: string }>;
+  toolCallAccum: Record<string, { id?: string; name: string; arguments: string }>;
   toolNameMap: Map<string, string>;
   usage: Record<string, number> | null;
 }
@@ -76,11 +76,11 @@ export function convertAntigravityResponseToOpenAI(
       // functionCall -> accumulate tool calls
       else if (part.functionCall) {
         const fc = part.functionCall as Record<string, unknown>;
-        const idx = (fc.id as number) ?? 0;
-        if (!state.toolCallAccum[idx]) {
-          state.toolCallAccum[idx] = { id: "", name: "", arguments: "" };
+        const key = (fc.id as string) ?? String(Object.keys(state.toolCallAccum).length);
+        if (!state.toolCallAccum[key]) {
+          state.toolCallAccum[key] = { id: undefined, name: "", arguments: "" };
         }
-        const accum = state.toolCallAccum[idx]!;
+        const accum = state.toolCallAccum[key]!;
         if (fc.id) accum.id = fc.id as string;
         if (fc.name) accum.name = fc.name as string;
         if (fc.args) {
@@ -92,10 +92,10 @@ export function convertAntigravityResponseToOpenAI(
 
   // On finish, emit accumulated tool calls
   if (finishReason) {
-    const toolCallIndices = Object.keys(state.toolCallAccum).map(Number);
-    if (toolCallIndices.length > 0) {
-      const toolCalls = toolCallIndices.map((idx) => {
-        const accum = state.toolCallAccum[idx]!;
+    const toolCallKeys = Object.keys(state.toolCallAccum);
+    if (toolCallKeys.length > 0) {
+      const toolCalls = toolCallKeys.map((key, idx) => {
+        const accum = state.toolCallAccum[key]!;
         return {
           index: idx,
           id: accum.id || `call_${idx}_${Date.now()}`,

@@ -266,7 +266,7 @@ async function handleSingleModelChat(
     }
 
     appendRequestLog(requestId, `error_${result.status}`);
-    return result.response;
+    return result.response ?? errorResponse(result.status ?? HTTP_STATUS.BAD_GATEWAY, result.error ?? "Unknown error");
   }
 }
 
