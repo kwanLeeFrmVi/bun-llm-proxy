@@ -7,6 +7,7 @@ import Providers from "@/pages/Providers.tsx";
 import ProviderDetail from "@/pages/ProviderDetail";
 import ApiKeys from "@/pages/ApiKeys.tsx";
 import Usage from "@/pages/Usage.tsx";
+import MavisUsage from "@/pages/MavisUsage.tsx";
 import Logs from "@/pages/Logs.tsx";
 import Models from "@/pages/Models.tsx";
 import Users from "@/pages/Users.tsx";
@@ -94,6 +95,7 @@ function ProtectedLayout() {
             {/* Shared routes */}
             <Route path='/keys' element={<ApiKeys />} />
             <Route path='/usage' element={<Usage />} />
+            <Route path='/mavis-usage' element={<MavisUsage />} />
             <Route path='/logs' element={<Logs />} />
             <Route path='/models' element={<Models />} />
             <Route path='/change-password' element={<ChangePassword />} />
