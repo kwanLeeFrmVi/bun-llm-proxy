@@ -1,5 +1,5 @@
 // GET /api/mavis/usage?range=7d — proxy to mavis.io.vn /api/usage
-import { getUsage } from "../../../../../lib/mavisService.ts";
+import { getUsage } from "lib/mavisService.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { register } from "lib/routeRegistry.ts";
 

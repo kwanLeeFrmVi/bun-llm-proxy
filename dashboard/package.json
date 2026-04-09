@@ -34,7 +34,7 @@
     "motion": "^12.38.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
-    "react-chartjs-2": "^5.3.0",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.6.1",
     "shadcn": "^4.2.0",

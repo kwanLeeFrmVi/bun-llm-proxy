@@ -3,6 +3,7 @@
 
 import { EventEmitter } from "events";
 import type { Database } from "bun:sqlite";
+import { normalizeModelName, stripSuffixes, baseModelName, getORModelCache } from "services/pricingSync.ts";
 
 // ─── DB singleton (inline to avoid circular dep on full db/index.ts) ───────────
 
@@ -143,7 +144,7 @@ export async function saveRequestUsage(
   // If open-sse computed a cost, use it; otherwise calculate from pricing if available.
   let finalCost = cost;
   if (finalCost === 0 && resolvedProvider && resolvedModel) {
-    finalCost = calculateCost(resolvedProvider, resolvedModel, promptTokens, completionTokens);
+    finalCost = await calculateCost(resolvedProvider, resolvedModel, promptTokens, completionTokens);
   }
 
   db().run(
@@ -201,13 +202,70 @@ export function saveRequestDetail(
 
 // ─── Cost calculation ──────────────────────────────────────────────────────────
 
-// Minimal pricing lookup — reads from KV via the db singleton.
-function calculateCost(
+type PriceEntry = { input: number; output: number };
+type ORCacheEntry = { id: string; input: number; output: number };
+
+/**
+ * Try to find pricing using multiple fallback strategies:
+ * 1. Exact match on provider + model
+ * 2. Normalized match (dots → dashes)
+ * 3. Suffix-stripped match
+ * 4. Base model name match
+ * 5. OpenRouter fuzzy lookup (full OR model ID)
+ */
+async function findPricing(
+  pricing: Record<string, Record<string, PriceEntry>>,
+  provider: string,
+  model: string,
+): Promise<PriceEntry | null> {
+  // 1. Exact match
+  if (pricing[provider]?.[model]) {
+    return pricing[provider][model];
+  }
+
+  // 2. Normalized match (e.g., "claude-sonnet-4.5" → "claude-sonnet-4-5")
+  const normalized = normalizeModelName(model);
+  if (normalized !== model && pricing[provider]?.[normalized]) {
+    return pricing[provider][normalized];
+  }
+
+  // 3. Suffix-stripped match (e.g., "glm-5-turbo" → "glm-5")
+  const stripped = stripSuffixes(model);
+  if (stripped !== model && pricing[provider]?.[stripped]) {
+    return pricing[provider][stripped];
+  }
+
+  // 4. Base model name match (e.g., "claude-sonnet-4-5" → "claude-sonnet")
+  const base = baseModelName(model);
+  if (base !== model && pricing[provider]?.[base]) {
+    return pricing[provider][base];
+  }
+
+  // 5. OpenRouter fuzzy lookup — always check cache regardless of stripped===model
+  const orCache = await getORModelCache();
+  if (orCache) {
+    // Check normalized, stripped, base, and raw model keys
+    for (const key of [normalized, stripped, base, model]) {
+      const entry = orCache[key] as ORCacheEntry | undefined;
+      if (entry) {
+        return { input: entry.input, output: entry.output };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculate cost using multi-level fallback pricing lookup.
+ * Reads from KV (pricing) and falls back to OpenRouter cached models.
+ */
+async function calculateCost(
   provider: string,
   model: string,
   promptTokens: number,
   completionTokens: number
-): number {
+): Promise<number> {
   try {
     const row = db()
       .query<{ value: string }, string>("SELECT value FROM kv WHERE key = 'pricing'")
@@ -215,15 +273,15 @@ function calculateCost(
     if (!row) return 0;
     const pricing = JSON.parse(row.value) as Record<
       string,
-      Record<string, Record<string, number>>
+      Record<string, PriceEntry>
     >;
-    const modelPricing = pricing[provider]?.[model];
-    if (!modelPricing) return 0;
-    const inputPrice  = modelPricing.input  ?? 0;
-    const outputPrice = modelPricing.output ?? 0;
+
+    const entry = await findPricing(pricing, provider, model);
+    if (!entry) return 0;
+
     return (
-      (promptTokens     * inputPrice  / 1_000_000) +
-      (completionTokens * outputPrice / 1_000_000)
+      (promptTokens     * entry.input  / 1_000_000) +
+      (completionTokens * entry.output / 1_000_000)
     );
   } catch {
     return 0;

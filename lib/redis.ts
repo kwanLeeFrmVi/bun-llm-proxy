@@ -100,3 +100,38 @@ export async function withLock<T>(
     if (release) await release();
   }
 }
+
+// ─── Cache helpers ──────────────────────────────────────────────────────────────
+
+const CACHE_PREFIX = "cache:";
+
+/**
+ * Get a cached string value.
+ */
+export async function getRedisCache(key: string): Promise<string | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    return await client.get(`${CACHE_PREFIX}${key}`);
+  } catch (err) {
+    log.debug("REDIS", `get error for ${key}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Set a cached string value with optional TTL (in seconds).
+ */
+export async function setRedisCache(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    if (ttlSeconds) {
+      await client.set(`${CACHE_PREFIX}${key}`, value, "EX", String(ttlSeconds));
+    } else {
+      await client.set(`${CACHE_PREFIX}${key}`, value);
+    }
+  } catch (err) {
+    log.debug("REDIS", `set error for ${key}: ${(err as Error).message}`);
+  }
+}

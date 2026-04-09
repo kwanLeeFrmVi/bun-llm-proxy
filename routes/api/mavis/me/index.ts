@@ -1,5 +1,5 @@
 // GET /api/mavis/me — proxy to mavis.io.vn /propilot/auth/me
-import { getMe } from "../../../../../lib/mavisService.ts";
+import { getMe } from "lib/mavisService.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { register } from "lib/routeRegistry.ts";
 

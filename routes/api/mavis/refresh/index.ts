@@ -1,5 +1,5 @@
 // POST /api/mavis/refresh — force re-login to mavis.io.vn
-import { refreshSession } from "../../../../../lib/mavisService.ts";
+import { refreshSession } from "lib/mavisService.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { register } from "lib/routeRegistry.ts";
 
