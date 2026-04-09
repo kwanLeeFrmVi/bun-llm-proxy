@@ -99,11 +99,24 @@ export async function GET(_req: Request): Promise<Response> {
       for (const [providerId, conn] of activeConnectionByProvider.entries()) {
         const staticAlias = providerIdToAlias[providerId] ?? providerId;
         const psd = (conn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-        const outputAlias = ((psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
+
+        // For compatible providers, get prefix from provider_nodes table
+        let nodePrefix: string | undefined;
+        const isCompatibleProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+        if (isCompatibleProvider) {
+          try {
+            const { getProviderNodeById } = await import("../../../db/index.ts");
+            const node = await getProviderNodeById(providerId);
+            nodePrefix = node?.prefix as string | undefined;
+          } catch {
+            // ignore error
+          }
+        }
+
+        const outputAlias = (nodePrefix ?? (psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
         const pModels = providerModels[staticAlias] ?? [];
         const enabledModels = psd.enabledModels as string[] | undefined;
         const hasExplicitEnabledModels = Array.isArray(enabledModels) && enabledModels.length > 0;
-        const isCompatibleProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
 
         let rawModelIds: string[] = hasExplicitEnabledModels
           ? Array.from(new Set(enabledModels.filter((id): id is string => typeof id === "string" && id.trim() !== "")))

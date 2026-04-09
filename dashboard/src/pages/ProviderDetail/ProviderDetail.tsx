@@ -338,10 +338,11 @@ export default function ProviderDetail() {
 
       // Construct full model path with provider alias (e.g., "nvidia/glm-5")
       // Only add prefix if modelId doesn't already start with it
-      const providerAlias = getProviderAlias(decodedId);
-      const fullModel = modelId.startsWith(`${providerAlias}/`)
+      // For compatible providers, use node prefix instead of provider alias
+      const providerPrefix = isCompatible ? (node?.prefix ?? decodedId) : getProviderAlias(decodedId);
+      const fullModel = modelId.startsWith(`${providerPrefix}/`)
         ? modelId
-        : `${providerAlias}/${modelId}`;
+        : `${providerPrefix}/${modelId}`;
 
       const start = Date.now();
       const res = await fetch(`${window.location.origin}/v1/chat/completions`, {
@@ -843,10 +844,11 @@ export default function ProviderDetail() {
                   </p>
                   <div className='flex flex-wrap gap-2'>
                     {customModels.map((m) => {
-                      const providerAlias = getProviderAlias(decodedId);
-                      const alias = m.startsWith(`${providerAlias}/`)
+                      // Use node prefix for compatible providers, otherwise use provider alias
+                      const providerPrefix = isCompatible ? (node?.prefix ?? decodedId) : getProviderAlias(decodedId);
+                      const alias = m.startsWith(`${providerPrefix}/`)
                         ? m
-                        : `${providerAlias}/${m}`;
+                        : `${providerPrefix}/${m}`;
                       return (
                         <ModelTile
                           key={m}
