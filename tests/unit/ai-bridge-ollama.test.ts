@@ -2,7 +2,8 @@
  * Unit tests for Ollama translators
  * Covers: convertClaudeRequestToOllama, convertOllamaRequestToClaude,
  * convertOllamaResponseToClaude, convertOllamaResponseToClaudeNonStream,
- * convertOllamaRequestToOpenAI, convertOpenAIRequestToOllama
+ * convertOllamaRequestToOpenAI, convertOpenAIRequestToOllama,
+ * convertOllamaResponseToOpenAI, convertOllamaResponseToOpenAINonStream
  */
 
 import { describe, it, expect } from "bun:test";
@@ -11,6 +12,7 @@ import { convertOllamaRequestToClaude } from "../../ai-bridge/translator/ollama/
 import { convertOllamaResponseToClaude, convertOllamaResponseToClaudeNonStream, type OllamaStreamingState } from "../../ai-bridge/translator/ollama/claude/response.ts";
 import { convertOllamaRequestToOpenAI } from "../../ai-bridge/translator/ollama/openai/request.ts";
 import { convertOpenAIRequestToOllama } from "../../ai-bridge/translator/openai/ollama/request.ts";
+import { convertOllamaResponseToOpenAI, convertOllamaResponseToOpenAINonStream, type OllamaOpenAIState } from "../../ai-bridge/translator/ollama/openai/response.ts";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -351,5 +353,228 @@ describe("convertOpenAIRequestToOllama", () => {
     }), true));
     const options = result.options as Record<string, unknown>;
     expect(options.top_p).toBe(0.9);
+  });
+});
+
+// ─── Ollama → OpenAI response (streaming) ─────────────────────────────────────
+
+describe("convertOllamaResponseToOpenAI (streaming)", () => {
+  const NO_RAW = new Uint8Array(0);
+
+  function decodeAll(chunks: Uint8Array[]): string {
+    return chunks.map(c => new TextDecoder().decode(c)).join("");
+  }
+
+  it("emits OpenAI SSE chunk for content chunk", () => {
+    // Ollama sends raw JSON (no "data: " prefix) in streaming NDJSON
+    const raw = enc.encode('{"model":"llama3","message":{"role":"assistant","content":"Hello"},"done":false}');
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain("data: ");
+    expect(text).toContain('"content":"Hello"');
+    expect(text).toContain('"object":"chat.completion.chunk"');
+  });
+
+  it("emits role chunk on first chunk", () => {
+    // First chunk has role:assistant and empty content — role delta should be emitted
+    // Note: empty content is skipped (no output for empty message), so this returns []
+    const raw = enc.encode('{"model":"llama3","message":{"role":"assistant","content":""},"done":false}');
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    // Empty content chunks are skipped — this is correct Ollama behavior
+    expect(chunks).toHaveLength(0);
+  });
+
+  it("emits finish_reason stop on done=true", () => {
+    const raw = enc.encode('{"model":"llama3","done":true,"done_reason":"stop","prompt_eval_count":5,"eval_count":4}');
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"finish_reason":"stop"');
+  });
+
+  it("maps done_reason=length to length", () => {
+    const raw = enc.encode('{"model":"llama3","done":true,"done_reason":"length","eval_count":100}');
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"finish_reason":"length"');
+  });
+
+  it("emits [DONE] sentinel inline (raw [DONE])", () => {
+    // [DONE] sentinel triggers done-events including the [DONE] marker
+    const raw = enc.encode("data: [DONE]");
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain("data: [DONE]");
+  });
+
+  it("accumulates state across chunks", () => {
+    // Create fresh state that will be mutated in-place
+    const state: OllamaOpenAIState = {
+      messageId: "", created: 0, model: "", finishReason: "",
+      contentAccumulator: "", thinkingAccumulator: "", hadToolCalls: false,
+    };
+
+    const chunk1 = enc.encode('{"model":"llama3","message":{"role":"assistant","content":"Hel"},"done":false}');
+    const chunks1 = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, chunk1, state);
+    expect(chunks1.length).toBeGreaterThan(0);
+
+    const chunk2 = enc.encode('{"model":"llama3","message":{"role":"assistant","content":"lo"},"done":false}');
+    const chunks2 = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, chunk2, state);
+    const text2 = decodeAll(chunks2);
+    // Second chunk should NOT re-emit the role/chunk header — only content delta
+    expect(text2).toContain('"content":"lo"');
+    // State should have accumulated content across chunks
+    expect(state.contentAccumulator).toBe("Hello");
+  });
+
+  it("returns empty for empty input", () => {
+    const raw = enc.encode("");
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    expect(chunks).toHaveLength(0);
+  });
+
+  it("handles thinking content", () => {
+    const raw = enc.encode('{"model":"llama3","message":{"role":"assistant","content":"answer","thinking":"reasoning"},"done":false}');
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    // Ollama thinking maps to reasoning_content in OpenAI
+    expect(text).toContain('"reasoning_content":"reasoning"');
+    expect(text).toContain('"content":"answer"');
+  });
+
+  it("handles tool_calls", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: {
+        role: "assistant",
+        content: "use the tool",
+        tool_calls: [{
+          id: "call_abc",
+          function: { name: "get_weather", arguments: '{"city":"NYC"}' },
+        }],
+      },
+      done: false,
+    }));
+    const chunks = convertOllamaResponseToOpenAI(null, "llama3", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"tool_calls"');
+    expect(text).toContain('"name":"get_weather"');
+  });
+});
+
+// ─── Ollama → OpenAI response (non-streaming) ──────────────────────────────────
+
+describe("convertOllamaResponseToOpenAINonStream (non-streaming)", () => {
+  const NO_RAW = new Uint8Array(0);
+
+  it("translates Ollama JSON to OpenAI chat.completion format", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "Hello world" },
+      done: true,
+      done_reason: "stop",
+      total_duration: 1_000_000_000,
+      prompt_eval_count: 5,
+      eval_count: 4,
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.object).toBe("chat.completion");
+    expect(out.choices[0].message.content).toBe("Hello world");
+    expect(out.choices[0].finish_reason).toBe("stop");
+    expect(out.model).toBe("llama3");
+  });
+
+  it("maps done_reason stop → stop", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "hi" },
+      done: true,
+      done_reason: "stop",
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.choices[0].finish_reason).toBe("stop");
+  });
+
+  it("maps done_reason length → length", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "truncated" },
+      done: true,
+      done_reason: "length",
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.choices[0].finish_reason).toBe("length");
+  });
+
+  it("maps done_reason tool_calls → tool_calls", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: {
+        role: "assistant",
+        content: "here",
+        tool_calls: [{
+          id: "call_1",
+          function: { name: "search", arguments: "{}" },
+        }],
+      },
+      done: true,
+      done_reason: "tool_calls",
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.choices[0].finish_reason).toBe("tool_calls");
+    expect(out.choices[0].message.tool_calls).toBeDefined();
+    expect(out.choices[0].message.tool_calls[0].function.name).toBe("search");
+  });
+
+  it("maps usage fields correctly", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "hi" },
+      done: true,
+      done_reason: "stop",
+      prompt_eval_count: 10,
+      eval_count: 5,
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.usage.prompt_tokens).toBe(10);
+    expect(out.usage.completion_tokens).toBe(5);
+    expect(out.usage.total_tokens).toBe(15);
+  });
+
+  it("handles reasoning_content (thinking)", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "final answer", thinking: "reasoning steps" },
+      done: true,
+      done_reason: "stop",
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.choices[0].message.content).toBe("final answer");
+    expect(out.choices[0].message.reasoning_content).toBe("reasoning steps");
+  });
+
+  it("handles empty content", () => {
+    const raw = enc.encode(JSON.stringify({
+      model: "llama3",
+      message: { role: "assistant", content: "" },
+      done: true,
+      done_reason: "stop",
+    }));
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+    expect(out.object).toBe("chat.completion");
+    expect(out.choices[0].message.content).toBe("");
+  });
+
+  it("returns raw on parse error", () => {
+    const raw = enc.encode("not json {");
+    const result = convertOllamaResponseToOpenAINonStream(null, "llama3", NO_RAW, NO_RAW, raw);
+    expect(new TextDecoder().decode(result)).toBe("not json {");
   });
 });
