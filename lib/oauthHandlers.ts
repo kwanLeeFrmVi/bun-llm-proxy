@@ -3,6 +3,7 @@
 
 import { OAUTH_CONFIGS, generatePKCE, type OAuthProviderId, type QwenConfig, type KiroConfig } from "./oauthConfig.ts";
 import { createProviderConnection } from "../db/index.ts";
+import { asObjectRecord } from "./utils.ts";
 
 // ─── Device Code Flow ──────────────────────────────────────────────────────────────
 
@@ -23,14 +24,11 @@ export async function requestDeviceCode(
   provider: OAuthProviderId,
   idcConfig?: { startUrl?: string; region?: string }
 ): Promise<DeviceCodeResult> {
-  const config = OAUTH_CONFIGS[provider];
-  if (!config) throw new Error(`Unknown OAuth provider: ${provider}`);
-
   if (provider === "qwen") {
-    return requestQwenDeviceCode(config);
+    return requestQwenDeviceCode(OAUTH_CONFIGS.qwen);
   }
   if (provider === "kiro") {
-    return requestKiroDeviceCode(config, idcConfig);
+    return requestKiroDeviceCode(OAUTH_CONFIGS.kiro, idcConfig);
   }
   throw new Error(`Provider ${provider} does not support device code flow`);
 }
@@ -54,14 +52,22 @@ async function requestQwenDeviceCode(config: QwenConfig): Promise<DeviceCodeResu
     throw new Error(`Qwen device code request failed: ${err}`);
   }
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
+  if (
+    typeof data.device_code !== "string" ||
+    typeof data.user_code !== "string" ||
+    typeof data.verification_uri !== "string" ||
+    typeof data.expires_in !== "number"
+  ) {
+    throw new Error("Qwen device code response is invalid");
+  }
   return {
     device_code: data.device_code,
     user_code: data.user_code,
     verification_uri: data.verification_uri,
-    verification_uri_complete: data.verification_uri_complete,
+    verification_uri_complete: typeof data.verification_uri_complete === "string" ? data.verification_uri_complete : undefined,
     expires_in: data.expires_in,
-    interval: data.interval || 5,
+    interval: typeof data.interval === "number" ? data.interval : 5,
     codeVerifier,
   };
 }
@@ -146,13 +152,11 @@ export async function pollDeviceToken(
   codeVerifier: string,
   extraData?: Record<string, unknown>
 ): Promise<PollResult> {
-  const config = OAUTH_CONFIGS[provider];
-
   if (provider === "qwen") {
-    return pollQwenToken(config, deviceCode, codeVerifier);
+    return pollQwenToken(OAUTH_CONFIGS.qwen, deviceCode, codeVerifier);
   }
   if (provider === "kiro") {
-    return pollKiroToken(config, deviceCode, extraData);
+    return pollKiroToken(OAUTH_CONFIGS.kiro, deviceCode, extraData);
   }
   throw new Error(`Provider ${provider} does not support device code polling`);
 }
@@ -173,15 +177,15 @@ async function pollQwenToken(
     }),
   });
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
 
-  if (res.ok) {
+  if (res.ok && typeof data.access_token === "string") {
     return {
       success: true,
       tokens: {
         accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
+        refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
+        expiresIn: typeof data.expires_in === "number" ? data.expires_in : undefined,
         resourceUrl: data.resource_url,
       },
     };
@@ -191,7 +195,11 @@ async function pollQwenToken(
   if (data.error === "authorization_pending" || data.error === "slow_down") {
     return { success: false, error: data.error };
   }
-  return { success: false, error: data.error, errorDescription: data.error_description };
+  return {
+    success: false,
+    error: typeof data.error === "string" ? data.error : "unknown_error",
+    errorDescription: typeof data.error_description === "string" ? data.error_description : undefined,
+  };
 }
 
 async function pollKiroToken(
@@ -217,7 +225,7 @@ async function pollKiroToken(
 
   let data: Record<string, unknown>;
   try {
-    data = await res.json();
+    data = asObjectRecord(await res.json()) ?? {};
   } catch {
     const text = await res.text();
     data = { error: "invalid_response", error_description: text };
@@ -255,26 +263,23 @@ export async function buildAuthorizeUrl(
   provider: OAuthProviderId,
   redirectUri: string
 ): Promise<AuthorizeResult> {
-  const config = OAUTH_CONFIGS[provider];
-  if (!config) throw new Error(`Unknown OAuth provider: ${provider}`);
-
   if (provider === "claude") {
-    return buildClaudeAuthorizeUrl(config, redirectUri);
+    return buildClaudeAuthorizeUrl(OAUTH_CONFIGS.claude, redirectUri);
   }
   if (provider === "codex") {
-    return buildCodexAuthorizeUrl(config, redirectUri);
+    return buildCodexAuthorizeUrl(OAUTH_CONFIGS.codex, redirectUri);
   }
   if (provider === "openai") {
-    return buildOpenAIAuthorizeUrl(config, redirectUri);
+    return buildOpenAIAuthorizeUrl(OAUTH_CONFIGS.openai, redirectUri);
   }
   if (provider === "gemini-cli") {
-    return buildGeminiAuthorizeUrl(config, redirectUri);
+    return buildGeminiAuthorizeUrl(OAUTH_CONFIGS["gemini-cli"], redirectUri);
   }
   if (provider === "iflow") {
-    return buildIflowAuthorizeUrl(config, redirectUri);
+    return buildIflowAuthorizeUrl(OAUTH_CONFIGS.iflow, redirectUri);
   }
   if (provider === "antigravity") {
-    return buildAntigravityAuthorizeUrl(config, redirectUri);
+    return buildAntigravityAuthorizeUrl(OAUTH_CONFIGS.antigravity, redirectUri);
   }
   throw new Error(`Provider ${provider} does not support authorization code flow`);
 }
@@ -401,16 +406,14 @@ export async function exchangeCode(
   codeVerifier?: string,
   state?: string
 ): Promise<ExchangeResult> {
-  const config = OAUTH_CONFIGS[provider];
-
   if (provider === "claude") {
-    return exchangeClaudeCode(config, code, redirectUri, codeVerifier, state);
+    return exchangeClaudeCode(OAUTH_CONFIGS.claude, code, redirectUri, codeVerifier, state);
   }
   if (provider === "gemini-cli") {
-    return exchangeGeminiCode(config, code, redirectUri);
+    return exchangeGeminiCode(OAUTH_CONFIGS["gemini-cli"], code, redirectUri);
   }
   if (provider === "iflow") {
-    return exchangeIflowCode(config, code, redirectUri);
+    return exchangeIflowCode(OAUTH_CONFIGS.iflow, code, redirectUri);
   }
   throw new Error(`Provider ${provider} does not support code exchange`);
 }
@@ -427,7 +430,7 @@ async function exchangeClaudeCode(
   let codeState = "";
   if (authCode.includes("#")) {
     const parts = authCode.split("#");
-    authCode = parts[0];
+    authCode = parts[0] ?? "";
     codeState = parts[1] || "";
   }
 
@@ -449,11 +452,14 @@ async function exchangeClaudeCode(
     throw new Error(`Claude token exchange failed: ${err}`);
   }
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
+  if (typeof data.access_token !== "string") {
+    throw new Error("Claude token response is invalid");
+  }
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresIn: data.expires_in,
+    refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
+    expiresIn: typeof data.expires_in === "number" ? data.expires_in : undefined,
     scope: data.scope,
   };
 }
@@ -480,7 +486,10 @@ async function exchangeGeminiCode(
     throw new Error(`Gemini token exchange failed: ${err}`);
   }
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
+  if (typeof data.access_token !== "string") {
+    throw new Error("Gemini token response is invalid");
+  }
 
   // Fetch user info
   let email: string | undefined;
@@ -489,8 +498,8 @@ async function exchangeGeminiCode(
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
     if (userRes.ok) {
-      const userInfo = await userRes.json();
-      email = userInfo.email;
+      const userInfo = asObjectRecord(await userRes.json()) ?? {};
+      email = typeof userInfo.email === "string" ? userInfo.email : undefined;
     }
   } catch { /* non-critical */ }
 
@@ -506,18 +515,21 @@ async function exchangeGeminiCode(
       body: JSON.stringify({ metadata: {}, mode: 1 }),
     });
     if (projectRes.ok) {
-      const projectData = await projectRes.json();
+      const projectData = asObjectRecord(await projectRes.json()) ?? {};
+      const companionProject = asObjectRecord(projectData.cloudaicompanionProject);
       projectId =
         typeof projectData.cloudaicompanionProject === "string"
           ? projectData.cloudaicompanionProject.trim()
-          : projectData.cloudaicompanionProject?.id?.trim();
+          : typeof companionProject?.id === "string"
+            ? companionProject.id.trim()
+            : undefined;
     }
   } catch { /* non-critical */ }
 
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresIn: data.expires_in,
+    refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
+    expiresIn: typeof data.expires_in === "number" ? data.expires_in : undefined,
     email,
     projectId,
   };
@@ -551,7 +563,10 @@ async function exchangeIflowCode(
     throw new Error(`iFlow token exchange failed: ${err}`);
   }
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
+  if (typeof data.access_token !== "string") {
+    throw new Error("iFlow token response is invalid");
+  }
 
   // Fetch user info (includes API key)
   let email: string | undefined;
@@ -561,18 +576,23 @@ async function exchangeIflowCode(
       headers: { Accept: "application/json" },
     });
     if (userRes.ok) {
-      const result = await userRes.json();
-      if (result.success && result.data) {
-        email = result.data.email || result.data.phone;
-        apiKey = result.data.apiKey;
+      const result = asObjectRecord(await userRes.json()) ?? {};
+      const resultData = asObjectRecord(result.data);
+      if (result.success && resultData) {
+        email = typeof resultData.email === "string"
+          ? resultData.email
+          : typeof resultData.phone === "string"
+            ? resultData.phone
+            : undefined;
+        apiKey = typeof resultData.apiKey === "string" ? resultData.apiKey : undefined;
       }
     }
   } catch { /* non-critical */ }
 
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresIn: data.expires_in,
+    refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
+    expiresIn: typeof data.expires_in === "number" ? data.expires_in : undefined,
     email,
     apiKey,
   };
@@ -618,11 +638,14 @@ export async function exchangeKiroSocialCode(
     throw new Error(`Kiro social token exchange failed: ${err}`);
   }
 
-  const data = await res.json();
+  const data = asObjectRecord(await res.json()) ?? {};
+  if (typeof data.accessToken !== "string") {
+    throw new Error("Kiro social token response is invalid");
+  }
   return {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    expiresIn: data.expiresIn || 3600,
+    refreshToken: typeof data.refreshToken === "string" ? data.refreshToken : undefined,
+    expiresIn: typeof data.expiresIn === "number" ? data.expiresIn : 3600,
     profileArn: data.profileArn,
   };
 }
@@ -649,10 +672,15 @@ export async function iflowCookieAuth(cookie: string): Promise<ExchangeResult> {
   });
 
   if (!getRes.ok) throw new Error("Failed to fetch iFlow API key info");
-  const getResult = await getRes.json();
-  if (!getResult.success) throw new Error(`iFlow API key fetch failed: ${getResult.message}`);
+  const getResult = asObjectRecord(await getRes.json()) ?? {};
+  if (!getResult.success) {
+    throw new Error(`iFlow API key fetch failed: ${typeof getResult.message === "string" ? getResult.message : "unknown error"}`);
+  }
 
-  const keyData = getResult.data;
+  const keyData = asObjectRecord(getResult.data);
+  if (!keyData || typeof keyData.name !== "string") {
+    throw new Error("iFlow API key fetch returned invalid data");
+  }
 
   // Step 2: POST to refresh API key
   const postRes = await fetch("https://platform.iflow.cn/api/openapi/apikey", {
@@ -668,10 +696,15 @@ export async function iflowCookieAuth(cookie: string): Promise<ExchangeResult> {
   });
 
   if (!postRes.ok) throw new Error("Failed to refresh iFlow API key");
-  const postResult = await postRes.json();
-  if (!postResult.success) throw new Error(`iFlow API key refresh failed: ${postResult.message}`);
+  const postResult = asObjectRecord(await postRes.json()) ?? {};
+  if (!postResult.success) {
+    throw new Error(`iFlow API key refresh failed: ${typeof postResult.message === "string" ? postResult.message : "unknown error"}`);
+  }
 
-  const refreshedKey = postResult.data;
+  const refreshedKey = asObjectRecord(postResult.data);
+  if (!refreshedKey || typeof refreshedKey.apiKey !== "string") {
+    throw new Error("iFlow API key refresh returned invalid data");
+  }
 
   // Extract BXAuth
   const bxAuthMatch = normalizedCookie.match(/BXAuth=([^;]+)/);
@@ -680,7 +713,7 @@ export async function iflowCookieAuth(cookie: string): Promise<ExchangeResult> {
   return {
     accessToken: refreshedKey.apiKey,
     apiKey: refreshedKey.apiKey,
-    email: refreshedKey.name || keyData.name,
+    email: typeof refreshedKey.name === "string" ? refreshedKey.name : keyData.name,
     providerSpecificData: {
       cookie: bxAuth ? `BXAuth=${bxAuth};` : "",
       expireTime: refreshedKey.expireTime,

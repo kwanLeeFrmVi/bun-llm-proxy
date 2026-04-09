@@ -4,6 +4,7 @@ import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
 import { getProviderConnections } from "db/index.ts";
+import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -23,16 +24,17 @@ export async function GET(req: Request): Promise<Response> {
       const activeConn = connections.find(c => c.isActive !== false);
       const psd = (activeConn?.providerSpecificData as Record<string, unknown> | undefined) ?? {};
       const baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
+      const apiKey = typeof activeConn?.apiKey === "string" ? activeConn.apiKey : "";
 
-      if (baseUrl && activeConn?.apiKey) {
+      if (baseUrl && apiKey) {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
 
         if (isOpenAICompatibleProvider(id)) {
-          headers.Authorization = `Bearer ${activeConn.apiKey}`;
+          headers.Authorization = `Bearer ${apiKey}`;
         } else {
-          headers["x-api-key"] = activeConn.apiKey;
-          headers["anthropic-version"] = "2023-06-01";
-          headers.Authorization = `Bearer ${activeConn.apiKey}`;
+          headers["x-api-key"] = apiKey;
+          headers["anthropic-version"] = ANTHROPIC_API_VERSION;
+          headers.Authorization = `Bearer ${apiKey}`;
         }
 
         try {

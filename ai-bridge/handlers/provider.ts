@@ -2,6 +2,15 @@
 // Refactored to use constants-based configuration for better maintainability.
 
 import { FORMATS } from "../translator/formats.ts";
+import {
+  CLAUDE_API_HEADERS,
+  OPENAI_DEFAULT_BASE_URL,
+  ANTHROPIC_DEFAULT_BASE_URL,
+  X_API_KEY_PROVIDERS,
+  ACCESS_TOKEN_ONLY_PROVIDERS,
+  OPENAI_COMPATIBLE_PREFIX,
+  ANTHROPIC_COMPATIBLE_PREFIX,
+} from "../../lib/constants.ts";
 
 // ─── Provider Configuration ───────────────────────────────────────────────────────
 
@@ -12,10 +21,6 @@ interface ProviderConfig {
   baseUrls?: string[];  // For providers with multiple fallback URLs (e.g., antigravity)
   usesApiKeyInUrl?: boolean;  // For Gemini where API key goes in URL
 }
-
-const CLAUDE_API_HEADERS = {
-  "Anthropic-Version": "2023-06-01",
-};
 
 export const PROVIDERS: Record<string, ProviderConfig> = {
   // ── OAuth / Special providers ────────────────────────────────────────────────────
@@ -186,24 +191,6 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
   },
 };
 
-// Providers that use x-api-key header instead of Authorization Bearer
-const X_API_KEY_PROVIDERS = new Set([
-  "claude",
-  "anthropic",
-  "glm",
-  "kimi",
-  "kimi-coding",
-  "minimax",
-  "minimax-cn",
-]);
-
-// Providers that only use accessToken (no API key support)
-const ACCESS_TOKEN_ONLY_PROVIDERS = new Set([
-  "gemini-cli",
-  "antigravity",
-  "kiro",
-]);
-
 // ─── Format Detection ─────────────────────────────────────────────────────────────
 
 /**
@@ -278,7 +265,7 @@ export function getTargetFormat(provider: string): string {
   if (config) return config.format;
 
   // Handle compatible providers
-  if (provider.startsWith("anthropic-compatible-")) return FORMATS.CLAUDE;
+  if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) return FORMATS.CLAUDE;
   return FORMATS.OPENAI;
 }
 
@@ -294,15 +281,15 @@ export function buildUpstreamUrl(
   const psd = credentials.providerSpecificData as Record<string, unknown> | undefined;
 
   // Handle openai-compatible-* dynamically
-  if (provider.startsWith("openai-compatible-")) {
-    const base = (psd?.baseUrl as string | undefined) ?? "https://api.openai.com";
+  if (provider.startsWith(OPENAI_COMPATIBLE_PREFIX)) {
+    const base = (psd?.baseUrl as string | undefined) ?? OPENAI_DEFAULT_BASE_URL.replace("/v1", "");
     const cleanBase = base.replace(/\/v1\/?$/, "");
     return `${cleanBase}/v1/chat/completions`;
   }
 
   // Handle anthropic-compatible-* dynamically
-  if (provider.startsWith("anthropic-compatible-")) {
-    const base = (psd?.baseUrl as string | undefined) ?? "https://api.anthropic.com";
+  if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) {
+    const base = (psd?.baseUrl as string | undefined) ?? ANTHROPIC_DEFAULT_BASE_URL.replace("/v1", "");
     const cleanBase = base.replace(/\/v1\/?$/, "");
     return `${cleanBase}/v1/messages`;
   }
@@ -316,7 +303,7 @@ export function buildUpstreamUrl(
   const config = PROVIDERS[provider];
   if (!config) {
     // Fallback for unknown providers
-    return "https://api.openai.com/v1/chat/completions";
+    return `${OPENAI_DEFAULT_BASE_URL}/chat/completions`;
   }
 
   // Handle Gemini API key in URL

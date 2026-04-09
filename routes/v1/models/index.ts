@@ -1,24 +1,20 @@
 // Port of src/app/api/v1/models/route.js
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "ai-bridge/config/providerModels.ts";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getCombos } from "db/index.ts";
+import { getProviderConnections, getCombos, type Combo } from "db/index.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
+import { parseOpenAIStyleModels, extractModelIds, normalizeBaseUrl } from "lib/utils.ts";
+import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 const providerModels = PROVIDER_MODELS as Record<string, Array<{ id: string; name?: string }>>;
 const providerIdToAlias = PROVIDER_ID_TO_ALIAS as Record<string, string>;
-
-function parseOpenAIStyleModels(data: unknown): Array<{ id?: string; name?: string; model?: string }> {
-  if (Array.isArray(data)) return data as Array<{ id?: string; name?: string; model?: string }>;
-  const d = data as Record<string, unknown>;
-  return (d?.data ?? d?.models ?? d?.results ?? []) as Array<{ id?: string; name?: string; model?: string }>;
-}
 
 async function fetchCompatibleModelIds(connection: Record<string, unknown>): Promise<string[]> {
   if (!connection?.apiKey) return [];
 
   const psd = (connection.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-  const baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
+  const baseUrl = typeof psd.baseUrl === "string" ? normalizeBaseUrl(psd.baseUrl) : "";
   if (!baseUrl) return [];
 
   let url = `${baseUrl}/models`;
@@ -27,10 +23,8 @@ async function fetchCompatibleModelIds(connection: Record<string, unknown>): Pro
   if (isOpenAICompatibleProvider(connection.provider as string)) {
     headers.Authorization = `Bearer ${connection.apiKey}`;
   } else if (isAnthropicCompatibleProvider(connection.provider as string)) {
-    if (url.endsWith("/messages/models")) url = url.slice(0, -9);
-    else if (url.endsWith("/messages")) url = `${url.slice(0, -9)}/models`;
     headers["x-api-key"] = connection.apiKey as string;
-    headers["anthropic-version"] = "2023-06-01";
+    headers["anthropic-version"] = ANTHROPIC_API_VERSION;
     headers.Authorization = `Bearer ${connection.apiKey}`;
   } else {
     return [];
@@ -41,13 +35,7 @@ async function fetchCompatibleModelIds(connection: Record<string, unknown>): Pro
     if (!response.ok) return [];
     const data = await response.json();
     const rawModels = parseOpenAIStyleModels(data);
-    return Array.from(
-      new Set(
-        rawModels
-          .map(m => m?.id ?? m?.name ?? m?.model)
-          .filter((id): id is string => typeof id === "string" && id.trim() !== "")
-      )
-    );
+    return extractModelIds(rawModels);
   } catch {
     return [];
   }
@@ -62,7 +50,7 @@ export async function GET(_req: Request): Promise<Response> {
       console.log("Could not fetch providers, returning all models");
     }
 
-    let combos: { name: string }[] = [];
+    let combos: Combo[] = [];
     try {
       combos = await getCombos();
     } catch {

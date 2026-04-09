@@ -6,7 +6,8 @@ import {
   FREE_PROVIDERS,
   FREE_TIER_PROVIDERS,
   APIKEY_PROVIDERS,
-} from "dashboard/src/constants/providers.ts";
+} from "lib/providerCatalog.ts";
+import { asObjectRecord, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/utils.ts";
 
 // ─── Validation helper ──────────────────────────────────────────────────────────
 
@@ -56,7 +57,8 @@ export async function POST(req: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const json = await req.json();
+    body = asObjectRecord(json) ?? {};
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -70,7 +72,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Support compatible providers (openai-compatible-* and anthropic-compatible-*)
   const isCompatible =
-    provider.startsWith("openai-compatible-") || provider.startsWith("anthropic-compatible-");
+    isOpenAICompatibleProvider(provider) || isAnthropicCompatibleProvider(provider);
 
   if (!isKnownProvider(provider) && !isCompatible) {
     return Response.json({ error: `Unknown provider: ${provider}` }, { status: 400, headers: CORS_HEADERS });

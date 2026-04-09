@@ -2,12 +2,13 @@ import { createProviderNode, getProviderNodes } from "@/lib/localDb";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
-
-const OPENAI_COMPATIBLE_PREFIX    = "openai-compatible-";
-const ANTHROPIC_COMPATIBLE_PREFIX = "anthropic-compatible-";
-
-const OPENAI_DEFAULTS    = { baseUrl: "https://api.openai.com/v1" };
-const ANTHROPIC_DEFAULTS = { baseUrl: "https://api.anthropic.com/v1" };
+import { asObjectRecord } from "lib/utils.ts";
+import {
+  OPENAI_COMPATIBLE_PREFIX,
+  ANTHROPIC_COMPATIBLE_PREFIX,
+  OPENAI_DEFAULT_BASE_URL,
+  ANTHROPIC_DEFAULT_BASE_URL,
+} from "lib/constants.ts";
 
 // GET /api/provider-nodes
 export async function GET(req: Request): Promise<Response> {
@@ -24,7 +25,8 @@ export async function POST(req: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const json = await req.json();
+    body = asObjectRecord(json) ?? {};
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -50,14 +52,14 @@ export async function POST(req: Request): Promise<Response> {
       type: "openai-compatible",
       prefix: (prefix as string).trim(),
       apiType: resolvedType,
-      baseUrl: ((baseUrl as string) || OPENAI_DEFAULTS.baseUrl).trim(),
+      baseUrl: ((baseUrl as string) || OPENAI_DEFAULT_BASE_URL).trim(),
       name: (name as string).trim(),
     });
     return Response.json({ node }, { status: 201, headers: CORS_HEADERS });
   }
 
   if (nodeType === "anthropic-compatible") {
-    let cleanBaseUrl = ((baseUrl as string) || ANTHROPIC_DEFAULTS.baseUrl).trim().replace(/\/$/, "");
+    let cleanBaseUrl = ((baseUrl as string) || ANTHROPIC_DEFAULT_BASE_URL).trim().replace(/\/$/, "");
     if (cleanBaseUrl.endsWith("/messages")) {
       cleanBaseUrl = cleanBaseUrl.slice(0, -9);
     }

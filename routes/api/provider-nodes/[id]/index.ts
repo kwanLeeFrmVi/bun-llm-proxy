@@ -2,6 +2,7 @@ import { getProviderNodeById, updateProviderNode, deleteProviderNode } from "@/l
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
+import { asObjectRecord } from "lib/utils.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -21,7 +22,7 @@ export async function PUT(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const id = (req as BunRequest).params.id ?? "";
-  const body: Record<string, unknown> = await req.json().catch(() => ({}));
+  const body = asObjectRecord(await req.json().catch(() => null)) ?? {};
 
   const node = await updateProviderNode(id, body);
   if (!node) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });

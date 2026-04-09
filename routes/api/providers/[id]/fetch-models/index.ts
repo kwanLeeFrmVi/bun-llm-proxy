@@ -4,41 +4,14 @@ import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { PROVIDERS } from "ai-bridge/handlers/provider.ts";
 import { getProviderAlias } from "lib/providers.ts";
+import { X_API_KEY_PROVIDERS, ANTHROPIC_API_VERSION } from "lib/constants.ts";
+import {
+  parseOpenAIStyleModels,
+  extractModelIds,
+  deriveModelsBaseUrl,
+} from "lib/utils.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
-
-// Providers that use x-api-key header instead of Authorization Bearer
-const X_API_KEY_PROVIDERS = new Set([
-  "claude", "anthropic", "glm", "glm-cn", "kimi", "kimi-coding", "minimax", "minimax-cn",
-]);
-
-function parseOpenAIStyleModels(data: unknown): Array<{ id?: string; name?: string; model?: string }> {
-  if (Array.isArray(data)) return data as Array<{ id?: string; name?: string; model?: string }>;
-  const d = data as Record<string, unknown>;
-  return (d?.data ?? d?.models ?? d?.results ?? []) as Array<{ id?: string; name?: string; model?: string }>;
-}
-
-/**
- * Derive the /models base URL from a provider's configured chat/completions URL.
- * e.g. "https://api.groq.com/openai/v1/chat/completions" -> "https://api.groq.com/openai/v1"
- */
-function deriveModelsBaseUrl(chatUrl: string): string {
-  try {
-    const u = new URL(chatUrl);
-    // Remove the path, keep origin only — we'll append /models
-    // Most providers follow the pattern: base/v1/chat/completions -> base/v1
-    const path = u.pathname; // e.g. /openai/v1/chat/completions
-    // Find /v1/ in the path and take everything up to and including it
-    const v1Idx = path.indexOf("/v1/");
-    if (v1Idx !== -1) {
-      return u.origin + path.slice(0, v1Idx + 3); // up to /v1
-    }
-    // No /v1/ found — just return origin
-    return u.origin;
-  } catch {
-    return "";
-  }
-}
 
 /**
  * POST /api/providers/:id/fetch-models
@@ -72,6 +45,14 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  const apiKey = typeof activeConn.apiKey === "string" ? activeConn.apiKey : "";
+  if (!apiKey) {
+    return Response.json(
+      { error: "Connection has no API key" },
+      { status: 400, headers: CORS_HEADERS },
+    );
+  }
+
   // Determine baseUrl: prefer providerSpecificData.baseUrl, fall back to provider config
   const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
   let baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
@@ -95,10 +76,10 @@ export async function POST(req: Request): Promise<Response> {
 
   // Use x-api-key for Claude-format providers, Bearer for OpenAI-format
   if (X_API_KEY_PROVIDERS.has(id)) {
-    headers["x-api-key"] = activeConn.apiKey;
-    headers["anthropic-version"] = "2023-06-01";
+    headers["x-api-key"] = apiKey;
+    headers["anthropic-version"] = ANTHROPIC_API_VERSION;
   } else {
-    headers.Authorization = `Bearer ${activeConn.apiKey}`;
+    headers.Authorization = `Bearer ${apiKey}`;
   }
 
   // Fetch models from the remote endpoint
@@ -123,13 +104,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const data = await response.json();
   const rawModels = parseOpenAIStyleModels(data);
-  const modelIds = Array.from(
-    new Set(
-      rawModels
-        .map(m => m?.id ?? m?.name ?? m?.model)
-        .filter((id): id is string => typeof id === "string" && id.trim() !== ""),
-    ),
-  );
+  const modelIds = extractModelIds(rawModels);
 
   if (modelIds.length === 0) {
     return Response.json(

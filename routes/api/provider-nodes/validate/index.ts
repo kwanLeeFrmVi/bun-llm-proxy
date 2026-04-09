@@ -1,26 +1,8 @@
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
-
-// ─── Fetch with timeout ────────────────────────────────────────────────────────
-
-async function fetchWithTimeout(url: string, opts: RequestInit, ms = 10000): Promise<Response> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
-  try {
-    return await fetch(url, { ...opts, signal: controller.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-function friendlyError(err: unknown): string {
-  const msg = String(err);
-  if (msg.includes("aborted") || msg.includes("timeout")) return "Request timeout (>10s) — provider not responding";
-  if (msg.includes("ECONNREFUSED")) return "Connection refused — server offline";
-  if (msg.includes("ENOTFOUND")) return "DNS failed — check the domain";
-  return "Network error — check URL and connectivity";
-}
+import { asObjectRecord, fetchWithTimeout, friendlyError, normalizeBaseUrl } from "lib/utils.ts";
+import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 // POST /api/provider-nodes/validate
 export async function POST(req: Request): Promise<Response> {
@@ -29,7 +11,8 @@ export async function POST(req: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const json = await req.json();
+    body = asObjectRecord(json) ?? {};
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -46,10 +29,7 @@ export async function POST(req: Request): Promise<Response> {
   const isAnthropic = type === "anthropic-compatible";
 
   // Normalize base URL
-  let normalizedBase = baseUrl.trim().replace(/\/$/, "");
-  if (normalizedBase.endsWith("/messages")) {
-    normalizedBase = normalizedBase.slice(0, -9);
-  }
+  const normalizedBase = normalizeBaseUrl(baseUrl);
 
   // Try /models endpoint
   const modelsUrl = isAnthropic ? `${normalizedBase}/models` : `${normalizedBase}/models`;
@@ -58,7 +38,7 @@ export async function POST(req: Request): Promise<Response> {
     if (isAnthropic) {
       modelsRes = await fetchWithTimeout(modelsUrl, {
         method: "GET",
-        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Authorization": `Bearer ${apiKey}` },
+        headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION, "Authorization": `Bearer ${apiKey}` },
       });
     } else {
       modelsRes = await fetchWithTimeout(modelsUrl, {
@@ -89,7 +69,7 @@ export async function POST(req: Request): Promise<Response> {
       if (isAnthropic) {
         chatRes = await fetchWithTimeout(chatUrl, {
           method: "POST",
-          headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+          headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION, "Content-Type": "application/json" },
           body: JSON.stringify({ model: modelId.trim(), messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
         });
       } else {

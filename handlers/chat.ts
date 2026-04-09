@@ -23,13 +23,19 @@ import { FORMATS } from "../ai-bridge/translator/formats.ts";
 import { detectFormat } from "../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 
+type ClientRawRequest = {
+  endpoint: string;
+  body: Record<string, unknown>;
+  headers: Record<string, string>;
+};
+
 /**
  * Handle chat completion request.
  * Supports: OpenAI, Claude, Gemini, OpenAI Responses API formats.
  */
 export async function handleChat(
   request: Request,
-  clientRawRequest: Record<string, unknown> | null = null
+  clientRawRequest: ClientRawRequest | null = null
 ): Promise<Response> {
   let body: Record<string, unknown>;
   try {
@@ -101,7 +107,7 @@ export async function handleChat(
 async function handleSingleModelChat(
   body: Record<string, unknown>,
   modelStr: string,
-  clientRawRequest: Record<string, unknown> | null = null,
+  clientRawRequest: ClientRawRequest | null = null,
   request: Request | null = null,
   apiKey: string | null = null,
   apiKeyId: string | null = null
@@ -216,7 +222,6 @@ async function handleSingleModelChat(
       connectionId: creds.connectionId as string | undefined,
       userAgent,
       apiKey,
-      ccFilterNaming: !!(chatSettings.ccFilterNaming as boolean | undefined),
       sourceFormatOverride: request?.url ? detectFormatByEndpoint(new URL(request.url).pathname, body) ?? undefined : undefined,
       onCredentialsRefreshed: async (newCreds: Record<string, unknown>) => {
         await updateProviderCredentials(creds.connectionId as string, {

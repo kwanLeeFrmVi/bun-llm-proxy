@@ -159,10 +159,11 @@ export interface GitHubConfig {
 }
 
 export type OAuthConfig = QwenConfig | KiroConfig | GeminiCliConfig | IflowConfig | ClaudeConfig | CodexConfig | OpenAIConfig | AntigravityConfig | GitHubConfig;
+export type OAuthProviderId = "claude" | "codex" | "openai" | "gemini-cli" | "antigravity" | "qwen" | "kiro" | "iflow" | "github";
 
 // ─── Provider OAuth Configs ───────────────────────────────────────────────────────
 
-export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
+export const OAUTH_CONFIGS = {
   // ─── Claude Code — Authorization Code Flow with PKCE ────────────────────────────
   claude: {
     flowType: "authorization_code_pkce",
@@ -299,9 +300,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     editorVersion: "vscode/1.85.0",
     editorPluginVersion: "copilot-chat/0.26.7",
   },
-};
-
-export type OAuthProviderId = "claude" | "codex" | "openai" | "gemini-cli" | "antigravity" | "qwen" | "kiro" | "iflow" | "github";
+} satisfies Record<OAuthProviderId, OAuthConfig>;
 
 export function isOAuthProviderId(id: string): id is OAuthProviderId {
   return id in OAUTH_CONFIGS;
