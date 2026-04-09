@@ -8,6 +8,7 @@ import ProviderDetail from "@/pages/ProviderDetail";
 import ApiKeys from "@/pages/ApiKeys";
 import Usage from "@/pages/Usage";
 import MavisUsage from "@/pages/MavisUsage";
+import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
 import Users from "@/pages/Users";
@@ -96,6 +97,7 @@ function ProtectedLayout() {
             <Route path='/keys' element={<ApiKeys />} />
             <Route path='/usage' element={<Usage />} />
             <Route path='/mavis-usage' element={<MavisUsage />} />
+            <Route path='/prox-usage' element={<ProxUsage />} />
             <Route path='/logs' element={<Logs />} />
             <Route path='/models' element={<Models />} />
             <Route path='/change-password' element={<ChangePassword />} />

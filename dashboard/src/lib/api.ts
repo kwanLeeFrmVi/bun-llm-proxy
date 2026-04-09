@@ -205,4 +205,32 @@ export const api = {
     update:  (id: string, data: { name?: string; models?: string[] }) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove:  (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
+
+  // ─── Pro-X (upstream pro-x.io.vn) ───────────────────────────────────────
+  prox: {
+    listKeys:  () => request<{ keys: { id: string; maskedName: string }[] }>("/api/prox/keys"),
+    getStatus:  (key?: string) => {
+      const qs = key ? `?key=${encodeURIComponent(key)}` : "";
+      return request<import("./proxTypes.ts").ProxStatus>(`/api/prox/status${qs}`);
+    },
+    getSummary: (days?: number, key?: string) => {
+      const params = new URLSearchParams();
+      if (days !== undefined) params.set("days", String(days));
+      if (key) params.set("key", key);
+      const qs = params.toString() ? `?${params}` : "";
+      return request<import("./proxTypes.ts").ProxSummary>(`/api/prox/summary${qs}`);
+    },
+    getChart:   (days?: number, key?: string) => {
+      const params = new URLSearchParams();
+      if (days !== undefined) params.set("days", String(days));
+      if (key) params.set("key", key);
+      const qs = params.toString() ? `?${params}` : "";
+      return request<import("./proxTypes.ts").ProxChart>(`/api/prox/chart${qs}`);
+    },
+    getRecent:  (page = 1, limit = 15, key?: string) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (key) params.set("key", key);
+      return request<import("./proxTypes.ts").ProxRecent>(`/api/prox/recent?${params}`);
+    },
+  },
 };

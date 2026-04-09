@@ -1,6 +1,6 @@
 import { useAuth } from "@/lib/auth.tsx";
 import { NavLink } from "react-router-dom";
-import { Network, Key, BarChart2, Terminal, Box, LogOut, Users, KeyRound, Cloud } from "lucide-react";
+import { Network, Key, BarChart2, Terminal, Box, LogOut, Users, KeyRound, Cloud, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: "/keys", label: "API Keys", Icon: Key },
     { to: "/usage", label: "Usage", Icon: BarChart2 },
     { to: "/mavis-usage", label: "Mavis", Icon: Cloud },
+    { to: "/prox-usage", label: "Pro-X", Icon: Zap },
     { to: "/logs", label: "Console", Icon: Terminal },
     { to: "/models", label: "Models", Icon: Box },
     ...(isAdmin ? [{ to: "/users", label: "Users", Icon: Users }] : []),
