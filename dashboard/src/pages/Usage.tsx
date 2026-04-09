@@ -812,7 +812,7 @@ function DetailsTab({ apiKeyMap }: { apiKeyMap: Map<string, string> }) {
 // ─── Root Component ────────────────────────────────────────────────────────────
 
 export default function Usage() {
-  const [period, setPeriod] = useState<Period>("7d");
+  const [period, setPeriod] = useState<Period>("24h");
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [recentRows, setRecentRows] = useState<UsageRecord[]>([]);
   const [apiKeyMap, setApiKeyMap] = useState<Map<string, string>>(new Map());

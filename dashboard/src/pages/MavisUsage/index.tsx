@@ -7,12 +7,13 @@ import type { MavisUsageResponse, MavisUserProfile } from "@/lib/mavisTypes.ts";
 import { RANGES, type Range } from "./utils/constants.ts";
 import { buildPricingMap } from "./utils/pricing.ts";
 import { QuotaCards } from "./components/QuotaCards.tsx";
+import { BudgetCard } from "./components/BudgetCard.tsx";
 import { ModelTable } from "./components/ModelTable.tsx";
 import { TimeseriesChart } from "./components/TimeseriesChart.tsx";
 import { PricingTable } from "./components/PricingTable.tsx";
 
 export default function MavisUsage() {
-  const [range, setRange] = useState<Range>("7d");
+  const [range, setRange] = useState<Range>("24h");
   const [profile, setProfile] = useState<MavisUserProfile | null>(null);
   const [usage, setUsage] = useState<MavisUsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,64 +67,25 @@ export default function MavisUsage() {
   const pricing = usage ? buildPricingMap(usage.model_pricing) : {};
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className='flex flex-col gap-6'>
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "16px",
-        }}
-      >
+      <div className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <h1
-            style={{
-              fontFamily: "var(--font-headline)",
-              fontSize: "28px",
-              fontWeight: 700,
-              color: "var(--on-surface)",
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <h1 className='font-headline text-[28px] font-700 text-[var(--on-surface)] tracking-[-0.02em]'>
             Mavis Usage
           </h1>
-          <p
-            style={{
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: "0.12em",
-              color: "var(--on-surface-variant)",
-              marginTop: "4px",
-              fontWeight: 500,
-            }}
-          >
+          <p className='mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-500'>
             Upstream LLM Gateway &middot; mavis.io.vn
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className='flex items-center gap-3'>
           <Tabs value={range} onValueChange={(v) => setRange(v as Range)}>
-            <TabsList
-              style={{
-                height: "36px",
-                background: "var(--surface-container-low)",
-                borderRadius: "8px",
-                padding: "4px",
-              }}
-            >
+            <TabsList className='h-9 bg-[var(--surface-container-low)] rounded-lg p-1'>
               {RANGES.map((r) => (
                 <TabsTrigger
                   key={r}
                   value={r}
-                  style={{
-                    height: "28px",
-                    paddingLeft: "12px",
-                    paddingRight: "12px",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                  }}
+                  className='h-7 px-3 rounded-md text-[12px] font-500'
                 >
                   {r}
                 </TabsTrigger>
@@ -135,15 +97,10 @@ export default function MavisUsage() {
             size='sm'
             onClick={handleRefresh}
             disabled={refreshing}
-            style={{ height: "36px" }}
+            className='h-9'
           >
             <RefreshCw
-              style={{
-                width: "14px",
-                height: "14px",
-                marginRight: "6px",
-                animation: refreshing ? "spin 1s linear infinite" : "none",
-              }}
+              className={`w-[14px] h-[14px] mr-1.5 ${refreshing ? "animate-spin" : ""}`}
             />
             {refreshing ? "Refreshing" : "Refresh"}
           </Button>
@@ -151,87 +108,32 @@ export default function MavisUsage() {
       </div>
 
       {lastUpdated && (
-        <p
-          style={{
-            fontSize: "11px",
-            color: "var(--on-surface-variant)",
-            marginTop: "-8px",
-          }}
-        >
+        <p className='-mt-2 text-[11px] text-[var(--on-surface-variant)]'>
           Last updated: {lastUpdated.toLocaleTimeString()}
         </p>
       )}
 
       {error && (
-        <div
-          style={{
-            background: "var(--surface-container-lowest)",
-            borderRadius: "12px",
-            padding: "24px",
-            border: "1px solid rgba(203,213,225,0.6)",
-            display: "flex",
-            gap: "12px",
-          }}
-        >
-          <AlertCircle
-            style={{
-              width: "20px",
-              height: "20px",
-              color: "#ef4444",
-              flexShrink: 0,
-            }}
-          />
+        <div className='flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(203,213,225,0.6)]'>
+          <AlertCircle className='shrink-0 w-5 h-5 text-[#ef4444]' />
           <div>
-            <p style={{ fontSize: "13px", fontWeight: 600, color: "#ef4444" }}>
+            <p className='text-[13px] font-600 text-[#ef4444]'>
               Failed to load Mavis data
             </p>
-            <p
-              style={{
-                fontSize: "11px",
-                color: "var(--on-surface-variant)",
-                marginTop: "4px",
-              }}
-            >
+            <p className='mt-1 text-[11px] text-[var(--on-surface-variant)]'>
               {error}
             </p>
-            <p
-              style={{
-                fontSize: "11px",
-                color: "var(--on-surface-variant)",
-                marginTop: "4px",
-              }}
-            >
+            <p className='mt-1 text-[11px] text-[var(--on-surface-variant)]'>
               Make sure{" "}
-              <code
-                style={{
-                  fontSize: "11px",
-                  background: "var(--surface-container-low)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                }}
-              >
+              <code className='bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]'>
                 MAVIS_USERNAME
               </code>{" "}
               and{" "}
-              <code
-                style={{
-                  fontSize: "11px",
-                  background: "var(--surface-container-low)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                }}
-              >
+              <code className='bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]'>
                 MAVIS_PASSWORD
               </code>{" "}
               are set in your{" "}
-              <code
-                style={{
-                  fontSize: "11px",
-                  background: "var(--surface-container-low)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                }}
-              >
+              <code className='bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]'>
                 .env
               </code>{" "}
               file.
@@ -241,39 +143,20 @@ export default function MavisUsage() {
       )}
 
       {loading && !usage ? (
-        <div style={{ padding: "48px", textAlign: "center" }}>
-          <div
-            style={{
-              width: "24px",
-              height: "24px",
-              border: "2px solid var(--primary)",
-              borderTopColor: "transparent",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-              display: "inline-block",
-            }}
-          />
-          <p
-            style={{
-              fontSize: "13px",
-              color: "var(--on-surface-variant)",
-              marginTop: "12px",
-            }}
-          >
+        <div className='px-12 py-12 text-center'>
+          <div className='inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent' />
+          <p className='mt-3 text-[13px] text-[var(--on-surface-variant)]'>
             Loading from mavis.io.vn
           </p>
         </div>
       ) : (
         <>
-          <QuotaCards profile={profile} usage={usage} />
+          <BudgetCard profile={profile} usage={usage} />
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4'>
+            <QuotaCards profile={profile} usage={usage} />
+          </div>
           <ModelTable usage={usage} pricing={pricing} />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "16px",
-            }}
-          >
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
             <TimeseriesChart usage={usage} />
             <PricingTable usage={usage} />
           </div>

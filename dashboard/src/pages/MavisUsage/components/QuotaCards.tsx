@@ -22,62 +22,20 @@ export function QuotaCards({
   const p = pct(usedQuota, quota);
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-        gap: "16px",
-      }}
-    >
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
       <QuotaCard label='Plan' value={planName} sub='Current plan' />
-      <div
-        style={{
-          background: "var(--surface-container-lowest)",
-          borderRadius: "12px",
-          padding: "24px",
-          border: "1px solid rgba(203,213,225,0.6)",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        }}
-      >
-        <p
-          style={{
-            fontSize: "10px",
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-            color: "var(--on-surface-variant)",
-            fontWeight: 600,
-          }}
-        >
+      <div className="flex flex-col items-center justify-center rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-600">
           Quota Used
         </p>
-        <p
-          style={{
-            fontSize: "28px",
-            fontWeight: 700,
-            marginTop: "4px",
-            color: "var(--primary)",
-            fontFamily: "var(--font-headline)",
-          }}
-        >
+        <p className="mt-1 font-headline text-[28px] font-700 text-[var(--primary)]">
           {fmt(usedQuota)}
         </p>
-        <p
-          style={{
-            fontSize: "11px",
-            color: "var(--on-surface-variant)",
-            marginTop: "4px",
-          }}
-        >
+        <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
           of {fmt(quota)}
         </p>
         <ProgressBar value={p} />
-        <p
-          style={{
-            fontSize: "11px",
-            color: "var(--on-surface-variant)",
-            marginTop: "6px",
-          }}
-        >
+        <p className="mt-1.5 text-[11px] text-[var(--on-surface-variant)]">
           {p}% used
         </p>
       </div>

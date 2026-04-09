@@ -1,5 +1,9 @@
 // Shared TypeScript types for Mavis API responses
 
+// Mavis uses internal quota units: 1 unit = $1/500000
+// e.g., planAllowance=50000000 means $100 budget
+export const MAVIS_QUOTA_DIVISOR = 500_000;
+
 export interface MavisUserProfile {
   id: number;
   username: string;

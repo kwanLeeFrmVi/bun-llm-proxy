@@ -25,13 +25,7 @@ ChartJS.register(
   Legend,
 );
 
-const cardStyle: React.CSSProperties = {
-  background: "var(--surface-container-lowest)",
-  borderRadius: "12px",
-  border: "1px solid rgba(203,213,225,0.6)",
-  boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-  overflow: "hidden",
-};
+const cardClass = "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
 export function TimeseriesChart({
   usage,
@@ -42,19 +36,12 @@ export function TimeseriesChart({
 
   if (ts.length === 0) {
     return (
-      <div style={cardStyle}>
+      <div className={cardClass}>
         <SectionHeader
           title='Token Usage Over Time'
           sub='Daily tokens and request volume'
         />
-        <div
-          style={{
-            padding: "40px",
-            textAlign: "center",
-            color: "var(--on-surface-variant)",
-            fontSize: "13px",
-          }}
-        >
+        <div className="px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]">
           No timeseries data available.
         </div>
       </div>
@@ -143,12 +130,12 @@ export function TimeseriesChart({
   };
 
   return (
-    <div style={cardStyle}>
+    <div className={cardClass}>
       <SectionHeader
         title='Token Usage Over Time'
         sub='Daily tokens and request volume'
       />
-      <div style={{ padding: "20px 24px", height: "260px" }}>
+      <div className="h-[260px] p-5 px-6">
         <Chart type='bar' data={chartData} options={chartOptions} />
       </div>
     </div>

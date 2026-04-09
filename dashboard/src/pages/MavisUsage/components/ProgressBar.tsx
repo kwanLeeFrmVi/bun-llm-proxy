@@ -1,23 +1,10 @@
-export function ProgressBar({ value }: { value: number }) {
-  const color = value > 80 ? "#ef4444" : value > 50 ? "#f59e0b" : "#22c55e";
+export function ProgressBar({ value, color }: { value: number; color?: string }) {
+  const autoColor = color ?? (value > 80 ? "#ef4444" : value > 50 ? "#f59e0b" : "#22c55e");
   return (
-    <div
-      style={{
-        marginTop: "12px",
-        height: "6px",
-        borderRadius: "9999px",
-        background: "rgba(203,213,225,0.3)",
-        overflow: "hidden",
-      }}
-    >
+    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[rgba(203,213,225,0.3)]">
       <div
-        style={{
-          height: "100%",
-          width: value + "%",
-          borderRadius: "9999px",
-          background: color,
-          transition: "width 0.5s ease",
-        }}
+        className="h-full rounded-full transition-[width] duration-500 ease-in-out"
+        style={{ width: `${value}%`, background: autoColor }}
       />
     </div>
   );

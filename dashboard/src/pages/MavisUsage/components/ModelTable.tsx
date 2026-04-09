@@ -23,14 +23,7 @@ export function ModelTable({
 
   if (models.length === 0) {
     return (
-      <div
-        style={{
-          padding: "40px",
-          textAlign: "center",
-          color: "var(--on-surface-variant)",
-          fontSize: "13px",
-        }}
-      >
+      <div className="px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]">
         No model data available.
       </div>
     );
@@ -45,96 +38,31 @@ export function ModelTable({
   });
 
   return (
-    <div
-      style={{
-        background: "var(--surface-container-lowest)",
-        borderRadius: "12px",
-        border: "1px solid rgba(203,213,225,0.6)",
-        boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        overflow: "hidden",
-      }}
-    >
+    <div className="overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <SectionHeader
         title='Usage by Model'
         sub='Token breakdown and estimated cost per model'
       />
-      <div style={{ overflowX: "auto" }}>
+      <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow
-              style={{
-                borderBottom: "1px solid rgba(203,213,225,0.4)",
-              }}
-            >
-              <TableHead
-                style={{
-                  padding: "12px 24px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                }}
-              >
+            <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
+              <TableHead className="px-6 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Model
               </TableHead>
-              <TableHead
-                style={{
-                  padding: "12px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  textAlign: "right",
-                }}
-              >
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Requests
               </TableHead>
-              <TableHead
-                style={{
-                  padding: "12px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  textAlign: "right",
-                }}
-              >
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Input Tokens
               </TableHead>
-              <TableHead
-                style={{
-                  padding: "12px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  textAlign: "right",
-                }}
-              >
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Output Tokens
               </TableHead>
-              <TableHead
-                style={{
-                  padding: "12px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  textAlign: "right",
-                }}
-              >
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Failures
               </TableHead>
-              <TableHead
-                style={{
-                  padding: "12px 24px",
-                  color: "var(--on-surface-variant)",
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  textAlign: "right",
-                }}
-              >
+              <TableHead className="px-6 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Est. Cost
               </TableHead>
             </TableRow>
@@ -143,79 +71,32 @@ export function ModelTable({
             {rows.map(({ m, cost, share }) => (
               <TableRow
                 key={m.model}
-                style={{
-                  borderBottom: "1px solid rgba(203,213,225,0.25)",
-                }}
+                className="border-b border-[rgba(203,213,225,0.25)]"
               >
-                <TableCell style={{ padding: "12px 24px" }}>
+                <TableCell className="px-6 py-3">
                   <Badge variant='endpoint'>{m.model}</Badge>
                   {share > 1 && (
-                    <div
-                      style={{
-                        marginTop: "6px",
-                        height: "3px",
-                        borderRadius: "9999px",
-                        background: "rgba(34,197,94,0.25)",
-                        width: "100%",
-                      }}
-                    >
+                    <div className="mt-1.5 h-[3px] w-full rounded-full bg-[rgba(34,197,94,0.25)]">
                       <div
-                        style={{
-                          height: "100%",
-                          width: share + "%",
-                          borderRadius: "9999px",
-                          background: "#22c55e",
-                        }}
+                        className="h-full rounded-full bg-[#22c55e]"
+                        style={{ width: `${share}%` }}
                       />
                     </div>
                   )}
                 </TableCell>
-                <TableCell
-                  style={{
-                    padding: "12px",
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
+                <TableCell className="px-3 py-3 text-right tabular-nums">
                   {m.requests.toLocaleString()}
                 </TableCell>
-                <TableCell
-                  style={{
-                    padding: "12px",
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    color: "var(--primary)",
-                  }}
-                >
+                <TableCell className="px-3 py-3 text-right tabular-nums text-[var(--primary)]">
                   {m.input_tokens.toLocaleString()}
                 </TableCell>
-                <TableCell
-                  style={{
-                    padding: "12px",
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
+                <TableCell className="px-3 py-3 text-right tabular-nums">
                   {m.output_tokens.toLocaleString()}
                 </TableCell>
-                <TableCell
-                  style={{
-                    padding: "12px",
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    color:
-                      m.failures > 0 ? "#ef4444" : "var(--on-surface-variant)",
-                  }}
-                >
+                <TableCell className={`px-3 py-3 text-right tabular-nums ${m.failures > 0 ? "text-[#ef4444]" : "text-[var(--on-surface-variant)]"}`}>
                   {m.failures}
                 </TableCell>
-                <TableCell
-                  style={{
-                    padding: "12px 24px",
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
+                <TableCell className="px-6 py-3 text-right tabular-nums">
                   ${cost.toFixed(4)}
                 </TableCell>
               </TableRow>
