@@ -88,8 +88,10 @@ function registerIdentity(format: string): void {
 
 function init(): void {
   // Claude ↔ OpenAI
-  register(FORMATS.CLAUDE, FORMATS.OPENAI, convertClaudeRequestToOpenAI, convertOpenAIResponseToClaude as ResponseTranslatorFn, convertOpenAIResponseToClaudeNonStream as ResponseNonStreamFn);
-  register(FORMATS.OPENAI, FORMATS.CLAUDE, convertOpenAIRequestToClaude, convertClaudeResponseToOpenAI as ResponseTranslatorFn, convertClaudeResponseToOpenAINonStream as ResponseNonStreamFn);
+  // register(from, to, requestFn, responseFn, responseNonStreamFn)
+  // Response translators convert FROM 'to' format BACK TO 'from' format
+  register(FORMATS.CLAUDE, FORMATS.OPENAI, convertClaudeRequestToOpenAI, convertClaudeResponseToOpenAI as ResponseTranslatorFn, convertClaudeResponseToOpenAINonStream as ResponseNonStreamFn);
+  register(FORMATS.OPENAI, FORMATS.CLAUDE, convertOpenAIRequestToClaude, convertOpenAIResponseToClaude as ResponseTranslatorFn, convertOpenAIResponseToClaudeNonStream as ResponseNonStreamFn);
 
   // Claude ↔ Ollama
   register(FORMATS.CLAUDE, FORMATS.OLLAMA, convertClaudeRequestToOllama, identityResponse, identityResponseNS);

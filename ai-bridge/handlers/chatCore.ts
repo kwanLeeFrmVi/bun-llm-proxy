@@ -1,7 +1,6 @@
 // Core streaming chat handler — written from scratch in TypeScript.
 // Handles the full lifecycle: translate request → upstream fetch → translate response → stream back.
 
-import { FORMATS } from "../translator/formats.ts";
 import { Request, NeedsTranslation, ResponseNonStream } from "../translator/index.ts";
 import { HTTP_STATUS } from "../config/runtimeConfig.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";

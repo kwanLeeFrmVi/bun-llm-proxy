@@ -3,9 +3,9 @@
 // Replaced @/lib/network/connectionProxy → ../lib/connectionProxy
 // Replaced @/shared/constants/providers.js → ../lib/providers
 
-import { getProviderConnections, updateProviderConnection, validateApiKey } from "../db/index.ts";
+import { getProviderConnections, updateProviderConnection, validateApiKey, getProviderNodeById } from "../db/index.ts";
 import { resolveConnectionProxyConfig } from "../lib/connectionProxy.ts";
-import { resolveProviderId } from "../lib/providers.ts";
+import { resolveProviderId, isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "../lib/providers.ts";
 import {
   formatRetryAfter,
   checkFallbackError,
@@ -130,6 +130,23 @@ export async function getProviderCredentials(
 
     const resolvedProxy = await resolveConnectionProxyConfig((connection.providerSpecificData as Record<string, unknown>) ?? {});
 
+    // For compatible providers, ensure baseUrl from provider_node is included if not set on connection
+    const providerSpecificData: Record<string, unknown> = {
+      ...((connection.providerSpecificData as Record<string, unknown>) ?? {}),
+      connectionProxyEnabled: resolvedProxy.connectionProxyEnabled,
+      connectionProxyUrl: resolvedProxy.connectionProxyUrl,
+      connectionNoProxy: resolvedProxy.connectionNoProxy,
+      connectionProxyPoolId: resolvedProxy.proxyPoolId ?? null,
+    };
+
+    const isCompatible = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+    if (isCompatible && !providerSpecificData.baseUrl) {
+      const node = await getProviderNodeById(providerId);
+      if (node?.baseUrl) {
+        providerSpecificData.baseUrl = node.baseUrl;
+      }
+    }
+
     return {
       apiKey: connection.apiKey,
       accessToken: connection.accessToken,
@@ -137,13 +154,7 @@ export async function getProviderCredentials(
       projectId: connection.projectId,
       connectionName: connection.displayName ?? connection.name ?? connection.email ?? connection.id,
       copilotToken: (connection.providerSpecificData as Record<string, unknown> | undefined)?.copilotToken,
-      providerSpecificData: {
-        ...((connection.providerSpecificData as Record<string, unknown>) ?? {}),
-        connectionProxyEnabled: resolvedProxy.connectionProxyEnabled,
-        connectionProxyUrl: resolvedProxy.connectionProxyUrl,
-        connectionNoProxy: resolvedProxy.connectionNoProxy,
-        connectionProxyPoolId: resolvedProxy.proxyPoolId ?? null,
-      },
+      providerSpecificData,
       connectionId: connection.id,
       testStatus: connection.testStatus,
       lastError: connection.lastError,
