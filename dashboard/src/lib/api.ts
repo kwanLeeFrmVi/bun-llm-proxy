@@ -128,6 +128,13 @@ export const api = {
       alias: string;
       models: Array<{ id: string; name?: string; type?: string }>;
     }>(`/api/providers/${id}/models`),
+    fetchModels: (id: string) => request<{
+      success: boolean;
+      provider: string;
+      alias: string;
+      count: number;
+      models: Array<{ id: string; name: string }>;
+    }>(`/api/providers/${id}/fetch-models`, { method: "POST" }),
   },
 
   // ─── Provider Nodes ─────────────────────────────────────────────────────────
@@ -179,6 +186,14 @@ export const api = {
 
   // ─── Models ───────────────────────────────────────────────────────────────
   models: {
-    list: () => request<{ data: { id: string; created: number }[] }>("/v1/models"),
+    list: () => request<{ data: { id: string; created: number; owned_by?: string; combo_models?: string[] }[] }>("/v1/models"),
+  },
+
+  // ─── Combos ───────────────────────────────────────────────────────────────
+  combos: {
+    list:    () => request<{ combos: { id: string; name: string; models: string[]; createdAt?: string; updatedAt?: string }[] }>("/api/combos"),
+    create:  (data: { name: string; models?: string[] }) => request("/api/combos", { method: "POST", body: JSON.stringify(data) }),
+    update:  (id: string, data: { name?: string; models?: string[] }) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove:  (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
 };

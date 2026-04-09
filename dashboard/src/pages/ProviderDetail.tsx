@@ -744,6 +744,7 @@ export default function ProviderDetail() {
   const [modelTestResults, setModelTestResults] = useState<
     Record<string, TestStatus>
   >({});
+  const [fetchingModels, setFetchingModels] = useState(false);
 
   // Determine provider info
   const isCompatible =
@@ -1132,6 +1133,68 @@ export default function ProviderDetail() {
     toast.success(`Model ${modelId} deleted`);
   }
 
+  async function handleFetchModels() {
+    if (fetchingModels) return;
+    setFetchingModels(true);
+    try {
+      const result = await api.providers.fetchModels(decodedId);
+      const fetched = result.models.map(m => ({
+        id: m.id,
+        name: m.name,
+      }));
+      setPredefinedModels(fetched);
+      toast.success(`Fetched ${result.count} models`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to fetch models");
+    } finally {
+      setFetchingModels(false);
+    }
+  }
+
+  async function handleDeleteAllPredefinedModels() {
+    if (predefinedModels.length === 0) return;
+    try {
+      setPredefinedModels([]);
+      const activeConn = connections.find(c => c.isActive !== false);
+      if (activeConn) {
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
+        await api.providers.update(activeConn.id, {
+          providerSpecificData: { ...psd, enabledModels: [] },
+        });
+      }
+      toast.success(`All models removed`);
+    } catch (e) {
+      toast.error("Failed to remove models");
+      fetchPredefinedModels();
+    }
+  }
+
+  async function handleDeletePredefinedModel(modelId: string) {
+    try {
+      // Remove from local state immediately
+      setPredefinedModels(prev => prev.filter(m => m.id !== modelId));
+
+      // Update enabledModels in DB: remove the model ID (strip prefix if present)
+      const activeConn = connections.find(c => c.isActive !== false);
+      if (activeConn) {
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
+        const enabledModels = (psd.enabledModels as string[]) ?? [];
+        // modelId may be like "mvo/gpt-4o" — strip prefix to get raw ID
+        const prefix = (psd.prefix as string | undefined) ?? decodedId;
+        const rawId = modelId.startsWith(`${prefix}/`) ? modelId.slice(prefix.length + 1) : modelId;
+        const updated = enabledModels.filter(m => m !== rawId);
+        await api.providers.update(activeConn.id, {
+          providerSpecificData: { ...psd, enabledModels: updated },
+        });
+      }
+      toast.success(`Model removed`);
+    } catch (e) {
+      toast.error("Failed to remove model");
+      // Re-fetch to restore state on error
+      fetchPredefinedModels();
+    }
+  }
+
   if (loading) {
     return (
       <div className='space-y-6 animate-pulse'>
@@ -1342,14 +1405,30 @@ export default function ProviderDetail() {
               </span>
             )}
           </h2>
-          <Button
-            size='sm'
-            variant='outline'
-            className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]'
-            onClick={() => setShowAddModel(true)}
-          >
-            <Plus className='w-3.5 h-3.5 mr-1' /> Add Model
-          </Button>
+          <div className='flex items-center gap-2'>
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]'
+              onClick={handleFetchModels}
+              disabled={fetchingModels}
+            >
+              {fetchingModels ? (
+                <Loader2 className='w-3.5 h-3.5 mr-1 animate-spin' />
+              ) : (
+                <Play className='w-3.5 h-3.5 mr-1' />
+              )}
+              Fetch Models
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]'
+              onClick={() => setShowAddModel(true)}
+            >
+              <Plus className='w-3.5 h-3.5 mr-1' /> Add Model
+            </Button>
+          </div>
         </div>
         <div className='p-4'>
           {loadingModels ? (
@@ -1371,9 +1450,19 @@ export default function ProviderDetail() {
               {/* Predefined models */}
               {predefinedModels.length > 0 && (
                 <div>
-                  <p className='text-xs font-medium text-[--on-surface-variant] mb-2'>
-                    Predefined Models
-                  </p>
+                  <div className='flex items-center justify-between mb-2'>
+                    <p className='text-xs font-medium text-[--on-surface-variant]'>
+                      Predefined Models
+                    </p>
+                    {predefinedModels.length > 0 && (
+                      <button
+                        onClick={handleDeleteAllPredefinedModels}
+                        className='text-xs text-[--error] hover:underline cursor-pointer'
+                      >
+                        Delete All
+                      </button>
+                    )}
+                  </div>
                   <div className='flex flex-wrap gap-2'>
                     {predefinedModels.map((m) => (
                       <ModelTile
@@ -1389,6 +1478,7 @@ export default function ProviderDetail() {
                         }
                         isTesting={testingModelId === m.id}
                         testStatus={modelTestResults[m.id]}
+                        onDelete={() => handleDeletePredefinedModel(m.id)}
                       />
                     ))}
                   </div>
