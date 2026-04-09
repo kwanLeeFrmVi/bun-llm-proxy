@@ -1,6 +1,22 @@
 import { Copy, Play, Loader2, Trash2 } from "lucide-react";
 import type { ModelTileProps } from "./types";
 
+// Format model ID to display name (e.g., "claude-opus-4-6" -> "Claude Opus 4.6")
+function formatModelName(modelId: string): string {
+  return modelId
+    .split(/[-/]/)
+    .map((part, index) => {
+      // Capitalize first letter
+      const formatted = part.charAt(0).toUpperCase() + part.slice(1);
+      // Convert version pattern "4-6" to "4.6", "4-5-20251001" to "4.5"
+      if (/^\d+$/.test(part)) return part; // Pure numbers stay as is
+      if (/^\d+-\d+$/.test(part)) return part.replace("-", "."); // "4-6" -> "4.6"
+      if (/^\d+-\d+-\d+$/.test(part)) return part.replace(/-/g, "."); // "4-5-20251001" -> "4.5.20251001"
+      return formatted;
+    })
+    .join(" ");
+}
+
 export function ModelTile({
   modelId,
   alias,
@@ -25,6 +41,13 @@ export function ModelTile({
         ? "text-red-500"
         : "text-[--on-surface-variant]";
 
+  // Use alias (full model ID with prefix) or fall back to modelId
+  const fullModelId = alias ?? modelId;
+  // Extract just the model name part (after the last slash)
+  const modelNameOnly = fullModelId.includes("/")
+    ? fullModelId.split("/").slice(1).join("/")
+    : modelId;
+
   return (
     <div
       className={`group flex items-center gap-2 px-3 py-2 rounded-lg border ${borderColor} hover:bg-[--surface-container-low]/50 transition-colors`}
@@ -48,9 +71,16 @@ export function ModelTile({
         <path d='M15 13v2' />
         <path d='M9 13v2' />
       </svg>
-      <code className='text-xs font-mono text-[--on-surface] flex-1 truncate'>
-        {alias ?? modelId}
-      </code>
+      <div className='flex-1 min-w-0'>
+        {/* First line: Formatted model name */}
+        <div className='text-sm font-medium text-[--on-surface] truncate'>
+          {formatModelName(modelNameOnly)}
+        </div>
+        {/* Second line: Full model ID with prefix (smaller, 80% opacity) */}
+        <div className='text-xs font-mono text-[--on-surface-variant]/80 truncate'>
+          {fullModelId}
+        </div>
+      </div>
       {onTest && (
         <button
           onClick={onTest}
@@ -79,11 +109,11 @@ export function ModelTile({
         </button>
       )}
       <button
-        onClick={() => onCopy(alias ?? modelId)}
+        onClick={() => onCopy(fullModelId)}
         className='shrink-0 text-[--on-surface-variant] hover:text-[--on-surface]'
         title='Copy'
       >
-        {copied === (alias ?? modelId) ? (
+        {copied === fullModelId ? (
           <span className='text-xs text-green-600'>ok</span>
         ) : (
           <Copy className='w-3.5 h-3.5' />

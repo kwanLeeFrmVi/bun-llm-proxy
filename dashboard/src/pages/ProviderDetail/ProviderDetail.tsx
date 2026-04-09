@@ -12,7 +12,7 @@ import {
   isAnthropicCompatibleProvider,
   isOAuthProvider,
   getProviderConfig,
-  getProviderAlias,
+  getEffectiveProviderAlias,
 } from "@/constants/providers";
 import { Button } from "@/components/ui/button";
 import {
@@ -348,10 +348,7 @@ export default function ProviderDetail() {
 
       // Construct full model path with provider alias (e.g., "nvidia/glm-5")
       // Only add prefix if modelId doesn't already start with it
-      // For compatible providers, use node prefix instead of provider alias
-      const providerPrefix = isCompatible
-        ? (node?.prefix ?? decodedId)
-        : getProviderAlias(decodedId);
+      const providerPrefix = getEffectiveProviderAlias(decodedId, nodes);
       const fullModel = modelId.startsWith(`${providerPrefix}/`)
         ? modelId
         : `${providerPrefix}/${modelId}`;
@@ -891,10 +888,8 @@ export default function ProviderDetail() {
                   </p>
                   <div className='flex flex-wrap gap-2'>
                     {customModels.map((m) => {
-                      // Use node prefix for compatible providers, otherwise use provider alias
-                      const providerPrefix = isCompatible
-                        ? (node?.prefix ?? decodedId)
-                        : getProviderAlias(decodedId);
+                      // Use effective prefix (node prefix for compatible providers, otherwise standard alias)
+                      const providerPrefix = getEffectiveProviderAlias(decodedId, nodes);
                       const alias = m.startsWith(`${providerPrefix}/`)
                         ? m
                         : `${providerPrefix}/${m}`;
@@ -945,6 +940,7 @@ export default function ProviderDetail() {
       <AddCustomModelModal
         isOpen={showAddModel}
         providerId={decodedId}
+        providerPrefix={getEffectiveProviderAlias(decodedId, nodes)}
         onAdd={handleAddModel}
         onClose={() => setShowAddModel(false)}
       />

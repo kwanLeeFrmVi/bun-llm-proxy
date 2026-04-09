@@ -14,6 +14,7 @@ import type { AddCustomModelModalProps } from "./types";
 export function AddCustomModelModal({
   isOpen,
   providerId: _providerId,
+  providerPrefix,
   onAdd,
   onClose,
 }: AddCustomModelModalProps) {
@@ -27,6 +28,11 @@ export function AddCustomModelModal({
     if (!modelId.trim()) return;
     onAdd(modelId.trim());
   }
+
+  // Show what the full model ID will be
+  const fullModelId = modelId.trim() && providerPrefix
+    ? `${providerPrefix}/${modelId.trim()}`
+    : modelId.trim() || (providerPrefix ? `${providerPrefix}/model-id` : "model-id");
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
@@ -45,14 +51,14 @@ export function AddCustomModelModal({
               value={modelId}
               onChange={(e) => setModelId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              placeholder='e.g. gpt-4o'
+              placeholder='e.g. claude-haiku-4-5-20251001'
               className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
               autoFocus
             />
             <p className='text-xs text-[--on-surface-variant]'>
-              Sent to provider as:{" "}
+              Will be saved as:{" "}
               <code className='font-mono bg-[--surface-container-low] px-1 rounded'>
-                {modelId.trim() || "model-id"}
+                {fullModelId}
               </code>
             </p>
           </div>
