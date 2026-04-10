@@ -1,7 +1,7 @@
 // Port of src/app/api/v1/models/route.js
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "ai-bridge/config/providerModels.ts";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getCombos, type Combo } from "db/index.ts";
+import { getProviderConnections, getCombos, getAllProviderEnabledModels, type Combo } from "db/index.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
 import { parseOpenAIStyleModels, extractModelIds, normalizeBaseUrl } from "lib/utils.ts";
@@ -9,6 +9,43 @@ import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 const providerModels = PROVIDER_MODELS as Record<string, Array<{ id: string; name?: string }>>;
 const providerIdToAlias = PROVIDER_ID_TO_ALIAS as Record<string, string>;
+
+function normalizeModelId(modelId: string, prefixes: string[]): string {
+  const trimmedModelId = modelId.trim();
+  for (const prefix of prefixes) {
+    if (trimmedModelId.startsWith(`${prefix}/`)) {
+      return trimmedModelId.slice(prefix.length + 1);
+    }
+  }
+  return trimmedModelId;
+}
+
+function mergeModelIds(
+  baseModelIds: string[],
+  enabledModels: unknown,
+  prefixes: string[],
+): string[] {
+  const mergedModelIds = new Set<string>();
+
+  for (const modelId of baseModelIds) {
+    const normalizedModelId = normalizeModelId(modelId, prefixes);
+    if (normalizedModelId) {
+      mergedModelIds.add(normalizedModelId);
+    }
+  }
+
+  if (Array.isArray(enabledModels)) {
+    for (const enabledModel of enabledModels) {
+      if (typeof enabledModel !== "string") continue;
+      const normalizedModelId = normalizeModelId(enabledModel, prefixes);
+      if (normalizedModelId) {
+        mergedModelIds.add(normalizedModelId);
+      }
+    }
+  }
+
+  return Array.from(mergedModelIds);
+}
 
 async function fetchCompatibleModelIds(connection: Record<string, unknown>): Promise<string[]> {
   if (!connection?.apiKey) return [];
@@ -57,6 +94,13 @@ export async function GET(_req: Request): Promise<Response> {
       console.log("Could not fetch combos");
     }
 
+    let persistedEnabledModelsByProvider: Record<string, string[]> = {};
+    try {
+      persistedEnabledModelsByProvider = await getAllProviderEnabledModels();
+    } catch {
+      console.log("Could not fetch provider enabled models");
+    }
+
     const activeConnectionByProvider = new Map<string, Record<string, unknown>>();
     for (const conn of connections) {
       if (!activeConnectionByProvider.has(conn.provider as string)) {
@@ -83,14 +127,21 @@ export async function GET(_req: Request): Promise<Response> {
 
     if (connections.length === 0) {
       for (const [alias, pModels] of Object.entries(providerModels)) {
-        for (const model of pModels) {
+        const providerId = Object.entries(providerIdToAlias).find(([, candidateAlias]) => candidateAlias === alias)?.[0] ?? alias;
+        const enabledModels = persistedEnabledModelsByProvider[providerId] ?? [];
+        const modelIds = mergeModelIds(
+          pModels.map(model => model.id),
+          enabledModels,
+          [alias, providerId],
+        );
+        for (const modelId of modelIds) {
           models.push({
-            id: `${alias}/${model.id}`,
+            id: `${alias}/${modelId}`,
             object: "model",
             created: timestamp,
             owned_by: alias,
             permission: [],
-            root: model.id,
+            root: modelId,
             parent: null,
           });
         }
@@ -115,24 +166,23 @@ export async function GET(_req: Request): Promise<Response> {
 
         const outputAlias = (nodePrefix ?? (psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
         const pModels = providerModels[staticAlias] ?? [];
-        const enabledModels = psd.enabledModels as string[] | undefined;
-        const hasExplicitEnabledModels = Array.isArray(enabledModels) && enabledModels.length > 0;
+        const enabledModels = persistedEnabledModelsByProvider[providerId] ?? (psd.enabledModels as string[] | undefined);
+        const prefixes = [outputAlias, staticAlias, providerId].filter(
+          (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index,
+        );
 
-        let rawModelIds: string[] = hasExplicitEnabledModels
-          ? Array.from(new Set(enabledModels.filter((id): id is string => typeof id === "string" && id.trim() !== "")))
-          : pModels.map(m => m.id);
+        let rawModelIds = mergeModelIds(
+          pModels.map(m => m.id),
+          enabledModels,
+          prefixes,
+        );
 
         if (isCompatibleProvider && rawModelIds.length === 0) {
           rawModelIds = await fetchCompatibleModelIds(conn);
         }
 
         const modelIds = rawModelIds
-          .map(modelId => {
-            if (modelId.startsWith(`${outputAlias}/`)) return modelId.slice(outputAlias.length + 1);
-            if (modelId.startsWith(`${staticAlias}/`)) return modelId.slice(staticAlias.length + 1);
-            if (modelId.startsWith(`${providerId}/`)) return modelId.slice(providerId.length + 1);
-            return modelId;
-          })
+          .map(modelId => normalizeModelId(modelId, prefixes))
           .filter((id): id is string => typeof id === "string" && id.trim() !== "");
 
         for (const modelId of modelIds) {
