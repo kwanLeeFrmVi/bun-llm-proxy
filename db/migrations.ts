@@ -96,8 +96,9 @@ const migrationV2: Migration = {
         .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_connections'")
         .get();
 
-      // Check if using old JSON blob schema
-      const isOldSchema = pcColumns?.sql.includes("data TEXT");
+      // Check if using old JSON blob schema (data column exists)
+      // Look for the actual column name in the schema - SQLite returns SQL with varying whitespace
+      const isOldSchema = pcColumns?.sql.includes("data") && pcColumns?.sql.includes("TEXT") && !pcColumns?.sql.includes("display_name");
 
       if (isOldSchema) {
         console.log("[Migration v2] Migrating provider_connections from JSON blob to columnar");
@@ -240,7 +241,8 @@ const migrationV2: Migration = {
         .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type='table' AND name='proxy_pools'")
         .get();
 
-      const isOldSchema = ppColumns?.sql.includes("data TEXT");
+      // Check if using old JSON blob schema (data column exists)
+      const isOldSchema = ppColumns?.sql.includes("data") && ppColumns?.sql.includes("TEXT") && !ppColumns?.sql.includes("proxy_url");
 
       if (isOldSchema) {
         console.log("[Migration v2] Migrating proxy_pools from JSON blob to columnar");
