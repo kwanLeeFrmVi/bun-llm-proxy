@@ -463,10 +463,100 @@ export function parseVertexSaJson(apiKey: string): Record<string, unknown> | nul
   }
 }
 
-export function refreshVertexToken(
-  _saJson: Record<string, unknown>
+// ─── Vertex AI Service Account Token Cache ───────────────────────────────────────
+
+interface CachedVertexToken {
+  token: string;
+  expiresAt: number;
+}
+
+const vertexTokenCache = new Map<string, CachedVertexToken>();
+
+/**
+ * Mint a short-lived OAuth2 Bearer token for Google Cloud Vertex AI
+ * using Service Account JSON + jose (RS256 JWT assertion flow).
+ * Token is cached until 5 minutes before expiry.
+ */
+export async function refreshVertexToken(
+  saJson: Record<string, unknown>
 ): Promise<TokenResult | null> {
-  return Promise.resolve(null);
+  const cacheKey = saJson.client_email as string;
+  const cached = vertexTokenCache.get(cacheKey);
+
+  // Return cached token if still valid (5-min buffer)
+  if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) {
+    return { accessToken: cached.token, expiresAt: cached.expiresAt };
+  }
+
+  try {
+    const { SignJWT, importPKCS8 } = await import("jose");
+
+    const privateKey = saJson.private_key as string;
+    const clientEmail = saJson.client_email as string;
+    const projectId = saJson.project_id as string;
+
+    if (!privateKey || !clientEmail || !projectId) {
+      log.error("TOKEN_REFRESH", "Invalid service account JSON: missing required fields");
+      return null;
+    }
+
+    log.debug("TOKEN_REFRESH", `Vertex minting token for ${clientEmail}`);
+
+    // Import the private key (handle escaped newlines)
+    const pemKey = privateKey.replace(/\\n/g, "\n");
+    const key = await importPKCS8(pemKey, "RS256");
+
+    const now = Math.floor(Date.now() / 1000);
+
+    // Create and sign the JWT
+    const jwt = await new SignJWT({ scope: "https://www.googleapis.com/auth/cloud-platform" })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer(clientEmail)
+      .setAudience("https://oauth2.googleapis.com/token")
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(key);
+
+    // Exchange JWT for access token
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      log.error("TOKEN_REFRESH", `Vertex token mint failed: ${errorText}`);
+      return null;
+    }
+
+    const data = await res.json() as Record<string, unknown>;
+    const accessToken = data.access_token as string;
+    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 3600;
+
+    if (!accessToken) {
+      log.error("TOKEN_REFRESH", "Vertex token response missing access_token");
+      return null;
+    }
+
+    const expiresAt = Date.now() + expiresIn * 1000;
+
+    // Cache the token
+    vertexTokenCache.set(cacheKey, { token: accessToken, expiresAt });
+    log.info("TOKEN_REFRESH", `Vertex token minted for ${clientEmail}`);
+
+    return {
+      accessToken,
+      expiresIn,
+      providerSpecificData: { projectId },
+    };
+  } catch (err) {
+    log.error("TOKEN_REFRESH", `Vertex token error: ${(err as Error).message}`);
+    return null;
+  }
 }
 
 export function refreshWithRetry(
@@ -624,6 +714,46 @@ export async function checkAndRefreshToken(
 
         creds.providerSpecificData = updatedSpecific;
         creds.copilotToken = copilotToken.token;
+      }
+    }
+  }
+
+  // 3. Vertex AI / Vertex Partner: mint OAuth token from service account JSON
+  if (provider === "vertex" || provider === "vertex-partner") {
+    const apiKey = creds.apiKey as string | undefined;
+    if (apiKey) {
+      const saJson = parseVertexSaJson(apiKey);
+      if (saJson) {
+        // Check if we have a cached token and it's still valid
+        const clientEmail = saJson.client_email as string;
+        const cached = vertexTokenCache.get(clientEmail);
+        const now = Date.now();
+        const needsRefresh = !cached || (cached.expiresAt - now) < TOKEN_EXPIRY_BUFFER_MS;
+
+        if (needsRefresh) {
+          log.info("TOKEN_REFRESH", "Vertex token expiring soon, refreshing proactively", {
+            provider,
+            expiresIn: cached ? Math.round((cached.expiresAt - now) / 1000) : 0,
+          });
+
+          const vertexResult = await refreshVertexToken(saJson);
+          if (vertexResult?.accessToken) {
+            // Update in-memory cache with expiresAt from refreshVertexToken
+            const newExpiresAt = vertexResult.expiresAt ?? now + (vertexResult.expiresIn ?? 3600) * 1000;
+            vertexTokenCache.set(clientEmail, {
+              token: vertexResult.accessToken,
+              expiresAt: typeof newExpiresAt === "number" ? newExpiresAt : now + 3600 * 1000,
+            });
+
+            creds.accessToken = vertexResult.accessToken;
+            if (vertexResult.providerSpecificData?.projectId) {
+              creds.projectId = vertexResult.providerSpecificData.projectId;
+            }
+          }
+        } else if (cached?.token) {
+          // Use cached token
+          creds.accessToken = cached.token;
+        }
       }
     }
   }
