@@ -2,25 +2,8 @@
 // open-sse internals import these; bun-runtime previously stubbed them out.
 
 import { EventEmitter } from "events";
-import type { Database } from "bun:sqlite";
 import { normalizeModelName, stripSuffixes, baseModelName, getORModelCache } from "services/pricingSync.ts";
-
-// ─── DB singleton (inline to avoid circular dep on full db/index.ts) ───────────
-
-let _db: Database | null = null;
-
-function db(): Database {
-  if (_db) return _db;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  // biome-ignore start: bun:sqlite is only available in Bun runtime
-  const Database = require("bun:sqlite").Database as { new (path: string): Database };
-  // biome-ignore end
-  const { join } = require("node:path");
-  const { homedir } = require("node:os");
-  const dataDir = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
-  _db = new Database(join(dataDir, "router.db"));
-  return _db;
-}
+import { getRawDb } from "db/connection.ts";
 
 // ─── In-memory state ───────────────────────────────────────────────────────────
 
@@ -99,7 +82,8 @@ export function trackPendingRequest(
   }
 ): void {
   const timestamp = new Date().toISOString();
-  db().run(
+  const db = getRawDb();
+  db.run(
     `INSERT INTO usage_log (id, timestamp, endpoint, provider, model, connection_id, api_key_id, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [requestId, timestamp, meta.endpoint ?? null, meta.provider ?? null,
@@ -149,7 +133,8 @@ export async function saveRequestUsage(
     finalCost = await calculateCost(resolvedProvider, resolvedModel, promptTokens, completionTokens);
   }
 
-  db().run(
+  const db = getRawDb();
+  db.run(
     `UPDATE usage_log SET
        prompt_tokens      = ?,
        completion_tokens  = ?,
@@ -185,7 +170,8 @@ export function appendRequestLog(
   status: string,
   _errorMsg?: string
 ): void {
-  db().run(
+  const db = getRawDb();
+  db.run(
     `UPDATE usage_log SET status = ? WHERE id = ?`,
     [status, requestId]
   );
@@ -260,7 +246,7 @@ async function findPricing(
 
 /**
  * Calculate cost using multi-level fallback pricing lookup.
- * Reads from KV (pricing) and falls back to OpenRouter cached models.
+ * Reads from pricing table and falls back to OpenRouter cached models.
  */
 async function calculateCost(
   provider: string,
@@ -269,14 +255,20 @@ async function calculateCost(
   completionTokens: number
 ): Promise<number> {
   try {
-    const row = db()
-      .query<{ value: string }, string>("SELECT value FROM kv WHERE key = 'pricing'")
-      .get("pricing");
-    if (!row) return 0;
-    const pricing = JSON.parse(row.value) as Record<
-      string,
-      Record<string, PriceEntry>
-    >;
+    const db = getRawDb();
+    const rows = db
+      .query<{ provider: string; model: string; input: number; output: number }, []>(
+        "SELECT provider, model, input, output FROM pricing"
+      )
+      .all();
+
+    const pricing: Record<string, Record<string, PriceEntry>> = {};
+    for (const row of rows) {
+      if (!pricing[row.provider]) {
+        pricing[row.provider] = {};
+      }
+      pricing[row.provider]![row.model] = { input: row.input, output: row.output };
+    }
 
     const entry = await findPricing(pricing, provider, model);
     if (!entry) return 0;
@@ -293,10 +285,11 @@ async function calculateCost(
 // ─── Stats query helpers (used by routes/api/usage/index.ts) ───────────────────
 
 export function getUsageStats(period: string): UsageStats {
+  const db = getRawDb();
   const since = periodToTimestamp(period);
   const baseWhere = since ? `WHERE timestamp >= '${since.replace(/'/g, "''")}'` : "WHERE 1=1";
 
-  const totals = db()
+  const totals = db
     .query<{ cnt: number; pt: number; ct: number; c: number }, []>(
       `SELECT COUNT(*) as cnt, COALESCE(SUM(prompt_tokens),0) as pt, COALESCE(SUM(completion_tokens),0) as ct, COALESCE(SUM(cost),0) as c FROM usage_log ${baseWhere === "WHERE 1=1" ? "" : baseWhere}`
     )
@@ -304,17 +297,17 @@ export function getUsageStats(period: string): UsageStats {
 
   const baseFilter = since ? `timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
 
-  const byProvider = db().query<{ provider: string; requests: number; cost: number; tokens: number }, []>(
+  const byProvider = db.query<{ provider: string; requests: number; cost: number; tokens: number }, []>(
     `SELECT provider, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
      FROM usage_log WHERE ${baseFilter} AND provider IS NOT NULL GROUP BY provider ORDER BY tokens DESC`
   ).all();
 
-  const byModel = db().query<{ model: string; requests: number; cost: number; tokens: number }, []>(
+  const byModel = db.query<{ model: string; requests: number; cost: number; tokens: number }, []>(
     `SELECT model, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
      FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL GROUP BY model ORDER BY tokens DESC`
   ).all();
 
-  const byApiKeyRaw = db().query<{ api_key_id: string; requests: number; cost: number }, []>(
+  const byApiKeyRaw = db.query<{ api_key_id: string; requests: number; cost: number }, []>(
     `SELECT api_key_id, COUNT(*) as requests, SUM(cost) as cost
      FROM usage_log WHERE ${baseFilter} AND api_key_id IS NOT NULL GROUP BY api_key_id ORDER BY cost DESC`
   ).all();
@@ -341,6 +334,7 @@ export function getUsageDetails(opts: {
   endDate?: string;
   period?: string;
 }): { rows: UsageRecord[]; total: number } {
+  const db = getRawDb();
   const { page, limit = 50, provider, model, apiKeyId, startDate, endDate, period } = opts;
   const offset = opts.offset ?? (page != null ? (page - 1) * limit : 0);
 
@@ -360,11 +354,11 @@ export function getUsageDetails(opts: {
 
   const where = `WHERE ${conditions.join(" AND ")}`;
 
-  const total = (db()
+  const total = (db
     .query<{ cnt: number }, []>(`SELECT COUNT(*) as cnt FROM usage_log ${where}`)
     .get() ?? { cnt: 0 }).cnt;
 
-  const rows = db()
+  const rows = db
     .query<{
       id: string; timestamp: string; endpoint: string; provider: string;
       model: string; connection_id: string; api_key_id: string;
@@ -418,10 +412,11 @@ export interface LeaderboardEntry {
  * Aggregates usage across all API keys owned by each user.
  */
 export function getLeaderboard(period: string): LeaderboardEntry[] {
+  const db = getRawDb();
   const since = periodToTimestamp(period);
   const baseFilter = since ? `timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
 
-  const rows = db().query<{
+  const rows = db.query<{
     user_id: string;
     username: string;
     role: string;

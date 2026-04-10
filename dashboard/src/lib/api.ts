@@ -62,15 +62,27 @@ export interface ProviderConnection {
   id: string;
   provider: string;
   name?: string;
+  displayName?: string;
+  email?: string;
   apiKey?: string;
-  baseUrl?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  projectId?: string;
+  baseUrl?: string;  // From providerSpecificData
   priority?: number;
   isActive?: boolean;
   authType?: string;
   testStatus?: string;
   lastError?: string;
+  errorCode?: number;
   lastErrorAt?: string;
-  lastTested?: string;
+  backoffLevel?: number;
+  lastUsedAt?: string;
+  consecutiveUseCount?: number;
+  providerSpecificData?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  // Dynamic properties (e.g., modelLock_*)
   [key: string]: unknown;
 }
 
