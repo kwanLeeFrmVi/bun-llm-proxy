@@ -1,12 +1,5 @@
 import { useMemo, useCallback, useRef } from "react";
-import {
-  ReactFlow,
-  Handle,
-  Position,
-  type Node,
-  type Edge,
-  type NodeProps,
-} from "@xyflow/react";
+import { ReactFlow, Handle, Position, type Node, type Edge, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   getProviderConfig,
@@ -34,7 +27,7 @@ function ProviderNode({ data }: NodeProps<Node<ProviderNodeData>>) {
   const { label, color, textIcon, active } = data;
   return (
     <div
-      className='flex items-center gap-2.5 px-4 py-2.5 rounded-lg border-2 transition-all duration-300 bg-[--surface-container-lowest]'
+      className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border-2 transition-all duration-300 bg-[--surface-container-lowest]"
       style={{
         borderColor: active ? color : "var(--color-border)",
         boxShadow: active ? `0 0 16px ${color}40` : "none",
@@ -42,33 +35,33 @@ function ProviderNode({ data }: NodeProps<Node<ProviderNodeData>>) {
       }}
     >
       <Handle
-        type='target'
+        type="target"
         position={Position.Top}
-        id='top'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="top"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='target'
+        type="target"
         position={Position.Bottom}
-        id='bottom'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="bottom"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='target'
+        type="target"
         position={Position.Left}
-        id='left'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="left"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='target'
+        type="target"
         position={Position.Right}
-        id='right'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="right"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
 
       {/* Provider icon badge */}
       <div
-        className='w-8 h-8 rounded-md flex items-center justify-center shrink-0 text-white text-sm font-bold'
+        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 text-white text-sm font-bold"
         style={{ backgroundColor: `${color}` }}
       >
         {textIcon}
@@ -76,7 +69,7 @@ function ProviderNode({ data }: NodeProps<Node<ProviderNodeData>>) {
 
       {/* Provider name */}
       <span
-        className='text-sm font-medium truncate'
+        className="text-sm font-medium truncate"
         style={{ color: active ? color : "var(--color-text)" }}
       >
         {label}
@@ -84,13 +77,13 @@ function ProviderNode({ data }: NodeProps<Node<ProviderNodeData>>) {
 
       {/* Active ping indicator */}
       {active && (
-        <span className='relative flex h-2 w-2 shrink-0'>
+        <span className="relative flex h-2 w-2 shrink-0">
           <span
-            className='animate-ping absolute inline-flex h-full w-full rounded-full opacity-75'
+            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
             style={{ backgroundColor: color }}
           />
           <span
-            className='relative inline-flex rounded-full h-2 w-2'
+            className="relative inline-flex rounded-full h-2 w-2"
             style={{ backgroundColor: color }}
           />
         </span>
@@ -101,36 +94,36 @@ function ProviderNode({ data }: NodeProps<Node<ProviderNodeData>>) {
 
 function RouterNode({ data }: NodeProps<Node<RouterNodeData>>) {
   return (
-    <div className='flex items-center justify-center px-5 py-3 rounded-xl border-2 border-[--primary] bg-[--primary]/5 shadow-md min-w-[130px]'>
+    <div className="flex items-center justify-center px-5 py-3 rounded-xl border-2 border-[--primary] bg-[--primary]/5 shadow-md min-w-[130px]">
       <Handle
-        type='source'
+        type="source"
         position={Position.Top}
-        id='top'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="top"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='source'
+        type="source"
         position={Position.Bottom}
-        id='bottom'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="bottom"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='source'
+        type="source"
         position={Position.Left}
-        id='left'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="left"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
       <Handle
-        type='source'
+        type="source"
         position={Position.Right}
-        id='right'
-        className='!bg-transparent !border-0 !w-0 !h-0'
+        id="right"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
 
-      <img src='/logo.svg' alt='LLM Gateway' className='w-6 h-6 mr-2' />
-      <span className='text-sm font-bold text-[--primary]'>LLM Gateway</span>
+      <img src="/logo.svg" alt="LLM Gateway" className="w-6 h-6 mr-2" />
+      <span className="text-sm font-bold text-[--primary]">LLM Gateway</span>
       {data.activeCount > 0 && (
-        <span className='ml-2 px-1.5 py-0.5 rounded-full bg-[--primary] text-white text-xs font-bold'>
+        <span className="ml-2 px-1.5 py-0.5 rounded-full bg-[--primary] text-white text-xs font-bold">
           {data.activeCount}
         </span>
       )}
@@ -147,7 +140,7 @@ function buildLayout(
   activeSet: Set<string>,
   lastSet: Set<string>,
   errorSet: Set<string>,
-  providerNodes?: ProviderNode[],
+  providerNodes?: ProviderNode[]
 ): { nodes: Node[]; edges: Edge[] } {
   const nodeW = 180;
   const nodeH = 30;
@@ -186,11 +179,29 @@ function buildLayout(
     draggable: false,
   });
 
-  const edgeStyle = (active: boolean, last: boolean, error: boolean) => {
-    if (error) return { stroke: "#ef4444", strokeWidth: 2.5, opacity: 0.9 };
-    if (active) return { stroke: "#22c55e", strokeWidth: 2.5, opacity: 0.9 };
-    if (last) return { stroke: "#f59e0b", strokeWidth: 2, opacity: 0.7 };
-    return { stroke: "var(--color-border)", strokeWidth: 1, opacity: 0.3 };
+  // Calculate max requests for usage scaling
+  const maxRequests = Math.max(...providers.map((p) => p.requests), 1);
+
+  const edgeStyle = (active: boolean, last: boolean, error: boolean, requests: number) => {
+    // Power curve for more extreme visual differentiation
+    const usageRatio = requests / maxRequests;
+    const scaled = Math.pow(usageRatio, 0.6); // curve: amplifies mid-low differences
+    const strokeWidth = 0.5 + scaled * 5.5; // 0.5 to 6
+    const opacity = 0.05 + scaled * 0.95; // 0.05 to 1.0
+
+    if (error) return { stroke: "#ef4444", strokeWidth, opacity: Math.max(opacity, 0.5) };
+    if (active) return { stroke: "#22c55e", strokeWidth, opacity: Math.max(opacity, 0.2) };
+    if (last)
+      return {
+        stroke: "#f59e0b",
+        strokeWidth: Math.max(strokeWidth, 1),
+        opacity: Math.max(opacity, 0.2),
+      };
+    return {
+      stroke: "var(--color-border)",
+      strokeWidth,
+      opacity,
+    };
   };
 
   providers.forEach((p, i) => {
@@ -202,16 +213,11 @@ function buildLayout(
 
     // For compatible providers, use the actual node name if available
     const isCompatible =
-      isOpenAICompatibleProvider(p.provider) ||
-      isAnthropicCompatibleProvider(p.provider);
-    const providerNode = isCompatible
-      ? providerNodes?.find((n) => n.id === p.provider)
-      : undefined;
+      isOpenAICompatibleProvider(p.provider) || isAnthropicCompatibleProvider(p.provider);
+    const providerNode = isCompatible ? providerNodes?.find((n) => n.id === p.provider) : undefined;
 
     const data: ProviderNodeData = {
-      label:
-        providerNode?.name ??
-        (config.name !== p.provider ? config.name : p.provider),
+      label: providerNode?.name ?? (config.name !== p.provider ? config.name : p.provider),
       color: config.color,
       textIcon: config.textIcon,
       active,
@@ -254,10 +260,9 @@ function buildLayout(
       target: nodeId,
       targetHandle,
       animated: active,
-      style: edgeStyle(active, last, error),
+      style: edgeStyle(active, last, error, p.requests),
     });
-  }
-);
+  });
 
   return { nodes, edges };
 }
@@ -289,24 +294,18 @@ export function ProviderTopology({
         .map((p) => p.provider?.toLowerCase())
         .sort()
         .join(","),
-    [providers],
+    [providers]
   );
   const lastKey = lastProvider?.toLowerCase() ?? "";
   const errorKey = errorProvider?.toLowerCase() ?? "";
 
-  const activeSet = useMemo(
-    () => new Set(activeKey ? activeKey.split(",") : []),
-    [activeKey],
-  );
+  const activeSet = useMemo(() => new Set(activeKey ? activeKey.split(",") : []), [activeKey]);
   const lastSet = useMemo(() => new Set(lastKey ? [lastKey] : []), [lastKey]);
-  const errorSet = useMemo(
-    () => new Set(errorKey ? [errorKey] : []),
-    [errorKey],
-  );
+  const errorSet = useMemo(() => new Set(errorKey ? [errorKey] : []), [errorKey]);
 
   const { nodes: flowNodes, edges } = useMemo(
     () => buildLayout(providers, activeSet, lastSet, errorSet, nodes),
-    [providers, activeKey, lastKey, errorKey, nodes],
+    [providers, activeKey, lastKey, errorKey, nodes]
   );
 
   const providersKey = useMemo(
@@ -315,24 +314,21 @@ export function ProviderTopology({
         .map((p) => p.provider)
         .sort()
         .join(","),
-    [providers],
+    [providers]
   );
 
   const rfInstance = useRef<{
     fitView: (opts: { padding: number }) => void;
   } | null>(null);
-  const onInit = useCallback(
-    (instance: { fitView: (opts: { padding: number }) => void }) => {
-      rfInstance.current = instance;
-      setTimeout(() => instance.fitView({ padding: 0.3 }), 50);
-    },
-    [],
-  );
+  const onInit = useCallback((instance: { fitView: (opts: { padding: number }) => void }) => {
+    rfInstance.current = instance;
+    setTimeout(() => instance.fitView({ padding: 0.3 }), 50);
+  }, []);
 
   return (
-    <div className='w-full' style={{ height: 480 }}>
+    <div className="w-full" style={{ height: 480 }}>
       {providers.length === 0 ? (
-        <div className='h-full flex items-center justify-center text-[--on-surface-variant] text-sm'>
+        <div className="h-full flex items-center justify-center text-[--on-surface-variant] text-sm">
           No providers connected
         </div>
       ) : (
