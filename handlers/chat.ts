@@ -24,6 +24,7 @@ import { detectFormat } from "../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 import { getProviderDisplayName } from "../lib/providers.ts";
 import { handleComboModel, getComboMetadata } from "../services/comboRouting.ts";
+import { incrementCircuitBreaker, resetCircuitBreaker } from "../lib/circuitBreaker.ts";
 
 type ClientRawRequest = {
   endpoint: string;
@@ -265,6 +266,7 @@ async function handleSingleModelChat(
       result = (await handleChatCore(chatCoreOpts)) as ChatCoreResult;
 
       if (result.success) {
+        await resetCircuitBreaker(creds.connectionId as string, model);
         if (isStreaming) {
           return wrapStreamingResponse(result.response!, requestId, provider, model, startTime, ctx);
         }
@@ -273,6 +275,16 @@ async function handleSingleModelChat(
 
       // Non-transient error — break immediately, no retry
       if (!TRANSIENT_ERROR_STATUSES.has(result.status)) break;
+
+      // ── Circuit breaker: skip retries if too many failures already seen ─────
+      // Only check on first attempt — subsequent retries are this request's own failures
+      if (attempt === 0) {
+        const totalFailures = await incrementCircuitBreaker(creds.connectionId as string, model);
+        if (totalFailures >= TRANSIENT_RETRY.maxAttempts) {
+          log.warn(ctx, "CHAT", `Circuit open for ${creds.connectionName} on ${model} — skipping retries, locking now`);
+          break;
+        }
+      }
 
       // Transient error with retries remaining — back off and retry
       if (attempt < TRANSIENT_RETRY.maxAttempts) {

@@ -16,6 +16,7 @@ import * as log from "../lib/logger.ts";
 import { RequestContext } from "../lib/requestContext.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
+import { incrementCircuitBreaker, resetCircuitBreaker } from "../lib/circuitBreaker.ts";
 
 /**
  * Handle embeddings request.
@@ -136,12 +137,23 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       result = (await handleEmbeddingsCore(embeddingsCoreOpts)) as EmbeddingsCoreResult;
 
       if (result.success) {
+        await resetCircuitBreaker(creds.connectionId as string, model);
         RequestContext.delete(ctx.id);
         return result.response!;
       }
 
       // Non-transient error — break immediately, no retry
       if (!TRANSIENT_ERROR_STATUSES.has(result.status)) break;
+
+      // ── Circuit breaker: skip retries if too many failures already seen ─────
+      // Only check on first attempt — subsequent retries are this request's own failures
+      if (attempt === 0) {
+        const totalFailures = await incrementCircuitBreaker(creds.connectionId as string, model);
+        if (totalFailures >= TRANSIENT_RETRY.maxAttempts) {
+          log.warn(ctx, "EMBEDDINGS", `Circuit open for ${creds.connectionName} on ${model} — skipping retries, locking now`);
+          break;
+        }
+      }
 
       // Transient error with retries remaining — back off and retry
       if (attempt < TRANSIENT_RETRY.maxAttempts) {
