@@ -63,6 +63,14 @@ export const CREATE_TABLES = `
     created_at TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS combo_latency (
+    combo_name TEXT NOT NULL,
+    model      TEXT NOT NULL,
+    ttft_ms    INTEGER NOT NULL,
+    timestamp  TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_cl ON combo_latency(combo_name, model, timestamp);
+
   CREATE TABLE IF NOT EXISTS usage_log (
     id                 TEXT PRIMARY KEY,
     timestamp          TEXT NOT NULL,
@@ -86,10 +94,11 @@ export const CREATE_TABLES = `
 
 // kv keys used
 export const KV_KEYS = {
-  SETTINGS:      "settings",
-  MODEL_ALIASES: "model_aliases",
-  MITM_ALIAS:    "mitm_alias",
-  PRICING:       "pricing",
+  SETTINGS:       "settings",
+  MODEL_ALIASES:  "model_aliases",
+  MITM_ALIAS:     "mitm_alias",
+  PRICING:        "pricing",
+  COMBO_CONFIGS:  "combo_configs",
 } as const;
 
 export const DEFAULT_SETTINGS = {

@@ -357,10 +357,19 @@ export async function createCombo(data: { name: string; models?: string[] }): Pr
 export async function updateCombo(id: string, data: Partial<Combo>): Promise<Combo | null> {
   const now = new Date().toISOString();
   if (data.models !== undefined) {
-    db().run(
-      "UPDATE combos SET name = COALESCE(?, name), models = ?, updated_at = ? WHERE id = ?",
-      [data.name ?? null, JSON.stringify(data.models), now, id]
-    );
+    // When updating models, always update name too if provided
+    if (data.name !== undefined) {
+      db().run(
+        "UPDATE combos SET name = ?, models = ?, updated_at = ? WHERE id = ?",
+        [data.name, JSON.stringify(data.models), now, id]
+      );
+    } else {
+      // Only update models, keep existing name
+      db().run(
+        "UPDATE combos SET models = ?, updated_at = ? WHERE id = ?",
+        [JSON.stringify(data.models), now, id]
+      );
+    }
   } else if (data.name) {
     db().run("UPDATE combos SET name = ?, updated_at = ? WHERE id = ?", [data.name, now, id]);
   }
@@ -368,8 +377,74 @@ export async function updateCombo(id: string, data: Partial<Combo>): Promise<Com
 }
 
 export async function deleteCombo(id: string): Promise<boolean> {
+  const combo = await getComboById(id);
   const result = db().run("DELETE FROM combos WHERE id = ?", [id]);
+  if ((result.changes ?? 0) > 0 && combo) {
+    await deleteComboConfig(combo.name);
+  }
   return (result.changes ?? 0) > 0;
+}
+
+// ─── Combo Model Configs (KV) ──────────────────────────────────────────────────
+
+export interface ComboModelConfig {
+  model: string;
+  weight: number;
+}
+export interface ComboConfig {
+  name: string;
+  models: ComboModelConfig[];
+}
+
+export async function getComboConfig(name: string): Promise<ComboConfig | null> {
+  const configs = kvGet<Record<string, ComboConfig>>(KV_KEYS.COMBO_CONFIGS, {});
+  return configs[name] ?? null;
+}
+
+export async function setComboConfig(name: string, config: ComboConfig): Promise<void> {
+  const configs = kvGet<Record<string, ComboConfig>>(KV_KEYS.COMBO_CONFIGS, {});
+  configs[name] = config;
+  kvSet(KV_KEYS.COMBO_CONFIGS, configs);
+}
+
+export async function deleteComboConfig(name: string): Promise<void> {
+  const configs = kvGet<Record<string, ComboConfig>>(KV_KEYS.COMBO_CONFIGS, {});
+  delete configs[name];
+  kvSet(KV_KEYS.COMBO_CONFIGS, configs);
+}
+
+// ─── Combo TTFT Tracking ───────────────────────────────────────────────────────
+
+const MAX_TTFT_SAMPLES = 50;
+
+export async function recordComboTTFT(comboName: string, model: string, ttftMs: number): Promise<void> {
+  const timestamp = new Date().toISOString();
+  db().run(
+    "INSERT INTO combo_latency (combo_name, model, ttft_ms, timestamp) VALUES (?, ?, ?, ?)",
+    [comboName, model, ttftMs, timestamp]
+  );
+  // Prune: keep only last MAX_TTFT_SAMPLES per (combo, model) by id
+  db().run(
+    `DELETE FROM combo_latency WHERE rowid NOT IN (
+       SELECT rowid FROM combo_latency
+       WHERE combo_name = ? AND model = ?
+       ORDER BY timestamp DESC LIMIT ?
+     ) AND combo_name = ? AND model = ?`,
+    [comboName, model, MAX_TTFT_SAMPLES, comboName, model]
+  );
+}
+
+export async function getAverageTTFT(comboName: string, model: string, sampleCount = 10): Promise<number | null> {
+  const rows = db()
+    .query<{ avg_ms: number }, [string, string, number]>(
+      `SELECT AVG(ttft_ms) as avg_ms FROM (
+         SELECT ttft_ms FROM combo_latency
+         WHERE combo_name = ? AND model = ?
+         ORDER BY timestamp DESC LIMIT ?
+       )`
+    )
+    .get(comboName, model, sampleCount);
+  return rows?.avg_ms ?? null;
 }
 
 // ─── API Keys ──────────────────────────────────────────────────────────────────

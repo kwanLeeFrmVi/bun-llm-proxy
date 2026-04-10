@@ -542,21 +542,21 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: OpenAI → Claude", () => {
     it("emits message_start event", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunk);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       const raw = chunks.join("");
       expect(raw).toContain("event: message_start");
     });
 
     it("maps finish_reason stop to end_turn", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunkDone);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       const raw = chunks.join("");
       expect(raw).toContain('"stop_reason":"end_turn"');
     });
 
     it("handles [DONE] sentinel", () => {
       const input = enc.encode(FIXTURES.openai.streamingDone);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       expect(chunks.length).toBeGreaterThan(0);
     });
   });
@@ -564,7 +564,7 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: Claude → OpenAI", () => {
     it("emits OpenAI SSE chunk", () => {
       const input = enc.encode(FIXTURES.claude.streamingDelta);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -572,14 +572,14 @@ describe("OpenAI ↔ Claude Translations", () => {
 
     it("maps end_turn to stop", () => {
       const input = enc.encode(FIXTURES.claude.streamingStop);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       const raw = chunks.join("");
       expect(raw).toContain('"finish_reason":"stop"');
     });
 
     it("emits [DONE] on message_stop", () => {
       const input = enc.encode(FIXTURES.claude.streamingStopEvent);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
       const raw = chunks.join("");
       expect(raw).toContain("data: [DONE]");
     });
@@ -588,7 +588,7 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: OpenAI → Claude", () => {
     it("transforms to Claude message format", () => {
       const input = encode(FIXTURES.openai.nonStreamingResponse);
-      const result = decode(ResponseNonStream("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
+      const result = decode(ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
       expect(result.type).toBe("message");
       expect(result.stop_reason).toBe("end_turn");
       const content = result.content as Array<Record<string, unknown>>;
@@ -599,7 +599,7 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: Claude → OpenAI", () => {
     it("transforms to OpenAI chat.completion format", () => {
       const input = encode(FIXTURES.claude.nonStreamingResponse);
-      const result = decode(ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
+      const result = decode(ResponseNonStream("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].finish_reason).toBe("stop");
       expect(result.choices[0].message.content).toBe("hello world");

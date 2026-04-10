@@ -16,6 +16,8 @@ import { convertClaudeResponseToOpenAINonStream } from "../../ai-bridge/translat
 import { convertOpenAIResponseToClaudeNonStream } from "../../ai-bridge/translator/claude/openai/response.ts";
 import { convertGeminiResponseToOpenAINonStream } from "../../ai-bridge/translator/gemini/openai/response.ts";
 import { convertOpenAIResponseToGemini, convertOpenAIResponseToGeminiNonStream } from "../../ai-bridge/translator/openai/gemini/response.ts";
+// Import identity passthrough functions for testing
+import { ResponseNonStream as IdentityResponseNS } from "../../ai-bridge/translator/index.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -418,6 +420,178 @@ describe("convertOpenAIResponseToGemini (streaming)", () => {
     const raw = encode("not json");
     const chunks = convertOpenAIResponseToGemini(null, "gpt-4o", NO_RAW, NO_RAW, raw, undefined);
     expect(chunks).toHaveLength(0);
+  });
+});
+
+// ─── Usage missing / fallback scenarios ───────────────────────────────────
+
+describe("convertOpenAIResponseToClaudeNonStream - usage fallback", () => {
+  it("handles missing usage field gracefully", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_no_usage",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hello" },
+        finish_reason: "stop",
+      }],
+      // no usage field
+    }));
+    const result = convertOpenAIResponseToClaudeNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.type).toBe("message");
+    expect(out.content[0].text).toBe("hello");
+    // Usage should be added with defaults
+    expect(out.usage.input_tokens).toBe(0);
+    expect(out.usage.output_tokens).toBe(0);
+  });
+
+  it("falls back to input_tokens / output_tokens when prompt_tokens / completion_tokens missing", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_alt_tokens",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hi" },
+        finish_reason: "stop",
+      }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    }));
+    const result = convertOpenAIResponseToClaudeNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.usage.input_tokens).toBe(10);
+    expect(out.usage.output_tokens).toBe(5);
+  });
+
+  it("handles null usage values", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_null_usage",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hello" },
+        finish_reason: "stop",
+      }],
+      usage: null,
+    }));
+    const result = convertOpenAIResponseToClaudeNonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.usage.input_tokens).toBe(0);
+    expect(out.usage.output_tokens).toBe(0);
+  });
+});
+
+// ─── Streaming usage fallback: claude → openai ────────────────────────────
+
+describe("convertClaudeResponseToOpenAI (streaming) - usage fallback", () => {
+  it("handles message_delta with missing usage", () => {
+    // message_delta without usage field
+    const sse = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}';
+    const chunks = decodeAll(convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(sse), undefined));
+    const raw = chunks.join("");
+
+    expect(raw).toContain('"finish_reason":"stop"');
+    // Should NOT crash and should not have NaN or undefined
+    expect(raw).not.toContain("NaN");
+    expect(raw).not.toContain("undefined");
+  });
+
+  it("handles message_delta with usage using alternate field names", () => {
+    // Some providers return prompt_tokens / completion_tokens instead of input_tokens / output_tokens
+    const sse = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"prompt_tokens":10,"completion_tokens":5}}';
+    const chunks = decodeAll(convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(sse), undefined));
+    const raw = chunks.join("");
+
+    expect(raw).toContain('"prompt_tokens":10');
+    expect(raw).toContain('"completion_tokens":5');
+  });
+
+  it("handles message_delta with partial usage data", () => {
+    // Only output_tokens present
+    const sse = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}';
+    const chunks = decodeAll(convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(sse), undefined));
+    const raw = chunks.join("");
+
+    expect(raw).toContain('"prompt_tokens":0');
+    expect(raw).toContain('"completion_tokens":3');
+    expect(raw).not.toContain("NaN");
+  });
+
+  it("handles message_delta with null usage values", () => {
+    const sse = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":null,"output_tokens":null}}';
+    const chunks = decodeAll(convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(sse), undefined));
+    const raw = chunks.join("");
+
+    expect(raw).toContain('"prompt_tokens":0');
+    expect(raw).toContain('"completion_tokens":0');
+  });
+});
+
+// ─── Identity response: non-streaming passthrough ──────────────────────────
+
+describe("Identity passthrough (non-streaming) - adds usage when missing", () => {
+  it("adds default usage to OpenAI response missing usage", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_no_usage",
+      object: "chat.completion",
+      model: "openai-compatible",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hello" },
+        finish_reason: "stop",
+      }],
+    }));
+    const result = IdentityResponseNS("openai", "openai", null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.usage).toBeDefined();
+    expect(out.usage.prompt_tokens).toBe(0);
+    expect(out.usage.completion_tokens).toBe(0);
+    expect(out.usage.total_tokens).toBe(0);
+  });
+
+  it("preserves existing usage in passthrough", () => {
+    const raw = encode(JSON.stringify({
+      id: "chat_with_usage",
+      object: "chat.completion",
+      model: "openai-compatible",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: "hello" },
+        finish_reason: "stop",
+      }],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+    }));
+    const result = IdentityResponseNS("openai", "openai", null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.usage.prompt_tokens).toBe(10);
+    expect(out.usage.completion_tokens).toBe(5);
+    expect(out.usage.total_tokens).toBe(15);
+  });
+
+  it("does not add usage to non-chat-completion responses", () => {
+    // Some responses don't have choices (e.g., error responses)
+    const raw = encode(JSON.stringify({
+      error: { message: "something went wrong" },
+    }));
+    const result = IdentityResponseNS("openai", "openai", null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.error).toBeDefined();
+    expect(out.usage).toBeUndefined();
+  });
+
+  it("handles invalid JSON gracefully", () => {
+    const raw = encode("not json");
+    const result = IdentityResponseNS("openai", "openai", null, "", NO_RAW, NO_RAW, raw);
+    expect(new TextDecoder().decode(result)).toBe("not json");
   });
 });
 
