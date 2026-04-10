@@ -105,8 +105,6 @@ export default function ProviderDetail() {
   const noticeText = providerMeta?.notice?.text;
   const noticeUrl = providerMeta?.notice?.apiKeyUrl;
   const activeConn = connections.find((c) => c.isActive !== false);
-  const activeProviderSpecificData =
-    (activeConn?.providerSpecificData as Record<string, unknown> | undefined) ?? {};
   const providerPrefix = getEffectiveProviderAlias(decodedId, nodes);
 
   const fetchData = useCallback(async () => {
@@ -134,15 +132,20 @@ export default function ProviderDetail() {
     setLoadingModels(true);
     try {
       const response = await api.providers.getModels(decodedId);
-      const enabledModels = Array.isArray(activeProviderSpecificData.enabledModels)
-        ? activeProviderSpecificData.enabledModels.filter(
-            (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
-          )
-        : [];
+      const enabledModels = response.models
+        .map((model) => normalizeModelId(model.id, [providerPrefix, decodedId]))
+        .filter((modelId) => {
+          return !response.models.some((candidate) => {
+            const normalizedCandidateId = normalizeModelId(candidate.id, [
+              providerPrefix,
+              decodedId,
+            ]);
+            return normalizedCandidateId === modelId && (candidate.type ?? undefined) !== undefined;
+          });
+        });
       const normalizedEnabledModels = new Set(
         enabledModels.map((modelId) => normalizeModelId(modelId, [providerPrefix, decodedId]))
       );
-
       setCustomModels(
         enabledModels.filter((modelId) => {
           const normalizedModelId = normalizeModelId(modelId, [providerPrefix, decodedId]);
@@ -174,7 +177,7 @@ export default function ProviderDetail() {
     } finally {
       setLoadingModels(false);
     }
-  }, [activeProviderSpecificData.enabledModels, decodedId, providerPrefix]);
+  }, [decodedId, providerPrefix]);
 
   useEffect(() => {
     fetchData();
@@ -464,28 +467,17 @@ export default function ProviderDetail() {
 
   async function handleAddModel(modelId: string) {
     // Update local state immediately for responsiveness
-    const updated = [...customModels, modelId];
-    setCustomModels(updated);
+    setCustomModels((prev) => [...prev, modelId]);
 
-    // Persist to database: add to providerSpecificData.enabledModels
-    if (activeConn) {
-      try {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-        const enabledModels = (psd.enabledModels as string[]) ?? [];
-        // Add model if not already present
-        if (!enabledModels.includes(modelId)) {
-          const updated = [...enabledModels, modelId];
-          await api.providers.update(activeConn.id, {
-            providerSpecificData: { ...psd, enabledModels: updated },
-          });
-        }
-      } catch (e) {
-        console.error("Failed to persist model to database:", e);
-        toast.error("Model added locally but failed to sync to database");
-        await fetchPredefinedModels();
-        setShowAddModel(false);
-        return;
-      }
+    // Persist to provider-level storage (independent of connections)
+    try {
+      await api.providers.addEnabledModel(decodedId, modelId);
+    } catch (e) {
+      console.error("Failed to persist model to database:", e);
+      toast.error("Model added locally but failed to sync to database");
+      await fetchPredefinedModels();
+      setShowAddModel(false);
+      return;
     }
 
     await fetchData();
@@ -496,24 +488,16 @@ export default function ProviderDetail() {
 
   async function handleDeleteCustomModel(modelId: string) {
     // Update local state immediately for responsiveness
-    const updated = customModels.filter((m) => m !== modelId);
-    setCustomModels(updated);
+    setCustomModels((prev) => prev.filter((m) => m !== modelId));
 
-    // Persist to database: remove from providerSpecificData.enabledModels
-    if (activeConn) {
-      try {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-        const enabledModels = (psd.enabledModels as string[]) ?? [];
-        const updated = enabledModels.filter((m) => m !== modelId);
-        await api.providers.update(activeConn.id, {
-          providerSpecificData: { ...psd, enabledModels: updated },
-        });
-      } catch (e) {
-        console.error("Failed to remove model from database:", e);
-        toast.error("Model removed locally but failed to sync to database");
-        await fetchPredefinedModels();
-        return;
-      }
+    // Persist to provider-level storage (independent of connections)
+    try {
+      await api.providers.removeEnabledModel(decodedId, modelId);
+    } catch (e) {
+      console.error("Failed to remove model from database:", e);
+      toast.error("Model removed locally but failed to sync to database");
+      await fetchPredefinedModels();
+      return;
     }
 
     await fetchData();
@@ -546,13 +530,9 @@ export default function ProviderDetail() {
     if (predefinedModels.length === 0) return;
     try {
       setPredefinedModels([]);
-      if (activeConn) {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-        await api.providers.update(activeConn.id, {
-          providerSpecificData: { ...psd, enabledModels: [] },
-        });
-      }
       setCustomModels([]);
+      // Clear provider-level enabled models (independent of connections)
+      await api.providers.setEnabledModels(decodedId, []);
       await fetchData();
       await fetchPredefinedModels();
       toast.success(`All models removed`);
@@ -567,18 +547,12 @@ export default function ProviderDetail() {
       // Remove from local state immediately
       setPredefinedModels((prev) => prev.filter((m) => m.id !== modelId));
 
-      // Update enabledModels in DB: remove the model ID (strip prefix if present)
-      if (activeConn) {
-        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-        const enabledModels = (psd.enabledModels as string[]) ?? [];
-        // modelId may be like "mvo/gpt-4o" strip prefix to get raw ID
-        const prefix = (psd.prefix as string | undefined) ?? decodedId;
-        const rawId = modelId.startsWith(`${prefix}/`) ? modelId.slice(prefix.length + 1) : modelId;
-        const updated = enabledModels.filter((m) => m !== rawId);
-        await api.providers.update(activeConn.id, {
-          providerSpecificData: { ...psd, enabledModels: updated },
-        });
-      }
+      // Remove from provider-level enabled models (strip prefix if present)
+      const rawId = modelId.startsWith(`${providerPrefix}/`)
+        ? modelId.slice(providerPrefix.length + 1)
+        : modelId;
+      await api.providers.removeEnabledModel(decodedId, rawId);
+
       await fetchData();
       await fetchPredefinedModels();
       toast.success(`Model removed`);

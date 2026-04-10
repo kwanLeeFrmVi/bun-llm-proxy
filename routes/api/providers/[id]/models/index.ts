@@ -3,7 +3,7 @@ import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections } from "db/index.ts";
+import { getProviderConnections, getProviderEnabledModels, getProviderNodeById } from "db/index.ts";
 import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
@@ -76,8 +76,21 @@ export async function GET(req: Request): Promise<Response> {
     const connections = await getProviderConnections({ provider: id });
     const activeConn = connections.find(c => c.isActive !== false);
     const psd = (activeConn?.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-    const outputAlias = typeof psd.prefix === "string" && psd.prefix.trim() ? psd.prefix.trim() : alias;
-    const enabledModels = psd.enabledModels;
+
+    // Determine output alias: prefer provider node prefix, then connection prefix, then alias
+    let outputAlias = alias;
+    if (isCompatible) {
+      const node = await getProviderNodeById(id);
+      if (node?.prefix) {
+        outputAlias = node.prefix;
+      }
+    }
+    if (typeof psd.prefix === "string" && psd.prefix.trim()) {
+      outputAlias = psd.prefix.trim();
+    }
+
+    // Get enabled models from provider-level storage only
+    const enabledModels = await getProviderEnabledModels(id);
 
     // For compatible providers, try fetching models from the remote endpoint
     if (isCompatible) {

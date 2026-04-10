@@ -43,6 +43,9 @@ export function normalizeModelName(model: string): string {
     }
   }
 
+  // Strip trailing YYYYMMDD or YYYYMMDDHH date-like suffixes (e.g., "claude-haiku-4-5-20251001")
+  name = name.replace(/-?\d{8,14}$/, "");
+
   return name;
 }
 
@@ -56,6 +59,8 @@ export function stripSuffixes(model: string): string {
       name = name.slice(0, -suffix.length);
     }
   }
+  // Strip trailing YYYYMMDD or YYYYMMDDHH date-like suffixes
+  name = name.replace(/-?\d{8,14}$/, "");
   return name;
 }
 

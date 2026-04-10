@@ -166,7 +166,8 @@ export async function GET(_req: Request): Promise<Response> {
 
         const outputAlias = (nodePrefix ?? (psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
         const pModels = providerModels[staticAlias] ?? [];
-        const enabledModels = persistedEnabledModelsByProvider[providerId] ?? (psd.enabledModels as string[] | undefined);
+        // Use provider-level enabled models only (not connection-specific)
+        const enabledModels = persistedEnabledModelsByProvider[providerId] ?? [];
         const prefixes = [outputAlias, staticAlias, providerId].filter(
           (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index,
         );

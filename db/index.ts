@@ -1579,6 +1579,55 @@ export async function updateSetting(key: string, value: unknown): Promise<void> 
   );
 }
 
+function getProviderEnabledModelsSettingKey(providerId: string): string {
+  return `providerEnabledModels:${providerId}`;
+}
+
+export async function getProviderEnabledModels(providerId: string): Promise<string[]> {
+  const value = await getSettingValue<unknown>(
+    getProviderEnabledModelsSettingKey(providerId),
+    []
+  );
+
+  if (!Array.isArray(value)) return [];
+
+  return value.filter(
+    (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+  );
+}
+
+export async function updateProviderEnabledModels(
+  providerId: string,
+  modelIds: unknown
+): Promise<string[]> {
+  const next = Array.isArray(modelIds)
+    ? modelIds.filter(
+        (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+      )
+    : [];
+
+  await updateSetting(getProviderEnabledModelsSettingKey(providerId), next);
+  return next;
+}
+
+export async function getAllProviderEnabledModels(): Promise<Record<string, string[]>> {
+  const settings = await getSettings();
+  const result: Record<string, string[]> = {};
+
+  for (const [key, value] of Object.entries(settings)) {
+    if (!key.startsWith("providerEnabledModels:")) continue;
+    const providerId = key.slice("providerEnabledModels:".length);
+    if (!providerId) continue;
+    result[providerId] = Array.isArray(value)
+      ? value.filter(
+          (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+        )
+      : [];
+  }
+
+  return result;
+}
+
 // ─── Pricing (dedicated table) ───────────────────────────────────────────────────
 
 export interface PricingEntry {

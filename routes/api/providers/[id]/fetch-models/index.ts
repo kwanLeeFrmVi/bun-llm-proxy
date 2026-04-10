@@ -1,4 +1,4 @@
-import { getProviderConnections, updateProviderConnection } from "db/index.ts";
+import { getProviderConnections, updateProviderEnabledModels } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
@@ -17,7 +17,7 @@ type BunRequest = Request & { params: Record<string, string> };
  * POST /api/providers/:id/fetch-models
  *
  * Fetches the model list from a provider's remote /models endpoint
- * and persists it into providerSpecificData.enabledModels on the connection.
+ * and persists it at the provider level (independent of connections).
  *
  * Works for any provider that has a /models endpoint (OpenAI-compatible or custom).
  */
@@ -113,11 +113,8 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Persist enabledModels into providerSpecificData on the connection
-  const updatedPsd = { ...psd, enabledModels: modelIds };
-  await updateProviderConnection(activeConn.id, {
-    providerSpecificData: updatedPsd,
-  });
+  // Persist enabledModels at provider level only (not connection-specific)
+  await updateProviderEnabledModels(id, modelIds);
 
   const prefix = (psd.prefix as string | undefined) ?? getProviderAlias(id) ?? id;
 

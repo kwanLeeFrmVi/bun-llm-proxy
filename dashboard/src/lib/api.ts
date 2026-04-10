@@ -174,6 +174,32 @@ export const api = {
       count: number;
       models: Array<{ id: string; name: string }>;
     }>(`/api/providers/${id}/fetch-models`, { method: "POST" }),
+    // Provider-level enabled models (independent of connections)
+    getEnabledModels: (id: string) => request<{
+      provider: string;
+      models: string[];
+    }>(`/api/providers/${id}/enabled-models`),
+    addEnabledModel: (id: string, model: string) => request<{
+      provider: string;
+      models: string[];
+    }>(`/api/providers/${id}/enabled-models`, {
+      method: "POST",
+      body: JSON.stringify({ model }),
+    }),
+    removeEnabledModel: (id: string, model: string) => request<{
+      provider: string;
+      models: string[];
+    }>(`/api/providers/${id}/enabled-models`, {
+      method: "DELETE",
+      body: JSON.stringify({ model }),
+    }),
+    setEnabledModels: (id: string, models: string[]) => request<{
+      provider: string;
+      models: string[];
+    }>(`/api/providers/${id}/enabled-models`, {
+      method: "PUT",
+      body: JSON.stringify({ models }),
+    }),
   },
 
   // ─── Provider Nodes ─────────────────────────────────────────────────────────
