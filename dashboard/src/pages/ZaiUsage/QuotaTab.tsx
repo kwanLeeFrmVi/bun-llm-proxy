@@ -20,30 +20,31 @@ interface QuotaLimitCardProps {
 }
 
 function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
-  const { type, unit, number, currentValue, remaining, percentage, nextResetTime, usageDetails } = limit;
+  const { type, unit, number, usage, currentValue, remaining, percentage, nextResetTime, usageDetails } = limit;
 
   const getTypeLabel = () => {
     if (type === "TIME_LIMIT") {
-      return unit === 5 ? "Requests/Minute" : unit === 1 ? "Requests/Second" : "Time Limit";
+      return unit === 5 ? "Rate Limit (5-min window)" : unit === 1 ? "Requests/Second" : "Time Limit";
     }
     if (type === "TOKENS_LIMIT") {
       const unitLabels: Record<number, string> = {
         1: "Day",
-        3: "Week",
+        3: "Hours",
         5: "Month",
-        6: "Year",
+        6: "Week",
       };
-      return `Tokens (${unitLabels[unit] || unit})`;
+      const unitLabel = unitLabels[unit] || unit;
+      return `Tokens (${number} ${unitLabel}${number > 1 ? "s" : ""})`;
     }
     return type;
   };
 
   const getLimitValue = () => {
     if (type === "TIME_LIMIT") {
-      return `${number} ${unit === 5 ? "req/min" : unit === 1 ? "req/sec" : ""}`;
+      return unit === 5 ? `${usage || 1000} / 5 min` : `${number} ${unit === 1 ? "req/sec" : ""}`;
     }
     if (type === "TOKENS_LIMIT") {
-      return fmt(number);
+      return fmt(number) + " tokens";
     }
     return String(number);
   };
@@ -53,7 +54,9 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
       return currentValue ? String(currentValue) : "-";
     }
     if (type === "TOKENS_LIMIT") {
-      return remaining !== undefined ? fmt(number - (number - remaining)) : "-";
+      // Calculate used from percentage: used = (percentage / 100) * number
+      const used = Math.round((percentage / 100) * number);
+      return fmt(used);
     }
     return "-";
   };
@@ -82,12 +85,18 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
           <QuotaCard
             label="Used"
             value={getUsageValue()}
-            sub={type === "TOKENS_LIMIT" ? "tokens" : "requests"}
+            sub={type === "TOKENS_LIMIT" ? "tokens" : ""}
           />
           <QuotaCard
             label="Remaining"
-            value={remaining !== undefined ? fmt(remaining) : "-"}
-            sub={type === "TOKENS_LIMIT" ? "tokens" : "requests"}
+            value={
+              remaining !== undefined
+                ? fmt(remaining)
+                : type === "TOKENS_LIMIT"
+                  ? fmt(number - Math.round((percentage / 100) * number))
+                  : "-"
+            }
+            sub={type === "TOKENS_LIMIT" ? "tokens" : ""}
           />
         </div>
 
