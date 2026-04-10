@@ -105,9 +105,7 @@ export function convertOpenAIRequestToGemini(
   }
 
   // safetySettings (passthrough if present)
-
-  // stream
-  out.stream = stream;
+  // Note: streaming is controlled by the endpoint (generateContent vs streamGenerateContent), not by a request body parameter
 
   return new TextEncoder().encode(JSON.stringify(out));
 }
