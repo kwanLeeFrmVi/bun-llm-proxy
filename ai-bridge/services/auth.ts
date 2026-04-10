@@ -83,10 +83,14 @@ export function checkFallbackError(
     };
   }
 
-  // Transient errors
+  // Transient errors - use exponential backoff
   const transient = [406, 408, 500, 502, 503, 504];
   if (transient.includes(status)) {
-    return { shouldFallback: true, cooldownMs: COOLDOWN_MS.transient };
+    return {
+      shouldFallback: true,
+      cooldownMs: getQuotaCooldown(backoffLevel),
+      newBackoffLevel: Math.min(backoffLevel + 1, BACKOFF_CONFIG.maxLevel),
+    };
   }
 
   return { shouldFallback: false, cooldownMs: 0 };
