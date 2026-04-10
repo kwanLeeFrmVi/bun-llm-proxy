@@ -312,7 +312,7 @@ export function buildUpstreamUrl(
     const apiKey = credentials.apiKey as string | undefined;
     if (!apiKey) return null;
     const action = stream ? "streamGenerateContent" : "generateContent";
-    return `${config.baseUrl}/${model}:${action}&key=${apiKey}`;
+    return `${config.baseUrl}/${model}:${action}?key=${apiKey}`;
   }
 
   // Handle antigravity with multiple baseUrls
@@ -422,7 +422,7 @@ function overlayCachedHeaders(
     if (lcKey === "anthropic-beta") {
       const staticBetaStr = baseHeaders[titleKey] || baseHeaders[lcKey] || "";
       const staticFlags = new Set(staticBetaStr.split(",").map((f) => f.trim()).filter(Boolean));
-      const cachedFlags = new Set(cached[lcKey].split(",").map((f) => f.trim()).filter(Boolean));
+      const cachedFlags = new Set((cached[lcKey] || "").split(",").map((f) => f.trim()).filter(Boolean));
 
       // Merge all static flags into the cached ones
       for (const flag of staticFlags) {
