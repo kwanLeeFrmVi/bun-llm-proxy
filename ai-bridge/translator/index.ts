@@ -74,9 +74,22 @@ function identity(_modelName: string, raw: Uint8Array): Uint8Array {
   return raw;
 }
 function identityResponse(_ctx: unknown, _m: string, _o: Uint8Array, _r: Uint8Array, raw: Uint8Array): Uint8Array[] {
+  // For streaming, pass through as-is but ensure usage data is added if present
   return [raw];
 }
 function identityResponseNS(_ctx: unknown, _m: string, _o: Uint8Array, _r: Uint8Array, raw: Uint8Array): Uint8Array {
+  // For non-streaming, ensure usage field exists with defaults if missing
+  try {
+    const text = new TextDecoder().decode(raw);
+    const parsed = JSON.parse(text);
+    // Only add usage to responses that have choices (valid chat completions)
+    if (parsed.choices && Array.isArray(parsed.choices) && !parsed.usage) {
+      parsed.usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+      return new TextEncoder().encode(JSON.stringify(parsed));
+    }
+  } catch {
+    // If parsing fails, return raw
+  }
   return raw;
 }
 

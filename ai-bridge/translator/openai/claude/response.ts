@@ -199,8 +199,11 @@ export function convertClaudeResponseToOpenAI(
       const usage = event.usage as Record<string, unknown> | undefined;
       if (usage && !state.finishReasonSent) {
         state.finishReasonSent = true;
+        // Safely extract usage values with proper fallbacks
+        const inputTokens = (usage.input_tokens as number | undefined) ?? (usage.prompt_tokens as number | undefined) ?? 0;
+        const outputTokens = (usage.output_tokens as number | undefined) ?? (usage.completion_tokens as number | undefined) ?? 0;
         results.push(new TextEncoder().encode(
-          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0, total_tokens: ((usage.input_tokens as number) ?? 0) + ((usage.output_tokens as number) ?? 0) } })}\n\n`
+          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens } })}\n\n`
         ));
       }
       continue;
@@ -413,12 +416,12 @@ export function convertOpenAIResponseToClaudeNonStream(
     }
   }
 
-  // usage
+  // usage - always include usage field with defaults if missing
   const usage = parsed.usage as Record<string, unknown> | undefined;
-  if (usage) {
-    (out.usage as Record<string, unknown>).input_tokens = (usage.prompt_tokens as number) ?? 0;
-    (out.usage as Record<string, unknown>).output_tokens = (usage.completion_tokens as number) ?? 0;
-  }
+  const inputTokens = (usage?.prompt_tokens as number) ?? (usage?.input_tokens as number) ?? 0;
+  const outputTokens = (usage?.completion_tokens as number) ?? (usage?.output_tokens as number) ?? 0;
+  (out.usage as Record<string, unknown>).input_tokens = inputTokens;
+  (out.usage as Record<string, unknown>).output_tokens = outputTokens;
 
   return new TextEncoder().encode(JSON.stringify(out));
 }
