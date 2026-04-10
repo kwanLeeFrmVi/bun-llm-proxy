@@ -312,12 +312,12 @@ function wrapStreamingResponse(
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.usage) {
+                if (data.usage && typeof data.usage === 'object') {
                   finalUsage = {
-                    prompt_tokens: data.usage.prompt_tokens ?? data.usage.input_tokens,
-                    completion_tokens: data.usage.completion_tokens ?? data.usage.output_tokens,
-                    reasoning_tokens: data.usage.reasoning_tokens ?? data.usage.thinking_tokens,
-                    cached_tokens: data.usage.prompt_tokens_details?.cached_tokens,
+                    prompt_tokens: (data.usage.prompt_tokens ?? data.usage.input_tokens) ?? 0,
+                    completion_tokens: (data.usage.completion_tokens ?? data.usage.output_tokens) ?? 0,
+                    reasoning_tokens: (data.usage.reasoning_tokens ?? data.usage.thinking_tokens) ?? 0,
+                    cached_tokens: data.usage.prompt_tokens_details?.cached_tokens ?? 0,
                   };
                 }
               } catch { /* skip non-JSON SSE lines */ }
