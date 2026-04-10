@@ -182,7 +182,7 @@ export default function Models() {
   const [comboDialogOpen, setComboDialogOpen] = useState(false);
   const [editingComboId, setEditingComboId] = useState<string | null>(null);
   const [editingComboName, setEditingComboName] = useState<string>("");
-  const [editingComboModels, setEditingComboModels] = useState<string[]>([]);
+  const [editingComboModels, setEditingComboModels] = useState<import("../components/ComboFormDialog").ModelWithWeight[]>([]);
 
   const refreshModels = useCallback(() => {
     api.models
@@ -194,12 +194,12 @@ export default function Models() {
   const openCreateCombo = useCallback(() => {
     setEditingComboId(null);
     setEditingComboName("");
-    setEditingComboModels([]);
+    setEditingComboModels([] as import("../components/ComboFormDialog").ModelWithWeight[]);
     setComboDialogOpen(true);
   }, []);
 
   const openEditCombo = useCallback(
-    (comboId: string, comboName: string, comboModels: string[]) => {
+    (comboId: string, comboName: string, comboModels: import("../components/ComboFormDialog").ModelWithWeight[]) => {
       setEditingComboId(comboId);
       setEditingComboName(comboName);
       setEditingComboModels([...comboModels]);
@@ -259,7 +259,7 @@ export default function Models() {
   }: {
     comboId: string;
     comboName: string;
-    comboModels: string[];
+    comboModels: import("../components/ComboFormDialog").ModelWithWeight[];
   }) {
     return (
       <Tooltip>
@@ -300,7 +300,7 @@ export default function Models() {
   }
 
   const handleComboSaved = useCallback(
-    async (name: string, comboModels: string[]) => {
+    async (name: string, comboModels: import("../components/ComboFormDialog").ModelWithWeight[]) => {
       try {
         if (editingComboId) {
           await api.combos.update(editingComboId, {
@@ -504,7 +504,7 @@ export default function Models() {
                           <EditComboButton
                             comboId={m.combo_id}
                             comboName={m.id}
-                            comboModels={m.combo_models ?? []}
+                            comboModels={(m.combo_models ?? []).map(model => ({ model, weight: 1 }))}
                           />
                           <DeleteComboButton comboId={m.combo_id} />
                         </div>

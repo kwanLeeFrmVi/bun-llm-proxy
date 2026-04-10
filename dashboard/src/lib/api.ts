@@ -21,6 +21,11 @@ const BASE_URL = getApiBaseUrl();
 
 // ─── Shared types ────────────────────────────────────────────────────────────────
 
+export interface ModelWithWeight {
+  model: string;
+  weight: number;
+}
+
 export interface TestResult {
   valid: boolean;
   error: string | null;
@@ -221,8 +226,8 @@ export const api = {
   // ─── Combos ───────────────────────────────────────────────────────────────
   combos: {
     list:    () => request<{ combos: { id: string; name: string; models: string[]; createdAt?: string; updatedAt?: string }[] }>("/api/combos"),
-    create:  (data: { name: string; models?: string[] }) => request("/api/combos", { method: "POST", body: JSON.stringify(data) }),
-    update:  (id: string, data: { name?: string; models?: string[] }) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    create:  (data: { name: string; models?: Array<{ model: string; weight: number }> }) => request("/api/combos", { method: "POST", body: JSON.stringify(data) }),
+    update:  (id: string, data: { name?: string; models?: Array<{ model: string; weight: number }> }) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove:  (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
 

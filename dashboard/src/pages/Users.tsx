@@ -74,7 +74,9 @@ export default function Users() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function handleCreate() {
     if (!newUsername.trim() || !newPassword.trim()) return;
@@ -115,7 +117,11 @@ export default function Users() {
       toast.error("Cannot delete the bootstrap admin user");
       return;
     }
-    if (!confirm(`Are you sure you want to delete user "${u.username}"? All their API keys and sessions will be removed.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete user "${u.username}"? All their API keys and sessions will be removed.`
+      )
+    ) {
       return;
     }
     try {
@@ -127,8 +133,8 @@ export default function Users() {
     }
   }
 
-  const adminCount = users.filter(u => u.role === "admin").length;
-  const userCount = users.filter(u => u.role === "user").length;
+  const adminCount = users.filter((u) => u.role === "admin").length;
+  const userCount = users.filter((u) => u.role === "user").length;
 
   return (
     <div className="space-y-6">
@@ -145,16 +151,26 @@ export default function Users() {
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={cardStyle + " p-6"}>
-          <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">Total Users</p>
-          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">{users.length}</p>
+          <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
+            Total Users
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            {users.length}
+          </p>
         </div>
         <div className={cardStyle + " p-6"}>
           <p className="text-xs uppercase tracking-[0.12em] text-amber-600 font-semibold">Admins</p>
-          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">{adminCount}</p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            {adminCount}
+          </p>
         </div>
         <div className={cardStyle + " p-6"}>
-          <p className="text-xs uppercase tracking-[0.12em] text-blue-600 font-semibold">Base Users</p>
-          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">{userCount}</p>
+          <p className="text-xs uppercase tracking-[0.12em] text-blue-600 font-semibold">
+            Base Users
+          </p>
+          <p className="text-3xl font-bold font-headline mt-1 tracking-tight text-[--on-surface]">
+            {userCount}
+          </p>
         </div>
       </div>
 
@@ -181,10 +197,18 @@ export default function Users() {
           <Table>
             <TableHeader>
               <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pl-6">Username</TableHead>
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3">Role</TableHead>
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell">Created</TableHead>
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pr-6 text-right">Actions</TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pl-6">
+                  Username
+                </TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3">
+                  Role
+                </TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 hidden md:table-cell">
+                  Created
+                </TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pr-6 text-right">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,18 +223,27 @@ export default function Users() {
                   <TableCell className="pl-6 py-4">
                     <div className="flex items-center gap-2.5">
                       <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-[--primary-fixed] text-[--on-primary-fixed]">
-                        {u.role === "admin"
-                          ? <ShieldCheck className="w-3.5 h-3.5" />
-                          : <User className="w-3.5 h-3.5" />
-                        }
+                        {u.role === "admin" ? (
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        ) : (
+                          <User className="w-3.5 h-3.5" />
+                        )}
                       </span>
-                      <span className="text-sm font-semibold text-[--on-surface]">{u.username}</span>
+                      <span className="text-sm font-semibold text-[--on-surface]">
+                        {u.username}
+                      </span>
                     </div>
                   </TableCell>
-                  <TableCell><RoleBadge role={u.role} /></TableCell>
+                  <TableCell>
+                    <RoleBadge role={u.role} />
+                  </TableCell>
                   <TableCell className="text-sm text-[--on-surface-variant] hidden md:table-cell">
                     {u.createdAt
-                      ? new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      ? new Date(u.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
                       : "—"}
                   </TableCell>
                   <TableCell className="pr-6 text-right">
@@ -219,7 +252,11 @@ export default function Users() {
                         variant="outline"
                         size="sm"
                         className="h-8 px-3 text-xs font-medium"
-                        onClick={() => { setSelectedUser(u); setPwValue(""); setShowPwModal(true); }}
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setPwValue("");
+                          setShowPwModal(true);
+                        }}
                       >
                         Change Password
                       </Button>
@@ -243,7 +280,7 @@ export default function Users() {
 
       {/* Create User Dialog */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
+        <DialogContent className="bg-white rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
           <DialogHeader>
             <DialogTitle className="font-headline text-lg font-bold">Create User</DialogTitle>
             <DialogDescription className="text-sm text-[--on-surface-variant]">
@@ -253,51 +290,66 @@ export default function Users() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Username</Label>
+              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+                Username
+              </Label>
               <Input
                 value={newUsername}
-                onChange={e => setNewUsername(e.target.value)}
+                onChange={(e) => setNewUsername(e.target.value)}
                 placeholder="e.g. alice"
                 autoFocus
                 className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Password</Label>
+              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+                Password
+              </Label>
               <Input
                 type="password"
                 value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
+                onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Minimum 6 characters"
-                onKeyDown={e => e.key === "Enter" && handleCreate()}
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Role</Label>
+              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+                Role
+              </Label>
               <div className="flex gap-3">
-                {(["user", "admin"] as const).map(r => (
-                  <button
+                {(["user", "admin"] as const).map((r) => (
+                  <Button
                     key={r}
                     type="button"
+                    variant={newRole === r ? "default" : "outline"}
                     onClick={() => setNewRole(r)}
                     className={
-                      "flex-1 flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-semibold transition-all " +
+                      "flex-1 h-10" +
                       (newRole === r
-                        ? "border-[--primary] bg-[--primary-fixed] text-[--on-primary-fixed]"
-                        : "border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:border-[--primary]/50")
+                        ? "bg-[--primary]hover:bg-[--primary]/90"
+                        : "text-[--on-surface-variant]")
                     }
                   >
-                    {r === "admin" ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                    {r === "admin" ? (
+                      <ShieldCheck className="w-4 h-4" />
+                    ) : (
+                      <User className="w-4 h-4" />
+                    )}
                     {r === "admin" ? "Admin" : "Base User"}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowModal(false)} className="h-10 px-4 rounded font-medium text-sm">
+            <Button
+              variant="outline"
+              onClick={() => setShowModal(false)}
+              className="h-10 px-4 rounded font-medium text-sm"
+            >
               Cancel
             </Button>
             <Button
@@ -321,19 +373,25 @@ export default function Users() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5 py-2">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">New Password</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              New Password
+            </Label>
             <Input
               type="password"
               value={pwValue}
-              onChange={e => setPwValue(e.target.value)}
+              onChange={(e) => setPwValue(e.target.value)}
               placeholder="Minimum 6 characters"
               autoFocus
-              onKeyDown={e => e.key === "Enter" && handleChangePassword()}
+              onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowPwModal(false)} className="h-10 px-4 rounded font-medium text-sm">
+            <Button
+              variant="outline"
+              onClick={() => setShowPwModal(false)}
+              className="h-10 px-4 rounded font-medium text-sm"
+            >
               Cancel
             </Button>
             <Button

@@ -19,7 +19,7 @@ function normalizeModels(raw: ComboModelsInput | undefined): string[] {
   });
 }
 
-function normalizeComboConfig(raw: ComboModelsInput | undefined): import("../db/index.ts").ComboConfig["models"] | null {
+function normalizeComboConfig(raw: ComboModelsInput | undefined): import("../../../db/index.ts").ComboConfig["models"] | null {
   if (!raw || raw.length === 0) return null;
   // If all strings, no extended config needed
   if (raw.every(item => typeof item === "string")) return null;

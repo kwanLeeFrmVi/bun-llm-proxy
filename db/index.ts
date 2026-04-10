@@ -550,13 +550,14 @@ export async function getUsers(): Promise<Omit<User, 'passwordHash'>[]> {
 }
 
 export async function createUser(username: string, passwordHash: string, role: UserRole = 'admin'): Promise<User> {
+  const normalizedUsername = username.toLowerCase();
   const id = randomUUID();
   const now = new Date().toISOString();
   db().run(
     "INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
-    [id, username, passwordHash, role, now]
+    [id, normalizedUsername, passwordHash, role, now]
   );
-  return { id, username, passwordHash, role, createdAt: now };
+  return { id, username: normalizedUsername, passwordHash, role, createdAt: now };
 }
 
 export async function updateUserPassword(id: string, newHash: string): Promise<boolean> {
@@ -565,11 +566,12 @@ export async function updateUserPassword(id: string, newHash: string): Promise<b
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
+  const normalizedUsername = username.toLowerCase();
   const row = db()
     .query<{ id: string; username: string; password_hash: string; role: string; created_at: string }, string>(
       "SELECT id, username, password_hash, role, created_at FROM users WHERE username = ?"
     )
-    .get(username);
+    .get(normalizedUsername);
   if (!row) return null;
   return { id: row.id, username: row.username, passwordHash: row.password_hash, role: (row.role ?? 'admin') as UserRole, createdAt: row.created_at };
 }

@@ -1,7 +1,7 @@
 // Model parsing, alias resolution, and combo handling.
 // Native TypeScript — no open-sse dependency.
 
-import { getModelAliases, getComboByName, getProviderNodes } from "../db/index.ts";
+import { getModelAliases, getComboByName, getComboConfig, getProviderNodes, type ComboModelConfig } from "../db/index.ts";
 import {
   parseModel as _parseModel,
   resolveModelAliasFromMap,
@@ -59,5 +59,28 @@ export async function getComboModels(modelStr: string): Promise<string[] | null>
   if (combo && combo.models && combo.models.length > 0) {
     return combo.models;
   }
+  return null;
+}
+
+/**
+ * Get combo model configs with weights.
+ * Returns array of {model, weight} or null if not a combo.
+ * Falls back to legacy string array (weight=1 for all).
+ */
+export async function getComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
+  if (modelStr.includes("/")) return null;
+
+  // Try extended config first
+  const comboConfig = await getComboConfig(modelStr);
+  if (comboConfig && comboConfig.models.length > 0) {
+    return comboConfig.models;
+  }
+
+  // Fallback to legacy string array
+  const models = await getComboModels(modelStr);
+  if (models) {
+    return models.map(model => ({ model, weight: 1 }));
+  }
+
   return null;
 }

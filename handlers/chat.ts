@@ -9,8 +9,8 @@ import {
 } from "../services/auth.ts";
 import { checkAuth } from "../lib/authMiddleware.ts";
 import { cacheClaudeHeaders } from "../ai-bridge/utils/claudeHeaderCache.ts";
-import { getSettings } from "../db/index.ts";
-import { getModelInfo, getComboModels } from "../services/model.ts";
+import { getSettings, getAverageTTFT, recordComboTTFT, type ComboModelConfig } from "../db/index.ts";
+import { getModelInfo, getComboModelConfigs } from "../services/model.ts";
 import { handleChatCore } from "../ai-bridge/handlers/chatCore.ts";
 import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts";
 import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
@@ -19,7 +19,6 @@ import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { getProjectIdForConnection } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
-import { FORMATS } from "../ai-bridge/translator/formats.ts";
 import { detectFormat } from "../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 import { getProviderDisplayName } from "../lib/providers.ts";
@@ -76,14 +75,14 @@ export async function handleChat(
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model") as Response;
   }
 
-  const comboModels = await getComboModels(modelStr);
+  const comboModels = await getComboModelConfigs(modelStr);
   if (comboModels) {
     const comboStrategies = (settings.comboStrategies as Record<string, Record<string, string>> | undefined) ?? {};
     const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy ?? (settings.comboStrategy as string | undefined) ?? "fallback";
 
     log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
-    return handleComboModelFallback({
+    return handleComboModel({
       body,
       models: comboModels,
       handleSingleModel: async (b: Record<string, unknown>, m: string) => {
@@ -96,6 +95,7 @@ export async function handleChat(
       log,
       comboName: modelStr,
       comboStrategy,
+      settings,
     });
   }
 
@@ -116,7 +116,7 @@ async function handleSingleModelChat(
   const modelInfo = await getModelInfo(modelStr);
 
   if (!modelInfo.provider) {
-    const comboModels = await getComboModels(modelStr);
+    const comboModels = await getComboModelConfigs(modelStr);
     if (comboModels) {
       const chatSettings = await getSettings();
       const comboStrategies = (chatSettings.comboStrategies as Record<string, Record<string, string>> | undefined) ?? {};
@@ -124,7 +124,7 @@ async function handleSingleModelChat(
       const comboStrategy = comboSpecificStrategy ?? (chatSettings.comboStrategy as string | undefined) ?? "fallback";
 
       log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
-      return handleComboModelFallback({
+      return handleComboModel({
         body,
         models: comboModels,
         handleSingleModel: async (b: Record<string, unknown>, m: string) => {
@@ -137,6 +137,7 @@ async function handleSingleModelChat(
         log,
         comboName: modelStr,
         comboStrategy,
+        settings: chatSettings,
       });
     }
     log.warn("CHAT", "Invalid model format", { model: modelStr });
@@ -279,7 +280,7 @@ async function handleSingleModelChat(
 
 /**
  * Wrap a streaming Response to intercept SSE chunks, parse usage data,
- * and call saveRequestUsage when the stream completes or errors.
+ * record TTFT for combo models, and call saveRequestUsage when the stream completes or errors.
  */
 function wrapStreamingResponse(
   response: Response,
@@ -289,6 +290,8 @@ function wrapStreamingResponse(
   startTime: number
 ): Response {
   if (!response.body) return response;
+
+  const comboMetadata = getComboMetadata(response);
 
   const originalBody = response.body;
   const stream = new ReadableStream({
@@ -300,11 +303,19 @@ function wrapStreamingResponse(
         reasoning_tokens?: number;
         cached_tokens?: number;
       } | null = null;
+      let ttftRecorded = false;
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
+          // Record TTFT for combo models on first chunk
+          if (comboMetadata && !ttftRecorded) {
+            const ttftMs = Date.now() - startTime;
+            recordComboTTFT(comboMetadata.comboName, comboMetadata.selectedModel, ttftMs).catch(() => {});
+            ttftRecorded = true;
+          }
 
           // Parse SSE chunks for usage data
           const text = new TextDecoder().decode(value);
@@ -347,44 +358,146 @@ function wrapStreamingResponse(
   });
 }
 
-// ─── Combo model fallback ───────────────────────────────────────────────────────
+// ─── Combo model routing strategies ─────────────────────────────────────────────
+
+// Per-combo round-robin state: index, stickyCount
+const rrStateMap = new Map<string, { index: number; stickyCount: number }>();
+
+// Per-combo speed state: model, count
+const speedStateMap = new Map<string, { model: string; count: number }>();
 
 interface ComboOptions {
   body: Record<string, unknown>;
-  models: string[];
+  models: ComboModelConfig[];
   handleSingleModel: (body: Record<string, unknown>, model: string) => Promise<Response>;
   log: { info: (ctx: string, msg: string) => void; warn: (ctx: string, msg: string) => void };
   comboName: string;
   comboStrategy: string;
+  settings: Record<string, unknown>;
 }
 
 /**
- * Try models in order until one succeeds.
- * fallback: use first model that succeeds.
- * round-robin: rotate through models, succeed on first.
+ * Combo routing strategies:
+ * - fallback: sequential try, first success wins
+ * - round-robin: rotate through models with sticky limit
+ * - weight: weighted random selection, fallback sequentially on failure
+ * - speed: pick fastest by avg TTFT, stick for N requests, re-evaluate on expiry
+ *
+ * Returns Response with selectedModel attached to a private symbol for TTFT tracking.
  */
-async function handleComboModelFallback(opts: ComboOptions): Promise<Response> {
-  const { body, models, handleSingleModel, log, comboName, comboStrategy } = opts;
+async function handleComboModel(opts: ComboOptions): Promise<Response> {
+  const { body, models, handleSingleModel, log, comboName, comboStrategy, settings } = opts;
 
   if (comboStrategy === "round-robin") {
-    const index = (handleComboModelFallback as unknown as { _rrIndex?: number })._rrIndex ?? 0;
-    const model = models[index % models.length]!;
-    (handleComboModelFallback as unknown as { _rrIndex: number })._rrIndex = index + 1;
-    log.info("COMBO", `Round-robin: trying ${model} (index ${index})`);
-    return handleSingleModel(body, model);
+    const stickyLimit = ((settings.comboStrategies as Record<string, Record<string, unknown>> | undefined)?.[comboName]?.stickyRoundRobinLimit as number | undefined)
+      ?? (settings.stickyRoundRobinLimit as number | undefined) ?? 1;
+
+    const rrState = rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
+    if (rrState.stickyCount < stickyLimit) {
+      rrState.stickyCount++;
+      rrStateMap.set(comboName, rrState);
+      const selectedModel = models[rrState.index % models.length]!.model;
+      log.info("COMBO", `Round-robin: using ${selectedModel} (index ${rrState.index}, sticky ${rrState.stickyCount}/${stickyLimit})`);
+      return attachComboName(await handleSingleModel(body, selectedModel), comboName, selectedModel);
+    }
+
+    // advance to next model
+    rrState.index = (rrState.index + 1) % models.length;
+    rrState.stickyCount = 1;
+    rrStateMap.set(comboName, rrState);
+    const selectedModel = models[rrState.index]!.model;
+    log.info("COMBO", `Round-robin: advanced to ${selectedModel} (index ${rrState.index}, sticky 1/${stickyLimit})`);
+    return attachComboName(await handleSingleModel(body, selectedModel), comboName, selectedModel);
   }
 
-  // fallback: try each model in order
+  if (comboStrategy === "weight") {
+    const totalWeight = models.reduce((sum, m) => sum + m.weight, 0);
+    const r = Math.random() * totalWeight;
+    let runningWeight = 0;
+    let selectedIndex = 0;
+
+    for (let i = 0; i < models.length; i++) {
+      runningWeight += models[i]!.weight;
+      if (r <= runningWeight) {
+        selectedIndex = i;
+        break;
+      }
+    }
+
+    const selectedModel = models[selectedIndex]!.model;
+    const selectedWeight = models[selectedIndex]!.weight;
+
+    // Try selected model first, then fallback to remaining models in order
+    const remainingModels = [
+      models[selectedIndex]!,
+      ...models.slice(0, selectedIndex),
+      ...models.slice(selectedIndex + 1),
+    ];
+
+    log.info("COMBO", `Weight: trying ${selectedModel} (weight ${selectedWeight}/${totalWeight})`);
+
+    let lastError: string | null = null;
+    for (const m of remainingModels) {
+      try {
+        const resp = await handleSingleModel(body, m.model);
+        if (resp.ok) {
+          log.info("COMBO", `Weight: model ${m.model} succeeded`);
+          return attachComboName(resp, comboName, m.model);
+        }
+        lastError = `Model ${m.model} returned status ${resp.status}`;
+      } catch (e) {
+        lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+
+    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (comboStrategy === "speed") {
+    const stickyLimit = ((settings.comboStrategies as Record<string, Record<string, unknown>> | undefined)?.[comboName]?.stickySpeedLimit as number | undefined)
+      ?? (settings.stickyRoundRobinLimit as number | undefined) ?? 3;
+
+    const state = speedStateMap.get(comboName);
+    if (state && state.count < stickyLimit) {
+      state.count++;
+      speedStateMap.set(comboName, state);
+      log.info("COMBO", `Speed: using ${state.model} (sticky ${state.count}/${stickyLimit})`);
+      return attachComboName(await handleSingleModel(body, state.model), comboName, state.model);
+    }
+
+    // re-evaluate: pick model with lowest avg TTFT
+    log.info("COMBO", `Speed: re-evaluating fastest model...`);
+    const modelSpeeds = await Promise.all(
+      models.map(async m => ({
+        model: m.model,
+        avgMs: await getAverageTTFT(comboName, m.model),
+      }))
+    );
+
+    modelSpeeds.sort((a, b) => (a.avgMs ?? Infinity) - (b.avgMs ?? Infinity));
+    const fastest = modelSpeeds[0]!;
+    speedStateMap.set(comboName, { model: fastest.model, count: 1 });
+    log.info("COMBO", `Speed: selected ${fastest.model} (avg TTFT: ${fastest.avgMs ?? "no data"}ms)`);
+    return attachComboName(await handleSingleModel(body, fastest.model), comboName, fastest.model);
+  }
+
+  // fallback (default): try each model in order
   let lastError: string | null = null;
   let attemptNumber = 1;
-  for (const model of models) {
-    log.info("COMBO", `Trying model ${attemptNumber}/${models.length}: ${model}`);
+  for (const m of models) {
+    log.info("COMBO", `Fallback: trying model ${attemptNumber}/${models.length}: ${m.model}`);
     try {
-      const resp = await handleSingleModel(body, model);
-      if (resp.ok) return resp;
-      lastError = `Model ${model} returned status ${resp.status}`;
+      const resp = await handleSingleModel(body, m.model);
+      if (resp.ok) {
+        log.info("COMBO", `Fallback: model ${m.model} succeeded`);
+        return attachComboName(resp, comboName, m.model);
+      }
+      lastError = `Model ${m.model} returned status ${resp.status}`;
     } catch (e) {
-      lastError = `${model}: ${e instanceof Error ? e.message : String(e)}`;
+      lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
     }
     attemptNumber++;
   }
@@ -393,4 +506,26 @@ async function handleComboModelFallback(opts: ComboOptions): Promise<Response> {
     status: 503,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// Symbol to attach combo metadata to Response (private, non-enumerable)
+const COMBO_METADATA = Symbol.for("comboMetadata");
+
+interface ComboMetadata {
+  comboName: string;
+  selectedModel: string;
+  startTime: number;
+}
+
+function attachComboName(resp: Response, comboName: string, selectedModel: string): Response {
+  (resp as unknown as { [COMBO_METADATA]?: ComboMetadata })[COMBO_METADATA] = {
+    comboName,
+    selectedModel,
+    startTime: Date.now(),
+  };
+  return resp;
+}
+
+function getComboMetadata(resp: Response): ComboMetadata | undefined {
+  return (resp as unknown as { [COMBO_METADATA]?: ComboMetadata })[COMBO_METADATA];
 }
