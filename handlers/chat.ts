@@ -98,7 +98,7 @@ export async function handleChat(
       body,
       models: comboModels,
       handleSingleModel: async (b: Record<string, unknown>, m: string) => {
-        const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, ctx);
+        const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId, ctx);
         if (resp.ok) {
           log.info(ctx, "COMBO", `Model ${m} succeeded`);
         }
@@ -107,6 +107,7 @@ export async function handleChat(
       comboName: modelStr,
       comboStrategy,
       settings,
+      log,
     });
   }
 
@@ -150,6 +151,7 @@ async function handleSingleModelChat(
         comboName: modelStr,
         comboStrategy,
         settings: chatSettings,
+        log,
       });
     }
     log.warn(ctx, "CHAT", "Invalid model format", { model: modelStr });

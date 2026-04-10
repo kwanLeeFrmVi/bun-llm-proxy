@@ -9,7 +9,7 @@ import * as log from "./logger.ts";
 let redis: InstanceType<typeof Bun.RedisClient> | null = null;
 let redisAvailable = true;
 
-function getRedis(): InstanceType<typeof Bun.RedisClient> | null {
+export function getRedis(): InstanceType<typeof Bun.RedisClient> | null {
   if (!redisAvailable) return null;
 
   if (!redis) {

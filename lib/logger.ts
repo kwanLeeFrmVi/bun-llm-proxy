@@ -3,8 +3,7 @@
 // Enhanced with request context tracking
 
 import type { LogContext } from "./requestContext.ts";
-import type { RequestContext as RequestContextType } from "./requestContext.ts";
-import { getRequestId, formatLogPrefix } from "./requestContext.ts";
+import { formatLogPrefix } from "./requestContext.ts";
 
 const LOG_LEVELS = {
   DEBUG: 0,
@@ -65,27 +64,68 @@ function formatLogWithDelta(
 
 // ─── Request-aware logging functions ───────────────────────────────────────
 
-export function debug(ctx: LogContext, tag: string, message: string, data?: unknown): void {
-  if (LEVEL <= LOG_LEVELS.DEBUG) {
-    console.log(formatLog(ctx, tag, message, data));
+// Backward-compatible signatures (old: tag, message, data)
+export function debug(tag: string, message: string, data?: unknown): void;
+export function debug(ctx: LogContext, tag: string, message: string, data?: unknown): void;
+export function debug(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+  if (typeof ctxOrTag === "string") {
+    // Old signature: debug(tag, message, data)
+    if (LEVEL <= LOG_LEVELS.DEBUG) {
+      console.log(formatLog(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown));
+    }
+  } else {
+    // New signature: debug(ctx, tag, message, data)
+    if (LEVEL <= LOG_LEVELS.DEBUG) {
+      console.log(formatLog(ctxOrTag, tagOrMsg, msgOrData as string, data));
+    }
   }
 }
 
-export function info(ctx: LogContext, tag: string, message: string, data?: unknown): void {
-  if (LEVEL <= LOG_LEVELS.INFO) {
-    console.log(`\x1b[36m${formatLogWithDelta(ctx, tag, message, data)}\x1b[0m`);
+export function info(tag: string, message: string, data?: unknown): void;
+export function info(ctx: LogContext, tag: string, message: string, data?: unknown): void;
+export function info(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+  if (typeof ctxOrTag === "string") {
+    // Old signature: info(tag, message, data)
+    if (LEVEL <= LOG_LEVELS.INFO) {
+      console.log(`\x1b[36m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`);
+    }
+  } else {
+    // New signature: info(ctx, tag, message, data)
+    if (LEVEL <= LOG_LEVELS.INFO) {
+      console.log(`\x1b[36m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`);
+    }
   }
 }
 
-export function warn(ctx: LogContext, tag: string, message: string, data?: unknown): void {
-  if (LEVEL <= LOG_LEVELS.WARN) {
-    console.warn(`\x1b[33m${formatLogWithDelta(ctx, tag, message, data)}\x1b[0m`);
+export function warn(tag: string, message: string, data?: unknown): void;
+export function warn(ctx: LogContext, tag: string, message: string, data?: unknown): void;
+export function warn(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+  if (typeof ctxOrTag === "string") {
+    // Old signature: warn(tag, message, data)
+    if (LEVEL <= LOG_LEVELS.WARN) {
+      console.warn(`\x1b[33m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`);
+    }
+  } else {
+    // New signature: warn(ctx, tag, message, data)
+    if (LEVEL <= LOG_LEVELS.WARN) {
+      console.warn(`\x1b[33m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`);
+    }
   }
 }
 
-export function error(ctx: LogContext, tag: string, message: string, data?: unknown): void {
-  if (LEVEL <= LOG_LEVELS.ERROR) {
-    console.log(`\x1b[31m[${formatTime()}] ${formatLogPrefix(ctx)} ❌ [${tag}] ${message}${data ? ` ${formatData(data)}` : ""}\x1b[0m`);
+export function error(tag: string, message: string, data?: unknown): void;
+export function error(ctx: LogContext, tag: string, message: string, data?: unknown): void;
+export function error(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+  if (typeof ctxOrTag === "string") {
+    // Old signature: error(tag, message, data)
+    if (LEVEL <= LOG_LEVELS.ERROR) {
+      console.log(`\x1b[31m[${formatTime()}] ❌ [${ctxOrTag}] ${tagOrMsg}${msgOrData !== undefined ? ` ${formatData(msgOrData)}` : ""}\x1b[0m`);
+    }
+  } else {
+    // New signature: error(ctx, tag, message, data)
+    if (LEVEL <= LOG_LEVELS.ERROR) {
+      console.log(`\x1b[31m[${formatTime()}] ${formatLogPrefix(ctxOrTag)} ❌ [${tagOrMsg}] ${msgOrData as string}${data !== undefined ? ` ${formatData(data)}` : ""}\x1b[0m`);
+    }
   }
 }
 
@@ -94,29 +134,59 @@ export function error(ctx: LogContext, tag: string, message: string, data?: unkn
 /**
  * Log incoming request start
  */
-export function requestStart(
-  ctx: LogContext,
-  method: string,
-  path: string,
-  extra?: unknown
-): void {
+export function requestStart(method: string, path: string, extra?: unknown): void;
+export function requestStart(ctx: LogContext, method: string, path: string, extra?: unknown): void;
+export function requestStart(ctxOrMethod: LogContext | string, methodOrPath: string, pathOrExtra?: string | unknown, extra?: unknown): void {
+  let ctx: LogContext = null;
+  let method: string;
+  let path: string;
+  let data: unknown = undefined;
+
+  if (typeof ctxOrMethod === "string") {
+    // Old signature: requestStart(method, path, extra)
+    method = ctxOrMethod;
+    path = methodOrPath;
+    data = pathOrExtra as unknown;
+  } else {
+    // New signature: requestStart(ctx, method, path, extra)
+    ctx = ctxOrMethod;
+    method = methodOrPath;
+    path = pathOrExtra as string;
+    data = extra;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
-  const dataStr = extra ? ` ${formatData(extra)}` : "";
+  const dataStr = data ? ` ${formatData(data)}` : "";
   console.log(`\x1b[36m[${formatTime()}] ${reqPrefix} 📥 ${method} ${path}${dataStr}\x1b[0m`);
 }
 
 /**
  * Log request completion with status and duration
  */
-export function requestEnd(
-  ctx: LogContext,
-  status: number,
-  duration: number,
-  extra?: unknown
-): void {
+export function response(status: number, duration: number, extra?: unknown): void;
+export function response(ctx: LogContext, status: number, duration: number, extra?: unknown): void;
+export function response(ctxOrStatus: LogContext | number, statusOrDuration: number, durationOrExtra?: number | unknown, extra?: unknown): void {
+  let ctx: LogContext = null;
+  let status: number;
+  let duration: number;
+  let data: unknown = undefined;
+
+  if (typeof ctxOrStatus === "number") {
+    // Old signature: response(status, duration, extra)
+    status = ctxOrStatus;
+    duration = statusOrDuration;
+    data = durationOrExtra as unknown;
+  } else {
+    // New signature: response(ctx, status, duration, extra)
+    ctx = ctxOrStatus;
+    status = statusOrDuration;
+    duration = durationOrExtra as number;
+    data = extra;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
   const icon = status < 400 ? "📤" : "💥";
-  const dataStr = extra ? ` ${formatData(extra)}` : "";
+  const dataStr = data ? ` ${formatData(data)}` : "";
   console.log(`[${formatTime()}] ${reqPrefix} ${icon} ${status} (${duration}ms)${dataStr}`);
 }
 
@@ -125,13 +195,26 @@ export function requestEnd(
 /**
  * Log stream event
  */
-export function stream(
-  ctx: LogContext,
-  event: string,
-  data?: unknown
-): void {
+export function stream(event: string, data?: unknown): void;
+export function stream(ctx: LogContext, event: string, data?: unknown): void;
+export function stream(ctxOrEvent: LogContext | string, eventOrData?: string | unknown, data?: unknown): void {
+  let ctx: LogContext = null;
+  let event: string;
+  let eventData: unknown = undefined;
+
+  if (typeof ctxOrEvent === "string") {
+    // Old signature: stream(event, data)
+    event = ctxOrEvent;
+    eventData = eventOrData as unknown;
+  } else {
+    // New signature: stream(ctx, event, data)
+    ctx = ctxOrEvent;
+    event = eventOrData as string;
+    eventData = data;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
-  const dataStr = data ? ` ${formatData(data)}` : "";
+  const dataStr = eventData ? ` ${formatData(eventData)}` : "";
 
   // For COMPLETE event, add total duration
   let durationStr = "";
@@ -147,12 +230,29 @@ export function stream(
 /**
  * Log pending request start (provider/model selection)
  */
-export function pending(ctx: LogContext, provider: string, model: string): void {
+export function pending(provider: string, model: string): void;
+export function pending(ctx: LogContext, provider: string, model: string): void;
+export function pending(ctxOrProvider: LogContext | string, providerOrModel: string, model?: string): void {
+  let ctx: LogContext = null;
+  let provider: string;
+  let mod: string;
+
+  if (typeof ctxOrProvider === "string") {
+    // Old signature: pending(provider, model)
+    provider = ctxOrProvider;
+    mod = providerOrModel;
+  } else {
+    // New signature: pending(ctx, provider, model)
+    ctx = ctxOrProvider;
+    provider = providerOrModel;
+    mod = model!;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
   // Import dynamically to avoid circular dependency
   import("./providers.ts").then(({ getProviderDisplayName }) => {
     getProviderDisplayName(provider).then(providerName => {
-      console.log(`[${formatTime()}] ${reqPrefix} ⏳ [PENDING] provider=${providerName} | model=${model}`);
+      console.log(`[${formatTime()}] ${reqPrefix} ⏳ [PENDING] provider=${providerName} | model=${mod}`);
     });
   });
 }
@@ -160,26 +260,95 @@ export function pending(ctx: LogContext, provider: string, model: string): void 
 /**
  * Log format detection
  */
-export function formatDetect(ctx: LogContext, from: string, to: string, stream: boolean): void {
+export function formatDetect(from: string, to: string, stream: boolean): void;
+export function formatDetect(ctx: LogContext, from: string, to: string, stream: boolean): void;
+export function formatDetect(ctxOrFrom: LogContext | string, fromOrTo: string, toOrStream?: string | boolean, stream?: boolean): void {
+  let ctx: LogContext = null;
+  let from: string;
+  let to: string;
+  let strm: boolean;
+
+  if (typeof ctxOrFrom === "string") {
+    // Old signature: formatDetect(from, to, stream)
+    from = ctxOrFrom;
+    to = fromOrTo;
+    strm = toOrStream as boolean;
+  } else {
+    // New signature: formatDetect(ctx, from, to, stream)
+    ctx = ctxOrFrom;
+    from = fromOrTo;
+    to = toOrStream as string;
+    strm = stream!;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
-  console.log(`[${formatTime()}] ${reqPrefix} 🔍 [FORMAT] ${from} → ${to} | stream=${stream}`);
+  console.log(`[${formatTime()}] ${reqPrefix} 🔍 [FORMAT] ${from} → ${to} | stream=${strm}`);
 }
 
 /**
  * Log passthrough mode
  */
-export function passthrough(ctx: LogContext, from: string, to: string, mode: string): void {
+export function passthrough(from: string, to: string, mode: string): void;
+export function passthrough(ctx: LogContext, from: string, to: string, mode: string): void;
+export function passthrough(ctxOrFrom: LogContext | string, fromOrTo: string, toOrMode?: string, mode?: string): void {
+  let ctx: LogContext = null;
+  let from: string;
+  let to: string;
+  let md: string;
+
+  if (typeof ctxOrFrom === "string") {
+    // Old signature: passthrough(from, to, mode)
+    from = ctxOrFrom;
+    to = fromOrTo;
+    md = toOrMode!;
+  } else {
+    // New signature: passthrough(ctx, from, to, mode)
+    ctx = ctxOrFrom;
+    from = fromOrTo;
+    to = toOrMode!;
+    md = mode!;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
-  console.log(`[${formatTime()}] ${reqPrefix} 🔍 [PROXY] Passthrough: ${from} → ${to} | ${mode}`);
+  console.log(`[${formatTime()}] ${reqPrefix} 🔍 [PROXY] Passthrough: ${from} → ${to} | ${md}`);
 }
 
 /**
  * Log upstream request
  */
-export function upstream(ctx: LogContext, method: string, url: string, extra?: string): void {
+export function upstream(method: string, url: string, extra?: string): void;
+export function upstream(ctx: LogContext, method: string, url: string, extra?: string): void;
+export function upstream(ctxOrMethod: LogContext | string, methodOrUrl: string, urlOrExtra?: string | undefined, extra?: string): void {
+  let ctx: LogContext = null;
+  let method: string;
+  let url: string;
+  let ext: string | undefined = undefined;
+
+  if (typeof ctxOrMethod === "string") {
+    // Old signature: upstream(method, url, extra)
+    method = ctxOrMethod;
+    url = methodOrUrl;
+    ext = urlOrExtra as string | undefined;
+  } else {
+    // New signature: upstream(ctx, method, url, extra)
+    ctx = ctxOrMethod;
+    method = methodOrUrl;
+    url = urlOrExtra!;
+    ext = extra;
+  }
+
   const reqPrefix = formatLogPrefix(ctx);
-  const extraStr = extra ? ` | ${extra}` : "";
+  const extraStr = ext ? ` | ${ext}` : "";
   console.log(`[${formatTime()}] ${reqPrefix} 🔍 [UPSTREAM] ${method} ${url}${extraStr}`);
+}
+
+// ─── Legacy functions for backward compatibility ───────────────────────────────
+
+/**
+ * @deprecated Use requestStart instead
+ */
+export function request(method: string, path: string, extra?: unknown): void {
+  requestStart(method, path, extra);
 }
 
 // ─── Utility functions ────────────────────────────────────────────────────────
@@ -190,5 +359,5 @@ export function maskKey(key: string): string {
 }
 
 // Re-export RequestContext types for convenience
-export type { RequestContext as RequestContextType, LogContext } from "./requestContext.ts";
+export type { LogContext } from "./requestContext.ts";
 export { RequestContext, getRequestId, formatLogPrefix } from "./requestContext.ts";
