@@ -196,12 +196,13 @@ export function convertClaudeResponseToOpenAI(
           state.finishReason = mapClaudeStopReason(reason);
         }
       }
-      const usage = event.usage as Record<string, unknown> | undefined;
-      if (usage && !state.finishReasonSent) {
+      if (!state.finishReasonSent && state.finishReason) {
         state.finishReasonSent = true;
-        // Safely extract usage values with proper fallbacks
-        const inputTokens = (usage.input_tokens as number | undefined) ?? (usage.prompt_tokens as number | undefined) ?? 0;
-        const outputTokens = (usage.output_tokens as number | undefined) ?? (usage.completion_tokens as number | undefined) ?? 0;
+        // Extract usage with support for both Claude (input_tokens/output_tokens)
+        // and OpenAI (prompt_tokens/completion_tokens) formats
+        const usage = event.usage as Record<string, unknown> | undefined;
+        const inputTokens = (usage?.input_tokens as number) ?? (usage?.prompt_tokens as number) ?? 0;
+        const outputTokens = (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
         results.push(new TextEncoder().encode(
           `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens } })}\n\n`
         ));
@@ -347,6 +348,14 @@ export function convertOpenAIResponseToClaudeNonStream(
   };
 
   const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+
+  // usage - always process and include usage field (supports both formats)
+  const usage = parsed.usage as Record<string, unknown> | undefined;
+  const inputTokens = (usage?.input_tokens as number) ?? (usage?.prompt_tokens as number) ?? 0;
+  const outputTokens = (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
+  (out.usage as Record<string, unknown>).input_tokens = inputTokens;
+  (out.usage as Record<string, unknown>).output_tokens = outputTokens;
+
   if (!choice) return raw;
 
   const finishReason = choice.finish_reason as string | undefined;
@@ -415,13 +424,6 @@ export function convertOpenAIResponseToClaudeNonStream(
       }
     }
   }
-
-  // usage - always include usage field with defaults if missing
-  const usage = parsed.usage as Record<string, unknown> | undefined;
-  const inputTokens = (usage?.prompt_tokens as number) ?? (usage?.input_tokens as number) ?? 0;
-  const outputTokens = (usage?.completion_tokens as number) ?? (usage?.output_tokens as number) ?? 0;
-  (out.usage as Record<string, unknown>).input_tokens = inputTokens;
-  (out.usage as Record<string, unknown>).output_tokens = outputTokens;
 
   return new TextEncoder().encode(JSON.stringify(out));
 }

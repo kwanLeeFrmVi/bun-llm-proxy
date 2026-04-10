@@ -110,7 +110,72 @@ export function convertOpenAIResponseToClaude(
   if (state.createdAt === 0 && parsed.created) state.createdAt = parsed.created as number;
 
   const results: Uint8Array[] = [];
-  const delta = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0]?.delta as Record<string, unknown> | undefined;
+  const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
+  const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
+
+  // ── finish_reason (process before delta guard so usage-only chunks aren't dropped) ─
+  const finishReason = choices?.[0]?.finish_reason as string | undefined;
+  if (finishReason) {
+    state.finishReason = state.sawToolCall ? "tool_calls" : finishReason;
+
+    stopThinkingBlock(state, results);
+    stopTextBlock(state, results);
+
+    if (!state.contentBlocksStopped) {
+      for (const [index, accum] of state.toolCalls) {
+        const blockIndex = state.toolBlockIndexes.get(index);
+        if (blockIndex === undefined || state.toolBlockStopped.get(index)) continue;
+        if (accum.arguments) {
+          results.push(appendSSEEventBytes(
+            new Uint8Array(),
+            "content_block_delta",
+            {
+              type: "content_block_delta",
+              index: blockIndex,
+              delta: { type: "input_json_delta", partial_json: fixPartialJSON(accum.arguments) },
+            },
+            2
+          ));
+        }
+        results.push(appendSSEEventBytes(
+          new Uint8Array(),
+          "content_block_stop",
+          { type: "content_block_stop", index: blockIndex },
+          2
+        ));
+        state.toolBlockStopped.set(index, true);
+      }
+      state.contentBlocksStopped = true;
+    }
+  }
+
+  // ── usage (process before delta guard: OpenAI may send usage in a choices:[] chunk) ─
+  const usage = parsed.usage as Record<string, unknown> | undefined;
+  if (state.finishReason && usage) {
+    const { inputTokens, outputTokens, cachedTokens } = extractTokensFromOpenAIUsage(usage);
+    const usageObj: Record<string, unknown> = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+    };
+    if (cachedTokens > 0) usageObj.cache_read_input_tokens = cachedTokens;
+
+    results.push(appendSSEEventBytes(
+      new Uint8Array(),
+      "message_delta",
+      {
+        type: "message_delta",
+        delta: {
+          stop_reason: mapFinishReason(state.finishReason),
+          stop_sequence: null,
+        },
+        usage: usageObj,
+      },
+      2
+    ));
+    state.messageDeltaSent = true;
+    emitMessageStop(state, results);
+  }
+
   if (!delta) return results;
 
   // ── message_start: send on very first chunk ─────────────────────────────────
@@ -263,77 +328,6 @@ export function convertOpenAIResponseToClaude(
     }
   }
 
-  // ── finish_reason ─────────────────────────────────────────────────────────────
-  const finishReason = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0]?.finish_reason as string | undefined;
-  if (finishReason) {
-    state.finishReason = state.sawToolCall ? "tool_calls" : finishReason;
-
-    // Stop thinking block
-    stopThinkingBlock(state, results);
-
-    // Stop text block
-    stopTextBlock(state, results);
-
-    // Stop all tool calls with accumulated arguments
-    if (!state.contentBlocksStopped) {
-      for (const [index, accum] of state.toolCalls) {
-        const blockIndex = state.toolBlockIndexes.get(index);
-        if (blockIndex === undefined || state.toolBlockStopped.get(index)) continue;
-
-        if (accum.arguments) {
-          results.push(appendSSEEventBytes(
-            new Uint8Array(),
-            "content_block_delta",
-            {
-              type: "content_block_delta",
-              index: blockIndex,
-              delta: {
-                type: "input_json_delta",
-                partial_json: fixPartialJSON(accum.arguments),
-              },
-            },
-            2
-          ));
-        }
-        results.push(appendSSEEventBytes(
-          new Uint8Array(),
-          "content_block_stop",
-          { type: "content_block_stop", index: blockIndex },
-          2
-        ));
-        state.toolBlockStopped.set(index, true);
-      }
-      state.contentBlocksStopped = true;
-    }
-  }
-
-  // ── usage info (may come in a later chunk) ─────────────────────────────────
-  const usage = parsed.usage as Record<string, unknown> | undefined;
-  if (state.finishReason && usage) {
-    const { inputTokens, outputTokens, cachedTokens } = extractTokensFromOpenAIUsage(usage);
-    const usageObj: Record<string, unknown> = {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-    };
-    if (cachedTokens > 0) usageObj.cache_read_input_tokens = cachedTokens;
-
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "message_delta",
-      {
-        type: "message_delta",
-        delta: {
-          stop_reason: mapFinishReason(state.finishReason),
-          stop_sequence: null,
-        },
-        usage: usageObj,
-      },
-      2
-    ));
-    state.messageDeltaSent = true;
-    emitMessageStop(state, results);
-  }
-
   return results;
 }
 
@@ -366,14 +360,14 @@ export function convertOpenAIResponseToClaudeNonStream(
   };
 
   const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
-  if (!choice) return raw;
 
-  // finish_reason
-  const finishReason = choice.finish_reason as string | undefined;
-  out.stop_reason = mapFinishReason(finishReason ?? "");
+  if (choice) {
+    // finish_reason
+    const finishReason = choice.finish_reason as string | undefined;
+    out.stop_reason = mapFinishReason(finishReason ?? "");
 
-  const message = choice.message as Record<string, unknown> | undefined;
-  if (message) {
+    const message = choice.message as Record<string, unknown> | undefined;
+    if (message) {
     // reasoning_content → thinking blocks
     const reasoning = message.reasoning_content;
     if (reasoning) {
@@ -438,6 +432,7 @@ export function convertOpenAIResponseToClaudeNonStream(
         });
       }
     }
+  }
   }
 
   // usage

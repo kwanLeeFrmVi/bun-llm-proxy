@@ -36,6 +36,7 @@ export function buildClaudeUsage(
 
 /**
  * Extract token counts from OpenAI-style usage object.
+ * Supports both OpenAI (prompt_tokens/completion_tokens) and Claude (input_tokens/output_tokens) formats.
  */
 export function extractTokensFromOpenAIUsage(usage: Record<string, unknown> | null): {
   inputTokens: number;
@@ -44,8 +45,9 @@ export function extractTokensFromOpenAIUsage(usage: Record<string, unknown> | nu
 } {
   if (!usage) return { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
-  const promptTokens     = (usage.prompt_tokens as number) ?? 0;
-  const completionTokens = (usage.completion_tokens as number) ?? 0;
+  // Support both OpenAI (prompt_tokens/completion_tokens) and Claude (input_tokens/output_tokens)
+  const promptTokens     = (usage.prompt_tokens as number) ?? (usage.input_tokens as number) ?? 0;
+  const completionTokens = (usage.completion_tokens as number) ?? (usage.output_tokens as number) ?? 0;
   let cachedTokens       = (usage.prompt_tokens_details as Record<string, number>)?.cached_tokens ?? 0;
 
   // Subtract cached from prompt to get actual non-cached input tokens
