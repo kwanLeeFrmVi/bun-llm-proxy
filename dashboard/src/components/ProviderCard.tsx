@@ -46,7 +46,11 @@ function getLogoPath(providerId: string, node?: ProviderNode): string {
   return `/providers/${providerId}.webp`;
 }
 
-function ProviderIconWrapper({ providerId, catalog, node }: {
+function ProviderIconWrapper({
+  providerId,
+  catalog,
+  node,
+}: {
   providerId: string;
   catalog?: ProviderCatalog;
   node?: ProviderNode;
@@ -101,10 +105,7 @@ function TestStatusIndicator({ connection }: { connection: ProviderConnection })
 
   if (isError) {
     return (
-      <div
-        className="relative group"
-        title={lastError || "Connection has an error"}
-      >
+      <div className="relative group" title={lastError || "Connection has an error"}>
         <XCircle className="w-4 h-4 text-red-500" />
         {/* Tooltip */}
         {lastError && (
@@ -137,7 +138,11 @@ export function ProviderCard({
   // Determine display name
   let name = providerId;
   if (node) {
-    name = node.name ?? (isAnthropicCompatibleProvider(node.type ?? "") ? "Anthropic Compatible" : "OpenAI Compatible");
+    name =
+      node.name ??
+      (isAnthropicCompatibleProvider(node.type ?? "")
+        ? "Anthropic Compatible"
+        : "OpenAI Compatible");
   } else if (catalog) {
     name = catalog.name;
   }
@@ -177,7 +182,7 @@ export function ProviderCard({
   return (
     <Link
       to={href}
-      className={`group flex items-center justify-between p-3 rounded-xl border border-[rgba(203,213,225,0.6)] bg-[--surface-container-lowest] shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-[rgba(203,213,225,0.9)] transition-all duration-150 cursor-pointer ${allDisabled ? "opacity-60" : ""}`}
+      className={`group flex items-center justify-between p-3 rounded-xl border border-[rgba(203,213,225,0.6)] bg-card shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-[rgba(203,213,225,0.9)] transition-all duration-150 cursor-pointer ${allDisabled ? "opacity-60" : ""}`}
     >
       {/* Left: icon + name */}
       <div className="flex items-center gap-3 min-w-0">
@@ -200,12 +205,14 @@ export function ProviderCard({
             )}
             {node && (
               <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-[--surface-container-low] text-[--on-surface-variant]">
-                {isAnthropicCompatibleProvider(node.type ?? "") ? "Messages" : node.apiType === "responses" ? "Responses" : "Chat"}
+                {isAnthropicCompatibleProvider(node.type ?? "")
+                  ? "Messages"
+                  : node.apiType === "responses"
+                    ? "Responses"
+                    : "Chat"}
               </span>
             )}
-            {firstConnection && (
-              <TestStatusIndicator connection={firstConnection} />
-            )}
+            {firstConnection && <TestStatusIndicator connection={firstConnection} />}
           </div>
         </div>
       </div>
@@ -231,10 +238,18 @@ export function ProviderCard({
           {/* Toggle */}
           {onToggle && (
             <div
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(!allDisabled); }}
             >
-              <Switch checked={!allDisabled} />
+              <Switch
+                checked={!allDisabled}
+                onCheckedChange={(checked) => {
+                  onToggle(checked);
+                }}
+              />
             </div>
           )}
         </div>

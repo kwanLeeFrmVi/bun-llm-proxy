@@ -10,7 +10,7 @@ const Table = React.forwardRef<
       ref={ref}
       className={cn(
         "w-full caption-bottom text-sm",
-        stickyHeader && "[&_thead_tr]:sticky [&_thead_tr]:top-0 [&_thead_tr]:bg-[--surface-container-lowest] [&_thead_tr]:z-10",
+        stickyHeader && "[&_thead_tr]:sticky [&_thead_tr]:top-0 [&_thead_tr]:bg-[var(--surface-container-lowest)] [&_thead_tr]:z-10",
         className
       )}
       {...props}

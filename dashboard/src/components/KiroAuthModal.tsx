@@ -53,7 +53,7 @@ export default function KiroAuthModal({ isOpen, onConnect, onClose }: KiroAuthMo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
+      <DialogContent className="rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline text-lg font-bold">
             Connect Kiro AI
