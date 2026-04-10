@@ -14,6 +14,7 @@ export const HTTP_STATUS = {
   BAD_GATEWAY:         502,
   SERVICE_UNAVAILABLE: 503,
   GATEWAY_TIMEOUT:     504,
+  SITE_OVERLOADED:     529,
 } as const;
 
 export const ERROR_TYPES: Record<number, { type: string; code: string }> = {

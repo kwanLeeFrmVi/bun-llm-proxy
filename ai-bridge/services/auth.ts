@@ -46,7 +46,8 @@ export function checkFallbackError(
       lowerError.includes("too many requests") ||
       lowerError.includes("quota exceeded") ||
       lowerError.includes("capacity") ||
-      lowerError.includes("overloaded")
+      lowerError.includes("overloaded") ||
+      lowerError.includes("temporarily unavailable")
     ) {
       return {
         shouldFallback: true,
@@ -66,6 +67,15 @@ export function checkFallbackError(
     return { shouldFallback: true, cooldownMs: COOLDOWN_MS.notFound };
   }
   if (status === HTTP_STATUS.RATE_LIMITED) {
+    return {
+      shouldFallback: true,
+      cooldownMs: getQuotaCooldown(backoffLevel),
+      newBackoffLevel: Math.min(backoffLevel + 1, BACKOFF_CONFIG.maxLevel),
+    };
+  }
+
+  // Pro-X site overloaded (529) - treat as rate limit with exponential backoff
+  if (status === HTTP_STATUS.SITE_OVERLOADED) {
     return {
       shouldFallback: true,
       cooldownMs: getQuotaCooldown(backoffLevel),
