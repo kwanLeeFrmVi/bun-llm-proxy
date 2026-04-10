@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import {
-  api,
-  CatalogResponse,
-  ProviderNode,
-  ProviderConnection,
-} from "@/lib/api";
+import { api, CatalogResponse, ProviderNode, ProviderConnection } from "@/lib/api";
 import { useAuth } from "@/lib/auth.tsx";
 import {
   isOpenAICompatibleProvider,
@@ -24,14 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ProviderIcon } from "@/components/ProviderIcon";
-import {
-  Plus,
-  ArrowLeft,
-  ExternalLink,
-  Play,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import { Plus, ArrowLeft, ExternalLink, Play, Loader2, Trash2 } from "lucide-react";
 import OAuthModal from "@/components/OAuthModal";
 import KiroAuthModal from "@/components/KiroAuthModal";
 import { toast } from "sonner";
@@ -44,6 +32,16 @@ import { ModelTile } from "./ModelTile";
 import { getLogoPath } from "./utils";
 import type { ProviderModel, TestStatus } from "./types";
 import { EditProviderModal } from "@/components/EditProviderModal";
+
+function normalizeModelId(modelId: string, prefixes: string[]) {
+  const trimmedModelId = modelId.trim();
+  for (const prefix of prefixes) {
+    if (trimmedModelId.startsWith(`${prefix}/`)) {
+      return trimmedModelId.slice(prefix.length + 1);
+    }
+  }
+  return trimmedModelId;
+}
 
 export default function ProviderDetail() {
   const { providerId } = useParams<{ providerId: string }>();
@@ -69,27 +67,19 @@ export default function ProviderDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditProvider, setShowEditProvider] = useState(false);
   const [editingNode, setEditingNode] = useState<ProviderNode | null>(null);
-  const [showDeleteProviderConfirm, setShowDeleteProviderConfirm] =
-    useState(false);
+  const [showDeleteProviderConfirm, setShowDeleteProviderConfirm] = useState(false);
   const [deletingProvider, setDeletingProvider] = useState(false);
-  const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(
-    null,
-  );
-  const [editingConn, setEditingConn] = useState<ProviderConnection | null>(
-    null,
-  );
+  const [deletingConn, setDeletingConn] = useState<ProviderConnection | null>(null);
+  const [editingConn, setEditingConn] = useState<ProviderConnection | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [testingAll, setTestingAll] = useState(false);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
-  const [modelTestResults, setModelTestResults] = useState<
-    Record<string, TestStatus>
-  >({});
+  const [modelTestResults, setModelTestResults] = useState<Record<string, TestStatus>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
 
   // Determine provider info
   const isCompatible =
-    isOpenAICompatibleProvider(decodedId) ||
-    isAnthropicCompatibleProvider(decodedId);
+    isOpenAICompatibleProvider(decodedId) || isAnthropicCompatibleProvider(decodedId);
   const isOAuth = isOAuthProvider(decodedId);
 
   const node = nodes.find((n) => n.id === decodedId);
@@ -97,9 +87,7 @@ export default function ProviderDetail() {
 
   const displayName = isCompatible
     ? (node?.name ??
-      (isAnthropicCompatibleProvider(decodedId)
-        ? "Anthropic Compatible"
-        : "OpenAI Compatible"))
+      (isAnthropicCompatibleProvider(decodedId) ? "Anthropic Compatible" : "OpenAI Compatible"))
     : (providerMeta?.name ?? decodedId);
 
   const color = isCompatible
@@ -116,6 +104,10 @@ export default function ProviderDetail() {
 
   const noticeText = providerMeta?.notice?.text;
   const noticeUrl = providerMeta?.notice?.apiKeyUrl;
+  const activeConn = connections.find((c) => c.isActive !== false);
+  const activeProviderSpecificData =
+    (activeConn?.providerSpecificData as Record<string, unknown> | undefined) ?? {};
+  const providerPrefix = getEffectiveProviderAlias(decodedId, nodes);
 
   const fetchData = useCallback(async () => {
     try {
@@ -124,9 +116,9 @@ export default function ProviderDetail() {
         api.providers.nodes(),
         api.providers.catalog(),
       ]);
-      const all = (
-        connRes as { connections: ProviderConnection[] }
-      ).connections.filter((c) => c.provider === decodedId);
+      const all = (connRes as { connections: ProviderConnection[] }).connections.filter(
+        (c) => c.provider === decodedId
+      );
       setConnections(all);
       setNodes((nodeRes as { nodes: ProviderNode[] }).nodes);
       setCatalog(catRes as CatalogResponse);
@@ -137,36 +129,60 @@ export default function ProviderDetail() {
     }
   }, [decodedId]);
 
-  // Load stored custom models from localStorage
-  const loadCustomModels = useCallback(() => {
-    try {
-      const stored = localStorage.getItem(`models:${decodedId}`);
-      if (stored) setCustomModels(JSON.parse(stored));
-    } catch {}
-  }, [decodedId]);
-
   // Fetch predefined models from API
   const fetchPredefinedModels = useCallback(async () => {
     setLoadingModels(true);
     try {
       const response = await api.providers.getModels(decodedId);
-      setPredefinedModels(response.models);
-      // Also update customModels from localStorage to match what's in the DB
-      // This keeps the custom models list in sync
-      loadCustomModels();
+      const enabledModels = Array.isArray(activeProviderSpecificData.enabledModels)
+        ? activeProviderSpecificData.enabledModels.filter(
+            (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+          )
+        : [];
+      const normalizedEnabledModels = new Set(
+        enabledModels.map((modelId) => normalizeModelId(modelId, [providerPrefix, decodedId]))
+      );
+
+      setCustomModels(
+        enabledModels.filter((modelId) => {
+          const normalizedModelId = normalizeModelId(modelId, [providerPrefix, decodedId]);
+          return !response.models.some((model) => {
+            const normalizedResponseModelId = normalizeModelId(model.id, [
+              providerPrefix,
+              decodedId,
+            ]);
+            return (
+              normalizedResponseModelId === normalizedModelId &&
+              (model.type ?? undefined) !== undefined
+            );
+          });
+        })
+      );
+      setPredefinedModels(
+        response.models.filter((model) => {
+          const normalizedModelId = normalizeModelId(model.id, [providerPrefix, decodedId]);
+          return (
+            !normalizedEnabledModels.has(normalizedModelId) ||
+            (model.type ?? undefined) !== undefined
+          );
+        })
+      );
     } catch (e) {
       console.error("Failed to fetch predefined models:", e);
+      setCustomModels([]);
       setPredefinedModels([]);
     } finally {
       setLoadingModels(false);
     }
-  }, [decodedId, loadCustomModels]);
+  }, [activeProviderSpecificData.enabledModels, decodedId, providerPrefix]);
 
   useEffect(() => {
     fetchData();
-    loadCustomModels();
+  }, [fetchData]);
+
+  useEffect(() => {
     fetchPredefinedModels();
-  }, [fetchData, loadCustomModels, fetchPredefinedModels]);
+  }, [fetchPredefinedModels]);
 
   // Copy helper
   function handleCopy(text: string) {
@@ -176,11 +192,7 @@ export default function ProviderDetail() {
   }
 
   // CRUD handlers
-  async function handleAddApiKey(data: {
-    name: string;
-    apiKey: string;
-    priority: number;
-  }) {
+  async function handleAddApiKey(data: { name: string; apiKey: string; priority: number }) {
     await api.providers.create({
       provider: decodedId,
       name: data.name,
@@ -201,10 +213,7 @@ export default function ProviderDetail() {
     toast.success("OAuth connection added");
   }
 
-  async function handleKiroAuthMethod(
-    method: string,
-    config?: Record<string, unknown>,
-  ) {
+  async function handleKiroAuthMethod(method: string, config?: Record<string, unknown>) {
     setShowKiroAuth(false);
 
     if (method === "builder-id") {
@@ -217,9 +226,7 @@ export default function ProviderDetail() {
       await fetchData();
       toast.success("Kiro connection imported");
     } else if (method === "google" || method === "github") {
-      toast.info(
-        `${method === "google" ? "Google" : "GitHub"} social login coming soon!`,
-      );
+      toast.info(`${method === "google" ? "Google" : "GitHub"} social login coming soon!`);
     }
   }
 
@@ -262,7 +269,7 @@ export default function ProviderDetail() {
       priority: number;
       refreshToken?: string;
       apiKey?: string;
-    },
+    }
   ) {
     const payload: Record<string, unknown> = {
       name: data.name,
@@ -287,9 +294,7 @@ export default function ProviderDetail() {
       }
       await fetchData();
     } catch (err) {
-      toast.error(
-        `Test failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-      );
+      toast.error(`Test failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }
 
@@ -322,9 +327,7 @@ export default function ProviderDetail() {
     setTestingAll(false);
 
     if (failed === 0) {
-      toast.success(
-        `All ${connections.length} connections tested successfully`,
-      );
+      toast.success(`All ${connections.length} connections tested successfully`);
     } else {
       toast.warning(`${passed}/${connections.length} passed, ${failed} failed`);
     }
@@ -444,9 +447,7 @@ export default function ProviderDetail() {
 
       if (!success) {
         setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
-        toast.error(
-          `Model ${modelId} test failed${errorMsg ? `: ${errorMsg}` : ""}`,
-        );
+        toast.error(`Model ${modelId} test failed${errorMsg ? `: ${errorMsg}` : ""}`);
       } else {
         setModelTestResults((prev) => ({ ...prev, [modelId]: "ok" }));
         toast.success(`Model ${modelId} tested successfully (${latencyMs}ms)`);
@@ -454,7 +455,7 @@ export default function ProviderDetail() {
     } catch (err) {
       setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
       toast.error(
-        `Model ${modelId} test failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        `Model ${modelId} test failed: ${err instanceof Error ? err.message : "Unknown error"}`
       );
     } finally {
       setTestingModelId(null);
@@ -466,17 +467,10 @@ export default function ProviderDetail() {
     const updated = [...customModels, modelId];
     setCustomModels(updated);
 
-    // Also persist to localStorage for backup
-    localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
-
     // Persist to database: add to providerSpecificData.enabledModels
-    const activeConn = connections.find((c) => c.isActive !== false);
     if (activeConn) {
       try {
-        const psd =
-          (activeConn.providerSpecificData as
-            | Record<string, unknown>
-            | undefined) ?? {};
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
         const enabledModels = (psd.enabledModels as string[]) ?? [];
         // Add model if not already present
         if (!enabledModels.includes(modelId)) {
@@ -488,11 +482,14 @@ export default function ProviderDetail() {
       } catch (e) {
         console.error("Failed to persist model to database:", e);
         toast.error("Model added locally but failed to sync to database");
+        await fetchPredefinedModels();
         setShowAddModel(false);
         return;
       }
     }
 
+    await fetchData();
+    await fetchPredefinedModels();
     setShowAddModel(false);
     toast.success(`Model ${modelId} added`);
   }
@@ -502,17 +499,10 @@ export default function ProviderDetail() {
     const updated = customModels.filter((m) => m !== modelId);
     setCustomModels(updated);
 
-    // Also update localStorage
-    localStorage.setItem(`models:${decodedId}`, JSON.stringify(updated));
-
     // Persist to database: remove from providerSpecificData.enabledModels
-    const activeConn = connections.find((c) => c.isActive !== false);
     if (activeConn) {
       try {
-        const psd =
-          (activeConn.providerSpecificData as
-            | Record<string, unknown>
-            | undefined) ?? {};
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
         const enabledModels = (psd.enabledModels as string[]) ?? [];
         const updated = enabledModels.filter((m) => m !== modelId);
         await api.providers.update(activeConn.id, {
@@ -521,10 +511,13 @@ export default function ProviderDetail() {
       } catch (e) {
         console.error("Failed to remove model from database:", e);
         toast.error("Model removed locally but failed to sync to database");
+        await fetchPredefinedModels();
         return;
       }
     }
 
+    await fetchData();
+    await fetchPredefinedModels();
     toast.success(`Model ${modelId} deleted`);
   }
 
@@ -538,6 +531,9 @@ export default function ProviderDetail() {
         name: m.name,
       }));
       setPredefinedModels(fetched);
+      setCustomModels([]);
+      await fetchData();
+      await fetchPredefinedModels();
       toast.success(`Fetched ${result.count} models`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to fetch models");
@@ -550,16 +546,15 @@ export default function ProviderDetail() {
     if (predefinedModels.length === 0) return;
     try {
       setPredefinedModels([]);
-      const activeConn = connections.find((c) => c.isActive !== false);
       if (activeConn) {
-        const psd =
-          (activeConn.providerSpecificData as
-            | Record<string, unknown>
-            | undefined) ?? {};
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
         await api.providers.update(activeConn.id, {
           providerSpecificData: { ...psd, enabledModels: [] },
         });
       }
+      setCustomModels([]);
+      await fetchData();
+      await fetchPredefinedModels();
       toast.success(`All models removed`);
     } catch (e) {
       toast.error("Failed to remove models");
@@ -573,23 +568,19 @@ export default function ProviderDetail() {
       setPredefinedModels((prev) => prev.filter((m) => m.id !== modelId));
 
       // Update enabledModels in DB: remove the model ID (strip prefix if present)
-      const activeConn = connections.find((c) => c.isActive !== false);
       if (activeConn) {
-        const psd =
-          (activeConn.providerSpecificData as
-            | Record<string, unknown>
-            | undefined) ?? {};
+        const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
         const enabledModels = (psd.enabledModels as string[]) ?? [];
         // modelId may be like "mvo/gpt-4o" strip prefix to get raw ID
         const prefix = (psd.prefix as string | undefined) ?? decodedId;
-        const rawId = modelId.startsWith(`${prefix}/`)
-          ? modelId.slice(prefix.length + 1)
-          : modelId;
+        const rawId = modelId.startsWith(`${prefix}/`) ? modelId.slice(prefix.length + 1) : modelId;
         const updated = enabledModels.filter((m) => m !== rawId);
         await api.providers.update(activeConn.id, {
           providerSpecificData: { ...psd, enabledModels: updated },
         });
       }
+      await fetchData();
+      await fetchPredefinedModels();
       toast.success(`Model removed`);
     } catch (e) {
       toast.error("Failed to remove model");
@@ -621,60 +612,60 @@ export default function ProviderDetail() {
 
   if (loading) {
     return (
-      <div className='space-y-6 animate-pulse'>
-        <div className='h-4 w-32 bg-[--surface-container-low] rounded' />
-        <div className='h-24 bg-[--surface-container-low] rounded-xl' />
-        <div className='h-64 bg-[--surface-container-low] rounded-xl' />
+      <div className="space-y-6 animate-pulse">
+        <div className="h-4 w-32 bg-[--surface-container-low] rounded" />
+        <div className="h-24 bg-[--surface-container-low] rounded-xl" />
+        <div className="h-64 bg-[--surface-container-low] rounded-xl" />
       </div>
     );
   }
 
   if (!catalog && !loading) {
     return (
-      <div className='text-center py-20'>
-        <p className='text-[--on-surface-variant]'>Provider not found</p>
+      <div className="text-center py-20">
+        <p className="text-[--on-surface-variant]">Provider not found</p>
       </div>
     );
   }
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {/* Back link */}
       <Link
-        to='/providers'
-        className='inline-flex items-center gap-1.5 text-sm text-[--on-surface-variant] hover:text-[--on-surface] transition-colors'
+        to="/providers"
+        className="inline-flex items-center gap-1.5 text-sm text-[--on-surface-variant] hover:text-[--on-surface] transition-colors"
       >
-        <ArrowLeft className='w-4 h-4' />
+        <ArrowLeft className="w-4 h-4" />
         Back to Providers
       </Link>
 
       {/* Provider header */}
-      <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-4'>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <ProviderIcon
             src={getLogoPath(decodedId, node)}
             alt={displayName}
             size={48}
-            className='rounded-lg'
+            className="rounded-lg"
             fallbackText={textIcon}
             fallbackColor={color}
           />
           <div>
-            <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
+            <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]">
               {displayName}
             </h1>
-            <p className='text-sm text-[--on-surface-variant] mt-0.5'>
+            <p className="text-sm text-[--on-surface-variant] mt-0.5">
               {connections.length} connection
               {connections.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
         {isCompatible && isAdmin && node && (
-          <div className='flex items-center gap-2'>
+          <div className="flex items-center gap-2">
             <Button
-              variant='outline'
-              size='sm'
-              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]'
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]"
               onClick={() => {
                 setEditingNode(node);
                 setShowEditProvider(true);
@@ -683,12 +674,12 @@ export default function ProviderDetail() {
               Edit Provider
             </Button>
             <Button
-              variant='outline'
-              size='sm'
-              className='h-8 px-3 text-xs font-medium border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700'
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs font-medium border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
               onClick={() => setShowDeleteProviderConfirm(true)}
             >
-              <Trash2 className='w-3.5 h-3.5 mr-1' />
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
               Delete
             </Button>
           </div>
@@ -697,50 +688,46 @@ export default function ProviderDetail() {
 
       {/* Notice/info banner */}
       {noticeText && (
-        <div className='flex items-center gap-2 px-4 py-3 rounded-xl bg-[--surface-container-low] border border-[rgba(203,213,225,0.4)]'>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[--surface-container-low] border border-[rgba(203,213,225,0.4)]">
           <svg
-            xmlns='http://www.w3.org/2000/svg'
-            width='16'
-            height='16'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            className='text-[--on-surface-variant] shrink-0'
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-[--on-surface-variant] shrink-0"
           >
-            <circle cx='12' cy='12' r='10' />
-            <path d='M12 16v-4' />
-            <path d='M12 8h.01' />
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
           </svg>
-          <p className='text-xs text-[--on-surface-variant] flex-1 leading-relaxed'>
-            {noticeText}
-          </p>
+          <p className="text-xs text-[--on-surface-variant] flex-1 leading-relaxed">{noticeText}</p>
           {noticeUrl && (
             <a
               href={noticeUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-xs text-[--primary] hover:underline shrink-0 flex items-center gap-1'
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[--primary] hover:underline shrink-0 flex items-center gap-1"
             >
-              Get API Key <ExternalLink className='w-3 h-3' />
+              Get API Key <ExternalLink className="w-3 h-3" />
             </a>
           )}
         </div>
       )}
 
       {/* Connections card */}
-      <div className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden'>
-        <div className='px-5 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between'>
-          <h2 className='text-sm font-semibold text-[--on-surface]'>
-            Connections
-          </h2>
-          <div className='flex items-center gap-2'>
+      <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[--on-surface]">Connections</h2>
+          <div className="flex items-center gap-2">
             <Button
-              variant='outline'
-              size='sm'
-              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]'
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)] text-[--on-surface-variant] hover:text-[--on-surface]"
               onClick={handleTestAllConnections}
               disabled={testingAll}
             >
@@ -748,79 +735,67 @@ export default function ProviderDetail() {
             </Button>
             {isOAuth ? (
               <Button
-                size='sm'
-                className='h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]'
-                onClick={() =>
-                  decodedId === "kiro"
-                    ? setShowKiroAuth(true)
-                    : setShowOAuth(true)
-                }
+                size="sm"
+                className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
+                onClick={() => (decodedId === "kiro" ? setShowKiroAuth(true) : setShowOAuth(true))}
               >
-                <Plus className='w-3.5 h-3.5 mr-1' />{" "}
-                {decodedId === "kiro" ? "Add" : "Connect"}
+                <Plus className="w-3.5 h-3.5 mr-1" /> {decodedId === "kiro" ? "Add" : "Connect"}
               </Button>
             ) : (
               <Button
-                size='sm'
-                className='h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]'
+                size="sm"
+                className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
                 onClick={() => setShowAddApiKey(true)}
               >
-                <Plus className='w-3.5 h-3.5 mr-1' /> Add
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add
               </Button>
             )}
           </div>
         </div>
 
         {connections.length === 0 ? (
-          <div className='text-center py-12'>
-            <div className='inline-flex items-center justify-center w-12 h-12 rounded-full bg-[--surface-container-low] mb-3'>
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[--surface-container-low] mb-3">
               <svg
-                xmlns='http://www.w3.org/2000/svg'
-                width='24'
-                height='24'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                className='text-[--on-surface-variant]'
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-[--on-surface-variant]"
               >
-                <path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' />
-                <circle cx='12' cy='12' r='3' />
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
             </div>
-            <p className='text-sm font-medium text-[--on-surface] mb-1'>
-              No connections yet
-            </p>
-            <p className='text-xs text-[--on-surface-variant] mb-4'>
+            <p className="text-sm font-medium text-[--on-surface] mb-1">No connections yet</p>
+            <p className="text-xs text-[--on-surface-variant] mb-4">
               Add your first connection to get started
             </p>
             {isOAuth ? (
               <Button
-                size='sm'
-                className='h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]'
-                onClick={() =>
-                  decodedId === "kiro"
-                    ? setShowKiroAuth(true)
-                    : setShowOAuth(true)
-                }
+                size="sm"
+                className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
+                onClick={() => (decodedId === "kiro" ? setShowKiroAuth(true) : setShowOAuth(true))}
               >
-                <Plus className='w-3.5 h-3.5 mr-1' />{" "}
-                {decodedId === "kiro" ? "Add" : "Connect"}
+                <Plus className="w-3.5 h-3.5 mr-1" /> {decodedId === "kiro" ? "Add" : "Connect"}
               </Button>
             ) : (
               <Button
-                size='sm'
-                className='h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]'
+                size="sm"
+                className="h-8 px-3 text-xs font-semibold bg-[#0F172A] text-white hover:bg-[#1e293b]"
                 onClick={() => setShowAddApiKey(true)}
               >
-                <Plus className='w-3.5 h-3.5 mr-1' /> Add
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add
               </Button>
             )}
           </div>
         ) : (
-          <div className='divide-y divide-[rgba(203,213,225,0.25)]'>
+          <div className="divide-y divide-[rgba(203,213,225,0.25)]">
             {connections.map((conn, i) => (
               <ConnectionRow
                 key={conn.id}
@@ -846,75 +821,74 @@ export default function ProviderDetail() {
       </div>
 
       {/* Available Models card */}
-      <div className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden'>
-        <div className='px-5 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between'>
-          <h2 className='text-sm font-semibold text-[--on-surface]'>
+      <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[--on-surface]">
             Available Models
             {!loadingModels && (
-              <span className='ml-2 text-xs font-normal text-[--on-surface-variant]'>
+              <span className="ml-2 text-xs font-normal text-[--on-surface-variant]">
                 ({predefinedModels.length + customModels.length})
               </span>
             )}
           </h2>
-          <div className='flex items-center gap-2'>
+          <div className="flex items-center gap-2">
             <Button
-              size='sm'
-              variant='outline'
-              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]'
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]"
               onClick={handleFetchModels}
               disabled={fetchingModels}
             >
               {fetchingModels ? (
-                <Loader2 className='w-3.5 h-3.5 mr-1 animate-spin' />
+                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
               ) : (
-                <Play className='w-3.5 h-3.5 mr-1' />
+                <Play className="w-3.5 h-3.5 mr-1" />
               )}
               Fetch Models
             </Button>
             <Button
-              size='sm'
-              variant='outline'
-              className='h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]'
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]"
               onClick={() => setShowAddModel(true)}
             >
-              <Plus className='w-3.5 h-3.5 mr-1' /> Add Model
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add Model
             </Button>
           </div>
         </div>
-        <div className='p-4'>
+        <div className="p-4">
           {loadingModels ? (
-            <div className='flex flex-wrap gap-2'>
+            <div className="flex flex-wrap gap-2">
               {[...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className='h-9 w-32 rounded-lg bg-[--surface-container-low] animate-pulse'
+                  className="h-9 w-32 rounded-lg bg-[--surface-container-low] animate-pulse"
                 />
               ))}
             </div>
           ) : predefinedModels.length === 0 && customModels.length === 0 ? (
-            <p className='text-xs text-[--on-surface-variant] text-center py-4'>
-              No models available for this provider. Click "Add Model" to add a
-              custom model.
+            <p className="text-xs text-[--on-surface-variant] text-center py-4">
+              No models available for this provider. Click "Add Model" to add a custom model.
             </p>
           ) : (
-            <div className='space-y-3'>
+            <div className="space-y-3">
               {/* Predefined models */}
               {predefinedModels.length > 0 && (
                 <div>
-                  <div className='flex items-center justify-between mb-2'>
-                    <p className='text-xs font-medium text-[--on-surface-variant]'>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-[--on-surface-variant]">
                       Predefined Models
                     </p>
                     {predefinedModels.length > 0 && (
                       <button
                         onClick={handleDeleteAllPredefinedModels}
-                        className='text-xs text-[--error] hover:underline cursor-pointer'
+                        className="text-xs text-[--error] hover:underline cursor-pointer"
                       >
                         Delete All
                       </button>
                     )}
                   </div>
-                  <div className='flex flex-wrap gap-2'>
+                  <div className="flex flex-wrap gap-2">
                     {predefinedModels.map((m) => (
                       <ModelTile
                         key={m.id}
@@ -922,11 +896,7 @@ export default function ProviderDetail() {
                         alias={m.id}
                         onCopy={handleCopy}
                         copied={copied}
-                        onTest={
-                          connections.length > 0
-                            ? () => handleTestModel(m.id)
-                            : undefined
-                        }
+                        onTest={connections.length > 0 ? () => handleTestModel(m.id) : undefined}
                         isTesting={testingModelId === m.id}
                         testStatus={modelTestResults[m.id]}
                         onDelete={() => handleDeletePredefinedModel(m.id)}
@@ -938,13 +908,12 @@ export default function ProviderDetail() {
               {/* Custom models */}
               {customModels.length > 0 && (
                 <div>
-                  <p className='text-xs font-medium text-[--on-surface-variant] mb-2'>
+                  <p className="text-xs font-medium text-[--on-surface-variant] mb-2">
                     Custom Models
                   </p>
-                  <div className='flex flex-wrap gap-2'>
+                  <div className="flex flex-wrap gap-2">
                     {customModels.map((m) => {
                       // Use effective prefix (node prefix for compatible providers, otherwise standard alias)
-                      const providerPrefix = getEffectiveProviderAlias(decodedId, nodes);
                       const alias = m.startsWith(`${providerPrefix}/`)
                         ? m
                         : `${providerPrefix}/${m}`;
@@ -955,11 +924,7 @@ export default function ProviderDetail() {
                           alias={alias}
                           onCopy={handleCopy}
                           copied={copied}
-                          onTest={
-                            connections.length > 0
-                              ? () => handleTestModel(m)
-                              : undefined
-                          }
+                          onTest={connections.length > 0 ? () => handleTestModel(m) : undefined}
                           isTesting={testingModelId === m}
                           testStatus={modelTestResults[m]}
                           onDelete={() => handleDeleteCustomModel(m)}
@@ -1018,30 +983,22 @@ export default function ProviderDetail() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
+        <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
           <DialogHeader>
-            <DialogTitle className='font-headline text-lg font-bold'>
-              Delete Connection
-            </DialogTitle>
-            <DialogDescription className='text-sm text-[--on-surface-variant]'>
+            <DialogTitle className="font-headline text-lg font-bold">Delete Connection</DialogTitle>
+            <DialogDescription className="text-sm text-[--on-surface-variant]">
               Are you sure you want to delete{" "}
-              <span className='font-medium text-[--on-surface]'>
+              <span className="font-medium text-[--on-surface]">
                 "{deletingConn?.name || "this connection"}"
               </span>
               ? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className='gap-2'>
-            <Button
-              variant='outline'
-              onClick={() => setShowDeleteConfirm(false)}
-            >
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={executeDelete}
-              className='bg-red-600 text-white hover:bg-red-700'
-            >
+            <Button onClick={executeDelete} className="bg-red-600 text-white hover:bg-red-700">
               Delete
             </Button>
           </DialogFooter>
@@ -1059,26 +1016,19 @@ export default function ProviderDetail() {
       />
 
       {/* Delete Provider Confirmation Dialog */}
-      <Dialog
-        open={showDeleteProviderConfirm}
-        onOpenChange={setShowDeleteProviderConfirm}
-      >
-        <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
+      <Dialog open={showDeleteProviderConfirm} onOpenChange={setShowDeleteProviderConfirm}>
+        <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
           <DialogHeader>
-            <DialogTitle className='font-headline text-lg font-bold'>
-              Delete Provider
-            </DialogTitle>
-            <DialogDescription className='text-sm text-[--on-surface-variant]'>
+            <DialogTitle className="font-headline text-lg font-bold">Delete Provider</DialogTitle>
+            <DialogDescription className="text-sm text-[--on-surface-variant]">
               Are you sure you want to delete{" "}
-              <span className='font-medium text-[--on-surface]'>
-                "{displayName}"
-              </span>
-              ? This will also delete all connections and cannot be undone.
+              <span className="font-medium text-[--on-surface]">"{displayName}"</span>? This will
+              also delete all connections and cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className='gap-2'>
+          <DialogFooter className="gap-2">
             <Button
-              variant='outline'
+              variant="outline"
               onClick={() => setShowDeleteProviderConfirm(false)}
               disabled={deletingProvider}
             >
@@ -1087,11 +1037,11 @@ export default function ProviderDetail() {
             <Button
               onClick={handleDeleteProvider}
               disabled={deletingProvider}
-              className='bg-red-600 text-white hover:bg-red-700'
+              className="bg-red-600 text-white hover:bg-red-700"
             >
               {deletingProvider ? (
                 <>
-                  <Loader2 className='w-3.5 h-3.5 mr-1 animate-spin' />
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                   Deleting...
                 </>
               ) : (
