@@ -18,14 +18,40 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showError, setShowError] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setShowError(false);
+
+    // Basic validation
+    if (!username.trim()) {
+      setError("Please enter your username");
+      setShowError(true);
+      return;
+    }
+    if (!password.trim()) {
+      setError("Please enter your password");
+      setShowError(true);
+      return;
+    }
+
     try {
       await login(username, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      setError(errorMessage);
+      setShowError(true);
+
+      // Shake animation for password field on error
+      const passwordInput = document.getElementById("password") as HTMLInputElement;
+      if (passwordInput) {
+        passwordInput.style.animation = "shake 0.5s ease-in-out";
+        setTimeout(() => {
+          passwordInput.style.animation = "";
+        }, 500);
+      }
     }
   }
 
@@ -36,21 +62,29 @@ export default function Login() {
     paddingRight: "14px",
     background: "#f8fafc",
     border: "1px solid #e2e8f0",
-    borderRadius: "4px",
+    borderRadius: "6px",
     fontSize: "0.875rem",
     color: "#0f172a",
     outline: "none",
     boxSizing: "border-box" as const,
-    transition: "border-color 0.15s, box-shadow 0.15s",
+    transition: "all 0.2s ease",
+  };
+
+  const errorInputStyle: React.CSSProperties = {
+    ...inputStyle,
+    border: "1px solid #fca5a5",
+    background: "#fef2f2",
   };
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = "#0F172A";
-    e.target.style.boxShadow = "0 0 0 1px #0F172A";
+    e.target.style.boxShadow = "0 0 0 3px rgba(15, 23, 42, 0.1)";
+    e.target.style.background = "#ffffff";
   }
   function blurInput(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = "#e2e8f0";
+    e.target.style.borderColor = showError ? "#fca5a5" : "#e2e8f0";
     e.target.style.boxShadow = "none";
+    e.target.style.background = showError ? "#fef2f2" : "#f8fafc";
   }
 
   return (
@@ -181,21 +215,57 @@ export default function Login() {
               {error && (
                 <div
                   style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    borderRadius: "4px",
-                    padding: "12px 14px",
+                    background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
+                    border: "1px solid #fca5a5",
+                    borderRadius: "8px",
+                    padding: "14px 16px",
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
+                    gap: "12px",
                     color: "#b91c1c",
                     fontSize: "0.875rem",
+                    fontWeight: "500",
+                    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.15)",
+                    animation: "slideIn 0.3s ease-out",
                   }}
                 >
                   <AlertCircle
-                    style={{ width: 16, height: 16, flexShrink: 0 }}
+                    style={{ width: 18, height: 18, flexShrink: 0 }}
                   />
-                  {error}
+                  <span style={{ flex: 1 }}>
+                    {error === "Invalid credentials" || error === "Unauthorized"
+                      ? "Invalid username or password. Please try again."
+                      : error === "Missing username or password"
+                      ? "Please enter both username and password."
+                      : error}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowError(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#b91c1c",
+                      cursor: "pointer",
+                      padding: "2px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "4px",
+                      transition: "background-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
                 </div>
               )}
 
@@ -233,10 +303,13 @@ export default function Login() {
                     type='text'
                     required
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      if (showError) setShowError(false);
+                    }}
                     placeholder='admin'
                     autoComplete='username'
-                    style={inputStyle}
+                    style={showError ? errorInputStyle : inputStyle}
                     onFocus={focusInput}
                     onBlur={blurInput}
                   />
@@ -298,10 +371,13 @@ export default function Login() {
                     type='password'
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (showError) setShowError(false);
+                    }}
                     placeholder='••••••••'
                     autoComplete='current-password'
-                    style={inputStyle}
+                    style={showError ? errorInputStyle : inputStyle}
                     onFocus={focusInput}
                     onBlur={blurInput}
                   />
@@ -336,40 +412,55 @@ export default function Login() {
                 style={{
                   width: "100%",
                   height: "48px",
-                  background: "#0F172A",
+                  background: loading
+                    ? "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)"
+                    : "linear-gradient(135deg, #0F172A 0%, #1e293b 100%)",
                   color: "#ffffff",
                   border: "none",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
                   fontWeight: 700,
                   fontSize: "0.875rem",
                   letterSpacing: "0.04em",
                   cursor: loading ? "not-allowed" : "pointer",
-                  opacity: loading ? 0.7 : 1,
+                  opacity: loading ? 0.8 : 1,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
-                  transition: "background 0.15s, transform 0.1s",
+                  transition: "all 0.2s ease",
+                  boxShadow: loading
+                    ? "none"
+                    : "0 4px 12px rgba(15, 23, 42, 0.2)",
+                  transform: loading ? "scale(0.98)" : "scale(1)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!loading) e.currentTarget.style.background = "#1e293b";
+                  if (!loading) {
+                    e.currentTarget.style.transform = "scale(1.02)";
+                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(15, 23, 42, 0.3)";
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#0F172A";
+                  if (!loading) {
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.2)";
+                  }
                 }}
               >
                 {loading ? (
-                  <span
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      border: "2px solid rgba(255,255,255,0.3)",
-                      borderTopColor: "#fff",
-                      animation: "lspin 0.7s linear infinite",
-                      display: "inline-block",
-                    }}
-                  />
+                  <>
+                    <span
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: "50%",
+                        border: "2px solid rgba(255,255,255,0.3)",
+                        borderTopColor: "#fff",
+                        animation: "lspin 0.7s linear infinite",
+                        display: "inline-block",
+                      }}
+                    />
+                    <span>Signing in...</span>
+                  </>
                 ) : (
                   <>
                     <span>Sign In</span>
@@ -468,7 +559,24 @@ export default function Login() {
         </div>
       </footer>
 
-      <style>{`@keyframes lspin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes lspin { to { transform: rotate(360deg); } }
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+      `}</style>
     </div>
   );
 }

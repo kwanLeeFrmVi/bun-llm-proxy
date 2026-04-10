@@ -107,7 +107,10 @@ async function request<T>(
 
   if (res.status === 401) {
     localStorage.removeItem("auth_token");
-    window.location.href = "/login";
+    // Only redirect if not already on login page (prevents reload loops)
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
     throw new Error("Unauthorized");
   }
 
