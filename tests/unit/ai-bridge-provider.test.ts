@@ -3,9 +3,15 @@
  * Tests: detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "../../ai-bridge/handlers/provider.ts";
 import { FORMATS } from "../../ai-bridge/translator/formats.ts";
+import { clearCachedClaudeHeaders } from "../../ai-bridge/utils/claudeHeaderCache.ts";
+
+// Clear cache before each test to ensure isolation
+beforeEach(() => {
+  clearCachedClaudeHeaders();
+});
 
 // ─── detectFormat ──────────────────────────────────────────────────────────────
 

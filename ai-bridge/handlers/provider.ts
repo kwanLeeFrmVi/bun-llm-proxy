@@ -11,6 +11,7 @@ import {
   OPENAI_COMPATIBLE_PREFIX,
   ANTHROPIC_COMPATIBLE_PREFIX,
 } from "../../lib/constants.ts";
+import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.ts";
 
 // ─── Provider Configuration ───────────────────────────────────────────────────────
 
@@ -338,18 +339,34 @@ export function buildUpstreamHeaders(
 ): Record<string, string> {
   const apiKey = credentials.apiKey as string | undefined;
   const accessToken = credentials.accessToken as string | undefined;
+  const providerSpecificData = credentials.providerSpecificData as Record<string, unknown> | undefined;
 
   // Handle anthropic-compatible-* dynamically
-  if (provider.startsWith("anthropic-compatible-")) {
+  if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...CLAUDE_API_HEADERS,
     };
+
+    // Overlay cached Claude headers if available
+    const cached = getCachedClaudeHeaders();
+    if (cached) {
+      overlayCachedHeaders(headers, cached);
+    }
+
     if (apiKey) {
       headers["x-api-key"] = apiKey;
     } else if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
+
+    // Strip first-party Claude Code identity headers for non-Anthropic upstreams
+    const baseUrl = (providerSpecificData?.baseUrl as string | undefined) ?? "";
+    const isOfficialAnthropic = baseUrl === "" || baseUrl.includes("api.anthropic.com");
+    if (!isOfficialAnthropic) {
+      stripClaudeCodeHeaders(headers);
+    }
+
     return headers;
   }
 
@@ -358,6 +375,14 @@ export function buildUpstreamHeaders(
     "Content-Type": "application/json",
     ...config?.headers,
   };
+
+  // Special handling for claude and anthropic providers
+  if (provider === "claude" || provider === "anthropic") {
+    const cached = getCachedClaudeHeaders();
+    if (cached) {
+      overlayCachedHeaders(headers, cached);
+    }
+  }
 
   // Gemini uses API key in URL, not header
   if (config?.usesApiKeyInUrl) {
@@ -379,4 +404,74 @@ export function buildUpstreamHeaders(
   }
 
   return headers;
+}
+
+/**
+ * Helper function to overlay cached Claude headers onto base headers.
+ * Handles Title-Case to lowercase conversion and merges anthropic-beta flags.
+ */
+function overlayCachedHeaders(
+  baseHeaders: Record<string, string>,
+  cached: Record<string, string>
+): void {
+  for (const lcKey of Object.keys(cached)) {
+    // Build the Title-Case equivalent: "anthropic-version" → "Anthropic-Version"
+    const titleKey = lcKey.replace(/(^|-)([a-z])/g, (_, sep, c) => sep + c.toUpperCase());
+
+    // Special handling for anthropic-beta to preserve required flags
+    if (lcKey === "anthropic-beta") {
+      const staticBetaStr = baseHeaders[titleKey] || baseHeaders[lcKey] || "";
+      const staticFlags = new Set(staticBetaStr.split(",").map((f) => f.trim()).filter(Boolean));
+      const cachedFlags = new Set(cached[lcKey].split(",").map((f) => f.trim()).filter(Boolean));
+
+      // Merge all static flags into the cached ones
+      for (const flag of staticFlags) {
+        cachedFlags.add(flag);
+      }
+
+      cached[lcKey] = Array.from(cachedFlags).join(",");
+    }
+
+    // Remove Title-Case variant if it exists
+    if (titleKey !== lcKey && baseHeaders[titleKey] !== undefined) {
+      delete baseHeaders[titleKey];
+    }
+  }
+
+  // Overlay cached headers
+  Object.assign(baseHeaders, cached);
+}
+
+/**
+ * Helper function to strip Claude Code identity headers for non-Anthropic upstreams.
+ * Removes headers that identify the request as coming from Claude Code client.
+ */
+function stripClaudeCodeHeaders(headers: Record<string, string>): void {
+  const headersToDelete = [
+    "anthropic-dangerous-direct-browser-access",
+    "Anthropic-Dangerous-Direct-Browser-Access",
+    "x-app",
+    "X-App",
+  ];
+
+  for (const key of headersToDelete) {
+    delete headers[key];
+  }
+
+  // Strip claude-code-20250219 from anthropic-beta
+  for (const betaKey of ["anthropic-beta", "Anthropic-Beta"]) {
+    if (headers[betaKey]) {
+      const filtered = headers[betaKey]
+        .split(",")
+        .map((s) => s.trim())
+        .filter((f) => f && f !== "claude-code-20250219")
+        .join(",");
+
+      if (filtered) {
+        headers[betaKey] = filtered;
+      } else {
+        delete headers[betaKey];
+      }
+    }
+  }
 }

@@ -53,6 +53,8 @@ export {
 export {
   cacheClaudeHeaders,
   getCachedClaudeHeaders,
+  clearCachedClaudeHeaders,
+  getCacheStats,
 } from "./utils/claudeHeaderCache.ts";
 
 export { transformToOllama } from "./utils/ollamaTransform.ts";
