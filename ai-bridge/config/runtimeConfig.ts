@@ -58,6 +58,15 @@ export const BACKOFF_CONFIG = {
   maxLevel: 15,
 } as const;
 
+// Retry-before-lock: retry transient errors on the same account before locking
+export const TRANSIENT_RETRY = {
+  maxAttempts:       2,         // retry up to 2 times (3 total attempts)
+  baseDelayMs:       250,       // first retry after 250ms, then 500ms
+} as const;
+
+// Which HTTP statuses trigger the retry-before-lock logic
+export const TRANSIENT_ERROR_STATUSES = new Set([502, 503, 504]);
+
 // Cooldown windows per error category (milliseconds)
 export const COOLDOWN_MS = {
   unauthorized:       2 * 60_000,

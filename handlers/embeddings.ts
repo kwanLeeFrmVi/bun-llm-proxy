@@ -11,7 +11,7 @@ import { checkAuth } from "../lib/authMiddleware.ts";
 import { getModelInfo } from "../services/model.ts";
 import { handleEmbeddingsCore } from "../ai-bridge/handlers/embeddingsCore.ts";
 import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts";
-import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
+import { HTTP_STATUS, TRANSIENT_RETRY, TRANSIENT_ERROR_STATUSES } from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "../lib/logger.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
@@ -104,7 +104,8 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
 
     const refreshedCredentials = await checkAndRefreshToken(provider, creds);
 
-    const result = await handleEmbeddingsCore({
+    // Build the request options once so we can reuse them in the retry loop
+    const embeddingsCoreOpts = {
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },
       credentials: refreshedCredentials,
@@ -120,34 +121,49 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model);
       },
-      onUsage: async (usage) => {
-        await saveRequestUsage(requestId, {
-          ...usage,
-          provider,
-          model,
-        }, Date.now() - startTime);
+      onUsage: async (usage: { prompt_tokens?: number; completion_tokens?: number; reasoning_tokens?: number; cached_tokens?: number }) => {
+        await saveRequestUsage(requestId, { ...usage, provider, model }, Date.now() - startTime);
       },
-    }) as { success: boolean; response: Response; status: number; error: string };
+    };
 
-    if (result.success) return result.response;
+    // ── Retry transient errors on the same account before locking ─────────────────
+    type EmbeddingsCoreResult = { success: boolean; response?: Response; status: number; error: string };
+    let result: EmbeddingsCoreResult | null = null;
+    for (let attempt = 0; attempt <= TRANSIENT_RETRY.maxAttempts; attempt++) {
+      result = (await handleEmbeddingsCore(embeddingsCoreOpts)) as EmbeddingsCoreResult;
 
+      if (result.success) return result.response!;
+
+      // Non-transient error — break immediately, no retry
+      if (!TRANSIENT_ERROR_STATUSES.has(result.status)) break;
+
+      // Transient error with retries remaining — back off and retry
+      if (attempt < TRANSIENT_RETRY.maxAttempts) {
+        const delayMs = TRANSIENT_RETRY.baseDelayMs * (attempt + 1);
+        log.warn("EMBEDDINGS", `Transient error ${result.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms...`);
+        await Bun.sleep(delayMs);
+      }
+    }
+
+    // All attempts exhausted (or non-transient error) — lock the account
+    const finalResult = result as EmbeddingsCoreResult;
     const { shouldFallback } = await markAccountUnavailable(
       creds.connectionId as string,
-      result.status,
-      result.error,
+      finalResult.status,
+      finalResult.error,
       provider,
       model
     );
 
     if (shouldFallback) {
-      log.warn("AUTH", `Account ${creds.connectionName} unavailable (${result.status}), trying fallback`);
+      log.warn("AUTH", `Account ${creds.connectionName} unavailable (${finalResult.status}), trying fallback`);
       excludeConnectionIds.add(creds.connectionId as string);
-      lastError = result.error;
-      lastStatus = result.status;
+      lastError = finalResult.error;
+      lastStatus = finalResult.status;
       continue;
     }
 
-    appendRequestLog(requestId, `error_${result.status}`);
-    return result.response;
+    appendRequestLog(requestId, `error_${finalResult.status}`);
+    return finalResult.response ?? errorResponse(finalResult.status ?? HTTP_STATUS.BAD_GATEWAY, finalResult.error ?? "Unknown error");
   }
 }
