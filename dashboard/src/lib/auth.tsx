@@ -55,17 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res: LoginResponse = await api.auth.login(u, p);
       localStorage.setItem("auth_token", res.token);
       localStorage.setItem("auth_username", res.username);
+      localStorage.setItem("auth_role", res.role);
+      localStorage.setItem("auth_user_id", res.userId);
       setToken(res.token);
       setUsername(res.username);
-
-      // Fetch role immediately after login
-      try {
-        const me = await api.auth.me();
-        localStorage.setItem("auth_role", me.role);
-        localStorage.setItem("auth_user_id", me.id);
-        setRole(me.role);
-        setUserId(me.id);
-      } catch {}
+      setRole(res.role);
+      setUserId(res.userId);
 
       window.location.href = "/";
     } finally {

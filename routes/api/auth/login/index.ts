@@ -26,7 +26,12 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid credentials" }, { status: 401, headers: CORS_HEADERS });
 
   const session = await createSession(user.id);
-  return Response.json({ token: session.token, username: user.username }, { headers: CORS_HEADERS });
+  return Response.json({
+    token: session.token,
+    username: user.username,
+    userId: user.id,
+    role: user.role
+  }, { headers: CORS_HEADERS });
 }
 
 export function OPTIONS(): Response {

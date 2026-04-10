@@ -121,7 +121,7 @@ async function request<T>(
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export interface LoginResponse { token: string; username: string }
+export interface LoginResponse { token: string; username: string; userId: string; role: 'admin' | 'user' }
 
 export const api = {
   auth: {
