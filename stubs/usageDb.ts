@@ -410,6 +410,7 @@ export interface LeaderboardEntry {
 /**
  * Get per-user token usage leaderboard for a given period.
  * Aggregates usage across all API keys owned by each user.
+ * Uses LEFT JOIN to include API keys without associated users (shown as "System").
  */
 export function getLeaderboard(period: string): LeaderboardEntry[] {
   const db = getRawDb();
@@ -427,7 +428,9 @@ export function getLeaderboard(period: string): LeaderboardEntry[] {
     total_cost: number;
     request_count: number;
   }, []>(
-    `SELECT u.id as user_id, u.username, u.role,
+    `SELECT COALESCE(u.id, '00000000-0000-0000-0000-000000000000') as user_id,
+            COALESCE(u.username, 'System') as username,
+            COALESCE(u.role, 'user') as role,
             SUM(ul.prompt_tokens + ul.completion_tokens) AS total_tokens,
             SUM(ul.prompt_tokens) AS prompt_tokens,
             SUM(ul.completion_tokens) AS completion_tokens,
@@ -435,8 +438,8 @@ export function getLeaderboard(period: string): LeaderboardEntry[] {
             COALESCE(SUM(ul.cost), 0) AS total_cost,
             COUNT(*) AS request_count
      FROM usage_log ul
-     JOIN api_keys ak ON ul.api_key_id = ak.id
-     JOIN users u ON ak.user_id = u.id
+     LEFT JOIN api_keys ak ON ul.api_key_id = ak.id
+     LEFT JOIN users u ON ak.user_id = u.id
      WHERE ${baseFilter} AND ul.status != 'pending'
      GROUP BY u.id
      ORDER BY total_tokens DESC`
