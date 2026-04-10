@@ -2,7 +2,7 @@
 // Stores normalized pricing in KV and raw data in Redis for fuzzy matching.
 
 import { getRedisCache, setRedisCache } from "lib/redis.ts";
-import { getPricing, updatePricing } from "db/index.ts";
+import { getPricing, updatePricing, type PricingEntry } from "db/index.ts";
 import * as log from "lib/logger.ts";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -148,8 +148,8 @@ async function fetchOpenRouterModels(apiKey?: string): Promise<OpenRouterModel[]
  * Keys: full OpenRouter model ID (e.g., "anthropic/claude-sonnet-4-5")
  * Values: { input, output } in $/1M tokens
  */
-function buildPricingMap(models: OpenRouterModel[]): Record<string, Record<string, number>> {
-  const pricing: Record<string, Record<string, number>> = {};
+function buildPricingMap(models: OpenRouterModel[]): Record<string, PricingEntry> {
+  const pricing: Record<string, PricingEntry> = {};
 
   for (const model of models) {
     const inputPrice = parseFloat(model.pricing.prompt ?? "0") * 1_000_000;

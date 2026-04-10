@@ -10,7 +10,7 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { openDb, closeDb } from "./index.ts";
+import { openDb } from "./index.ts";
 
 const DATA_DIR = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
 const DB_PATH = join(DATA_DIR, "router.db");
@@ -284,7 +284,7 @@ async function main() {
         // Import provider nodes
         const nodes = (data.providerNodes as Array<Record<string, unknown>>) || [];
         for (const node of nodes) {
-          const exists = db.query("SELECT 1 FROM provider_nodes WHERE id = ?", [node.id]).get();
+          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM provider_nodes WHERE id = ?").get(node.id as string);
           if (!exists) {
             db.run(
               "INSERT INTO provider_nodes (id, type, name, prefix, api_type, base_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -306,12 +306,12 @@ async function main() {
         // Import proxy pools
         const pools = (data.proxyPools as Array<Record<string, unknown>>) || [];
         for (const pool of pools) {
-          const exists = db.query("SELECT 1 FROM proxy_pools WHERE id = ?", [pool.id]).get();
+          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM proxy_pools WHERE id = ?").get(pool.id as string);
           if (!exists) {
             db.run(
               `INSERT INTO proxy_pools (id, name, proxy_url, no_proxy, is_active, strict_proxy, test_status, last_tested_at, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
-                pool.id,
+                toStringOrNull(pool.id),
                 toStringOrNull(pool.name),
                 toStringOrNull(pool.proxyUrl),
                 toStringOrNull(pool.noProxy),
@@ -331,7 +331,7 @@ async function main() {
         // Import combos
         const combos = (data.combos as Array<{ name: string; models: string[]; id?: string }>) || [];
         for (const combo of combos) {
-          const exists = db.query("SELECT 1 FROM combos WHERE name = ?", [combo.name]).get();
+          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM combos WHERE name = ?").get(combo.name);
           if (!exists) {
             const id = combo.id || crypto.randomUUID();
             db.run(
@@ -416,7 +416,7 @@ async function main() {
           const [prefix, ...rest] = model.split("/");
           const alias = `${prefix}-${rest.join("-")}`;
 
-          const exists = db.query("SELECT 1 FROM model_aliases WHERE alias = ?", [alias]).get();
+          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM model_aliases WHERE alias = ?").get(alias);
           if (!exists) {
             console.log(`[FIX] Missing alias: ${alias} (for combo ${combo.name})`);
             // We can't auto-fix this without knowing the target provider/model
@@ -438,7 +438,6 @@ async function main() {
   }
 
   console.log("[FIX] Done!");
-  closeDb();
 }
 
 main().catch((err) => {
