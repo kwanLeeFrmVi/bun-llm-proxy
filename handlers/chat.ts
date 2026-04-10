@@ -9,20 +9,21 @@ import {
 } from "../services/auth.ts";
 import { checkAuth } from "../lib/authMiddleware.ts";
 import { cacheClaudeHeaders } from "../ai-bridge/utils/claudeHeaderCache.ts";
-import { getSettings, getAverageTTFT, recordComboTTFT, type ComboModelConfig } from "../db/index.ts";
+import { getSettings, getAverageTTFT, recordComboTTFT } from "../db/index.ts";
 import { getModelInfo, getComboModelConfigs } from "../services/model.ts";
 import { handleChatCore } from "../ai-bridge/handlers/chatCore.ts";
 import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts";
 import { HTTP_STATUS, TRANSIENT_RETRY, TRANSIENT_ERROR_STATUSES } from "../ai-bridge/config/runtimeConfig.ts";
 import { detectFormatByEndpoint } from "../ai-bridge/translator/formats.ts";
 import * as log from "../lib/logger.ts";
+import { RequestContext } from "../lib/requestContext.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
 import { getProjectIdForConnection } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
 import { detectFormat } from "../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 import { getProviderDisplayName } from "../lib/providers.ts";
-import { handleComboModel, resetAllComboState, getComboMetadata } from "../services/comboRouting.ts";
+import { handleComboModel, getComboMetadata } from "../services/comboRouting.ts";
 
 type ClientRawRequest = {
   endpoint: string;
@@ -38,11 +39,15 @@ export async function handleChat(
   request: Request,
   clientRawRequest: ClientRawRequest | null = null
 ): Promise<Response> {
+  // Create request context for log correlation
+  const ctx = RequestContext.create();
+  const startTime = Date.now();
+
   let body: Record<string, unknown>;
   try {
     body = await request.json() as Record<string, unknown>;
   } catch {
-    log.warn("CHAT", "Invalid JSON body");
+    log.warn(ctx, "CHAT", "Invalid JSON body");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body") as Response;
   }
 
@@ -62,9 +67,14 @@ export async function handleChat(
   const msgCount = (body.messages as unknown[] | undefined)?.length ?? (body.input as unknown[] | undefined)?.length ?? 0;
   const toolCount = (body.tools as unknown[] | undefined)?.length ?? 0;
   const effort = (body.reasoning_effort as string | undefined) ?? (body.reasoning as Record<string, unknown> | undefined)?.effort ?? null;
-  log.request("POST", `${url.pathname} | ${modelStr} | ${msgCount} msgs${toolCount ? ` | ${toolCount} tools` : ""}${effort ? ` | effort=${effort}` : ""}`);
 
-  const auth = await checkAuth(request);
+  // Build extra info for request log
+  const extraParts = [`model=${modelStr}`, `${msgCount} msgs`];
+  if (toolCount) extraParts.push(`${toolCount} tools`);
+  if (effort) extraParts.push(`effort=${effort}`);
+  log.requestStart(ctx, "POST", url.pathname, extraParts.join(" | "));
+
+  const auth = await checkAuth(request, ctx);
   if (!auth.ok) return auth.response;
   const apiKey = auth.apiKey;
   const apiKeyId = auth.apiKeyId;
@@ -72,7 +82,7 @@ export async function handleChat(
   const settings = await getSettings();
 
   if (!modelStr) {
-    log.warn("CHAT", "Missing model");
+    log.warn(ctx, "CHAT", "Missing model");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model") as Response;
   }
 
@@ -82,25 +92,25 @@ export async function handleChat(
     const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy ?? (settings.comboStrategy as string | undefined) ?? "fallback";
 
-    log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
+    log.info(ctx, "ROUTING", `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`);
     return handleComboModelWithDB({
+      ctx,
       body,
       models: comboModels,
       handleSingleModel: async (b: Record<string, unknown>, m: string) => {
-        const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey);
+        const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, ctx);
         if (resp.ok) {
-          log.info("COMBO", `Model ${m} succeeded`);
+          log.info(ctx, "COMBO", `Model ${m} succeeded`);
         }
         return resp;
       },
-      log,
       comboName: modelStr,
       comboStrategy,
       settings,
     });
   }
 
-  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, apiKeyId);
+  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, apiKeyId, ctx);
 }
 
 /**
@@ -112,7 +122,8 @@ async function handleSingleModelChat(
   clientRawRequest: ClientRawRequest | null = null,
   request: Request | null = null,
   apiKey: string | null = null,
-  apiKeyId: string | null = null
+  apiKeyId: string | null = null,
+  ctx: RequestContext
 ): Promise<Response> {
   const modelInfo = await getModelInfo(modelStr);
 
@@ -124,36 +135,36 @@ async function handleSingleModelChat(
       const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
       const comboStrategy = comboSpecificStrategy ?? (chatSettings.comboStrategy as string | undefined) ?? "fallback";
 
-      log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
+      log.info(ctx, "ROUTING", `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`);
       return handleComboModelWithDB({
+        ctx,
         body,
         models: comboModels,
         handleSingleModel: async (b: Record<string, unknown>, m: string) => {
-          const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId);
+          const resp = await handleSingleModelChat(b, m, clientRawRequest, request, apiKey, apiKeyId, ctx);
           if (resp.ok) {
-            log.info("COMBO", `Model ${m} succeeded`);
+            log.info(ctx, "COMBO", `Model ${m} succeeded`);
           }
           return resp;
         },
-        log,
         comboName: modelStr,
         comboStrategy,
         settings: chatSettings,
       });
     }
-    log.warn("CHAT", "Invalid model format", { model: modelStr });
+    log.warn(ctx, "CHAT", "Invalid model format", { model: modelStr });
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid model format") as Response;
   }
 
   const { provider, model } = modelInfo as { provider: string; model: string };
 
   if (modelStr !== `${provider}/${model}`) {
-    log.info("ROUTING", `${modelStr} → ${provider}/${model}`);
+    log.info(ctx, "ROUTING", `${modelStr} → ${provider}/${model}`);
   } else {
-    log.info("ROUTING", `Provider: ${provider}, Model: ${model}`);
+    log.info(ctx, "ROUTING", `Provider: ${provider}, Model: ${model}`);
   }
 
-  const requestId = crypto.randomUUID();
+  const requestId = ctx.id;
   const startTime = Date.now();
   trackPendingRequest(requestId, {
     endpoint: request?.url ? new URL(request.url).pathname : undefined,
@@ -161,7 +172,7 @@ async function handleSingleModelChat(
     model,
     apiKeyId: apiKeyId ?? undefined,
   });
-  await log.pending(provider, model);
+  await log.pending(ctx, provider, model);
 
   const userAgent = request?.headers?.get("user-agent") ?? "";
 
@@ -170,30 +181,30 @@ async function handleSingleModelChat(
   let lastStatus: number | null = null;
 
   while (true) {
-    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model);
+    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model, ctx);
 
     if (!credentials || (credentials as Record<string, unknown>).allRateLimited) {
       const creds = credentials as Record<string, unknown> | null;
       if (creds?.allRateLimited) {
         const errorMsg = lastError ?? (creds.lastError as string | undefined) ?? "Unavailable";
         const status = lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
-        log.warn("CHAT", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
+        log.warn(ctx, "CHAT", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
         appendRequestLog(requestId, "rate_limited");
         return unavailableResponse(status, `[${provider}/${model}] ${errorMsg}`, creds.retryAfter as string, creds.retryAfterHuman as string) as Response;
       }
       if (excludeConnectionIds.size === 0) {
-        log.warn("AUTH", `No active credentials for provider: ${provider}`);
+        log.warn(ctx, "AUTH", `No active credentials for provider: ${provider}`);
         appendRequestLog(requestId, "no_credentials");
         return errorResponse(HTTP_STATUS.NOT_FOUND, `No active credentials for provider: ${provider}`) as Response;
       }
-      log.warn("CHAT", "No more accounts available", { provider });
+      log.warn(ctx, "CHAT", "No more accounts available", { provider });
       appendRequestLog(requestId, "unavailable");
       return errorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable") as Response;
     }
 
     const creds = credentials as Record<string, unknown>;
     const providerName = await getProviderDisplayName(provider);
-    log.info("AUTH", `\x1b[32mUsing ${providerName} account: ${creds.connectionName}\x1b[0m`);
+    log.info(ctx, "AUTH", `Selected account: ${creds.connectionName}`);
 
     const refreshedCredentials = await checkAndRefreshToken(provider, creds);
 
@@ -211,17 +222,17 @@ async function handleSingleModelChat(
     const sourceFormat = detectFormat(body);
     const targetFormat = getTargetFormat(provider);
     const isPassthrough = sourceFormat === targetFormat;
-    log.formatDetect(sourceFormat, targetFormat, isStreaming);
+    log.formatDetect(ctx, sourceFormat, targetFormat, isStreaming);
     if (isPassthrough) {
-      log.passthrough(sourceFormat, targetFormat, "native lossless");
+      log.passthrough(ctx, sourceFormat, targetFormat, "native lossless");
     }
 
     // Build the request options once so we can reuse them in the retry loop
     const chatCoreOpts = {
+      ctx,
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },
       credentials: refreshedCredentials,
-      log,
       clientRawRequest: clientRawRequest ?? undefined,
       connectionId: creds.connectionId as string | undefined,
       userAgent,
@@ -236,7 +247,7 @@ async function handleSingleModelChat(
         });
       },
       onRequestSuccess: async () => {
-        await clearAccountError(creds.connectionId as string, creds, model);
+        await clearAccountError(creds.connectionId as string, creds, model, ctx);
       },
       onUsage: async (usage: { prompt_tokens?: number; completion_tokens?: number; reasoning_tokens?: number; cached_tokens?: number }) => {
         if (!isStreaming) {
@@ -253,7 +264,7 @@ async function handleSingleModelChat(
 
       if (result.success) {
         if (isStreaming) {
-          return wrapStreamingResponse(result.response!, requestId, provider, model, startTime);
+          return wrapStreamingResponse(result.response!, requestId, provider, model, startTime, ctx);
         }
         return result.response!;
       }
@@ -264,7 +275,7 @@ async function handleSingleModelChat(
       // Transient error with retries remaining — back off and retry
       if (attempt < TRANSIENT_RETRY.maxAttempts) {
         const delayMs = TRANSIENT_RETRY.baseDelayMs * (attempt + 1);
-        log.warn("CHAT", `Transient error ${result.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms...`);
+        log.warn(ctx, "CHAT", `Transient error ${result.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms...`);
         await Bun.sleep(delayMs);
       }
     }
@@ -276,11 +287,12 @@ async function handleSingleModelChat(
       finalResult.status,
       finalResult.error,
       provider,
-      model
+      model,
+      ctx
     );
 
     if (shouldFallback) {
-      log.warn("AUTH", `Account ${creds.connectionName} unavailable (${finalResult.status}), trying fallback`);
+      log.warn(ctx, "AUTH", `Account ${creds.connectionName} unavailable (${finalResult.status}), trying fallback`);
       excludeConnectionIds.add(creds.connectionId as string);
       lastError = finalResult.error;
       lastStatus = finalResult.status;
@@ -301,7 +313,8 @@ function wrapStreamingResponse(
   requestId: string,
   provider: string,
   model: string,
-  startTime: number
+  startTime: number,
+  ctx: RequestContext
 ): Response {
   if (!response.body) return response;
 
@@ -358,12 +371,12 @@ function wrapStreamingResponse(
           controller.enqueue(value);
         }
         const durationMs = Date.now() - startTime;
-        log.stream("COMPLETE", { provider, model, duration: `${durationMs}ms`, usage: finalUsage });
+        log.stream(ctx, "COMPLETE", { provider, model, usage: finalUsage });
         controller.close();
       } catch (err) {
         const durationMs = Date.now() - startTime;
         const errMsg = err instanceof Error ? err.message : String(err);
-        log.stream("ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
+        log.stream(ctx, "ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
         controller.error(err);
       } finally {
         reader.releaseLock();
@@ -373,6 +386,7 @@ function wrapStreamingResponse(
           provider,
           model,
         }, durationMs).catch(() => {});
+        RequestContext.delete(ctx.id);
       }
     },
   });
@@ -386,7 +400,7 @@ function wrapStreamingResponse(
 // ─── Combo model routing strategies ─────────────────────────────────────────────
 
 // Wrapper for handleComboModel that injects getAverageTTFT
-async function handleComboModelWithDB(opts: Parameters<typeof handleComboModel>[0]): Promise<Response> {
+async function handleComboModelWithDB(opts: Parameters<typeof handleComboModel>[0] & { ctx: RequestContext }): Promise<Response> {
   return handleComboModel({
     ...opts,
     getAverageTTFT,

@@ -14,6 +14,7 @@ import {
   getEarliestModelLockUntil,
 } from "../ai-bridge/services/auth.ts";
 import * as log from "../lib/logger.ts";
+import type { RequestContext } from "../lib/requestContext.ts";
 
 // Mutex to prevent race conditions during account selection
 let selectionMutex = Promise.resolve();
@@ -25,7 +26,8 @@ let selectionMutex = Promise.resolve();
 export async function getProviderCredentials(
   provider: string,
   excludeConnectionIds: Set<string> | string | null = null,
-  model: string | null = null
+  model: string | null = null,
+  ctx?: RequestContext
 ): Promise<Record<string, unknown> | null> {
   const excludeSet: Set<string> =
     excludeConnectionIds instanceof Set
@@ -45,10 +47,10 @@ export async function getProviderCredentials(
     const connections = await getProviderConnections({ provider: providerId, isActive: true });
     const providerName = await getProviderDisplayName(providerId);
 
-    log.info("AUTH", `${providerName} | total connections: ${connections.length}, excludeIds: ${excludeSet.size > 0 ? [...excludeSet].join(",") : "none"}, model: ${model ?? "any"}`);
+    log.info(ctx ?? null, "AUTH", `${providerName}: ${connections.length} total, ${excludeSet.size > 0 ? excludeSet.size + " excluded, " : ""}model: ${model ?? "any"}`);
 
     if (connections.length === 0) {
-      log.warn("AUTH", `No credentials for ${providerName}`);
+      log.warn(ctx ?? null, "AUTH", `No credentials for ${providerName}`);
       return null;
     }
 
@@ -58,13 +60,13 @@ export async function getProviderCredentials(
       return true;
     });
 
-    log.info("AUTH", `${providerName} | available: ${availableConnections.length}/${connections.length}`);
+    log.info(ctx ?? null, "AUTH", `${providerName}: ${availableConnections.length}/${connections.length} available`);
     connections.forEach((c: Record<string, unknown>) => {
       const excluded = excludeSet.has(c.id as string);
       const locked = isModelLockActive(c, model);
       if (excluded || locked) {
         const lockUntil = getEarliestModelLockUntil(c);
-        log.debug("AUTH", `  → ${(c.id as string)?.slice(0, 8)} | ${excluded ? "excluded" : ""} ${locked ? `modelLocked(${model}) until ${lockUntil}` : ""}`);
+        log.debug(ctx ?? null, "AUTH", `  → ${(c.id as string)?.slice(0, 8)} | ${excluded ? "excluded" : ""} ${locked ? `modelLocked(${model}) until ${lockUntil}` : ""}`);
       }
     });
 
@@ -74,7 +76,7 @@ export async function getProviderCredentials(
       const earliest = expiries.sort()[0] ?? null;
       if (earliest) {
         const earliestConn = lockedConns[0] as Record<string, unknown>;
-        log.warn("AUTH", `${providerName} | all ${connections.length} accounts locked for ${model ?? "all"} (${formatRetryAfter(earliest)}) | lastError=${(earliestConn?.lastError as string)?.slice(0, 50)}`);
+        log.warn(ctx ?? null, "AUTH", `${providerName} | all ${connections.length} accounts locked for ${model ?? "all"} (${formatRetryAfter(earliest)}) | lastError=${(earliestConn?.lastError as string)?.slice(0, 50)}`);
         return {
           allRateLimited: true,
           retryAfter: earliest,
@@ -83,7 +85,7 @@ export async function getProviderCredentials(
           lastErrorCode: earliestConn?.errorCode ?? null,
         };
       }
-      log.warn("AUTH", `${providerName} | all ${connections.length} accounts unavailable`);
+      log.warn(ctx ?? null, "AUTH", `${providerName} | all ${connections.length} accounts unavailable`);
       return null;
     }
 
@@ -174,7 +176,8 @@ export async function markAccountUnavailable(
   status: number,
   errorText: string,
   provider: string | null = null,
-  model: string | null = null
+  model: string | null = null,
+  ctx?: RequestContext
 ): Promise<{ shouldFallback: boolean; cooldownMs: number }> {
   const connections = await getProviderConnections({ provider: provider ?? undefined });
   const conn = connections.find((c: Record<string, unknown>) => c.id === connectionId);
@@ -197,7 +200,7 @@ export async function markAccountUnavailable(
 
   const lockKey = Object.keys(lockUpdate)[0] ?? "modelLock";
   const connName = (conn?.displayName ?? conn?.name ?? conn?.email ?? (connectionId as string).slice(0, 8)) as string;
-  log.warn("AUTH", `${connName} locked ${lockKey} for ${Math.round(cooldownMs / 1000)}s [${status}]`);
+  log.warn(ctx ?? null, "AUTH", `${connName} locked ${lockKey} for ${Math.round(cooldownMs / 1000)}s [${status}]`);
 
   if (provider && status && reason) {
     console.error(`❌ ${provider} [${status}]: ${reason}`);
@@ -212,7 +215,8 @@ export async function markAccountUnavailable(
 export async function clearAccountError(
   connectionId: string,
   currentConnection: Record<string, unknown>,
-  model: string | null = null
+  model: string | null = null,
+  ctx?: RequestContext
 ): Promise<void> {
   const conn = (currentConnection._connection ?? currentConnection) as Record<string, unknown>;
   const now = Date.now();
@@ -243,7 +247,7 @@ export async function clearAccountError(
 
   await updateProviderConnection(connectionId, clearObj);
   const connName = (conn?.displayName ?? conn?.name ?? conn?.email ?? (connectionId as string).slice(0, 8)) as string;
-  log.info("AUTH", `Account ${connName} cleared lock for model=${model ?? "__all"}`);
+  log.info(ctx ?? null, "AUTH", `Account ${connName} cleared lock for model=${model ?? "__all"}`);
 }
 
 /**

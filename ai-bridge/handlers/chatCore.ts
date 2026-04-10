@@ -6,17 +6,14 @@ import { HTTP_STATUS } from "../config/runtimeConfig.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "./provider.js";
 import { errorResponse } from "../utils/error.ts";
+import * as log from "../../lib/logger.ts";
+import type { RequestContext } from "../../lib/requestContext.ts";
 
 export interface ChatCoreOptions {
+  ctx?: RequestContext;
   body: Record<string, unknown>;
   modelInfo: { provider: string; model: string };
   credentials: Record<string, unknown>;
-  log?: {
-    debug?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    info?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    warn?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    error?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-  };
   clientRawRequest?: { endpoint: string; body: Record<string, unknown>; headers: Record<string, string> };
   connectionId?: string;
   userAgent?: string;
@@ -49,7 +46,7 @@ export interface ChatCoreResult {
 const STREAM_PROVIDERS = new Set(["openai", "codex"]);
 
 export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreResult> {
-  const { body, modelInfo, credentials, log, sourceFormatOverride } = opts;
+  const { body, modelInfo, credentials, ctx, sourceFormatOverride } = opts;
   const { provider, model } = modelInfo;
 
   // Detect source format
@@ -64,7 +61,7 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   const streamProvider = STREAM_PROVIDERS.has(provider);
   const stream = streamProvider ? true : (body.stream !== false);
 
-  log?.debug?.("CHAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
+  log.debug(ctx ?? null, "CHAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
 
   // Translate request body
   const bodyBytes = new TextEncoder().encode(JSON.stringify(body));
@@ -87,8 +84,9 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   // Calculate message count for upstream logging
   const messages = (body.messages as unknown[] | undefined)?.length ?? (body.input as unknown[] | undefined)?.length ?? 0;
 
-  log?.debug?.("CHAT", `${provider.toUpperCase()} → ${upstreamUrl}`);
-  log?.info?.("REQUEST", `${provider.toUpperCase()} | ${model} | ${messages} msgs`);
+  log.debug(ctx ?? null, "CHAT", `${provider.toUpperCase()} → ${upstreamUrl}`);
+  log.info(ctx ?? null, "REQUEST", `${provider.toUpperCase()} | ${model} | ${messages} msgs`);
+  log.upstream(ctx ?? null, "POST", upstreamUrl, `${messages} msgs`);
 
   // NVIDIA NIM models can be very slow — allow 5 minutes before timing out
   const TIMEOUT_MS = provider === "nvidia" ? 300_000 : 120_000;
@@ -154,11 +152,11 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     const msg = err instanceof Error ? err.message : String(err);
     // Detect abort (timeout) vs. other errors
     if (msg === "The operation was aborted" || msg === "aborted") {
-      log?.error?.("CHAT", `Request timed out after ${TIMEOUT_MS / 1000}s`);
+      log.error(ctx ?? null, "CHAT", `Request timed out after ${TIMEOUT_MS / 1000}s`);
       const timeoutMsg = `Request timed out after ${TIMEOUT_MS / 1000}s`;
       return { success: false, status: HTTP_STATUS.GATEWAY_TIMEOUT, error: timeoutMsg, response: errorResponse(HTTP_STATUS.GATEWAY_TIMEOUT, timeoutMsg) };
     }
-    log?.error?.("CHAT", `Upstream error: ${msg}`);
+    log.error(ctx ?? null, "CHAT", `Upstream error: ${msg}`);
     return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: msg, response: errorResponse(HTTP_STATUS.BAD_GATEWAY, msg) };
   } finally {
     clearTimeout(timeout);

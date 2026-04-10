@@ -3,6 +3,7 @@ import { extractApiKey, isValidApiKey } from "../services/auth.ts";
 import { errorResponse } from "../ai-bridge/utils/error.ts";
 import { HTTP_STATUS } from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "./logger.ts";
+import type { RequestContext } from "./requestContext.ts";
 
 export type AuthResult =
   | { ok: true; apiKey: string | null; apiKeyId: string | null }
@@ -12,7 +13,10 @@ export type AuthResult =
  * Validate the incoming API key against settings.requireApiKey.
  * Logs key identity when present. Returns an error Response if auth fails.
  */
-export async function checkAuth(request: Request): Promise<AuthResult> {
+export async function checkAuth(
+  request: Request,
+  ctx?: RequestContext
+): Promise<AuthResult> {
   const apiKey = extractApiKey(request);
 
   let apiKeyId: string | null = null;
@@ -20,20 +24,20 @@ export async function checkAuth(request: Request): Promise<AuthResult> {
     const keyRecord = await getApiKeyByKey(apiKey);
     apiKeyId = (keyRecord?.id as string | undefined) ?? null;
     const keyName = (keyRecord?.name as string | undefined) ?? "unnamed";
-    log.info("AUTH", `API Key: ${log.maskKey(apiKey)} (${keyName})`);
+    log.info(ctx ?? null, "AUTH", `API Key: ${log.maskKey(apiKey)} (${keyName})`);
   } else {
-    log.debug("AUTH", "No API key provided (local mode)");
+    log.debug(ctx ?? null, "AUTH", "No API key provided (local mode)");
   }
 
   const settings = await getSettings();
   if (settings.requireApiKey) {
     if (!apiKey) {
-      log.warn("AUTH", "Missing API key");
+      log.warn(ctx ?? null, "AUTH", "Missing API key");
       return { ok: false, response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key") as Response };
     }
     const valid = await isValidApiKey(apiKey);
     if (!valid) {
-      log.warn("AUTH", "Invalid API key");
+      log.warn(ctx ?? null, "AUTH", "Invalid API key");
       return { ok: false, response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key") as Response };
     }
   }

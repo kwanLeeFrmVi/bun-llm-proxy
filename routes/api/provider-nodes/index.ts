@@ -40,6 +40,19 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Prefix is required" }, { status: 400, headers: CORS_HEADERS });
   }
 
+  // Sanitize prefix: only alphanumeric, dashes, and underscores allowed
+  const sanitizedPrefix = (prefix as string).trim().replace(/[^a-zA-Z0-9-_]/g, "");
+  if (!sanitizedPrefix) {
+    return Response.json({ error: "Prefix must contain at least one alphanumeric character" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  // Check prefix uniqueness
+  const existingNodes = await getProviderNodes();
+  const existingNode = existingNodes.find((n) => n.prefix === sanitizedPrefix);
+  if (existingNode) {
+    return Response.json({ error: `Prefix "${sanitizedPrefix}" already exists` }, { status: 409, headers: CORS_HEADERS });
+  }
+
   const nodeType = (type as string) || "openai-compatible";
 
   if (nodeType === "openai-compatible") {
@@ -48,9 +61,9 @@ export async function POST(req: Request): Promise<Response> {
     }
     const resolvedType = (apiType as string) || "chat";
     const node = await createProviderNode({
-      id: `${OPENAI_COMPATIBLE_PREFIX}${resolvedType}-${Date.now()}`,
+      id: `${OPENAI_COMPATIBLE_PREFIX}${sanitizedPrefix}`,
       type: "openai-compatible",
-      prefix: (prefix as string).trim(),
+      prefix: sanitizedPrefix,
       apiType: resolvedType,
       baseUrl: ((baseUrl as string) || OPENAI_DEFAULT_BASE_URL).trim(),
       name: (name as string).trim(),
@@ -64,9 +77,9 @@ export async function POST(req: Request): Promise<Response> {
       cleanBaseUrl = cleanBaseUrl.slice(0, -9);
     }
     const node = await createProviderNode({
-      id: `${ANTHROPIC_COMPATIBLE_PREFIX}${Date.now()}`,
+      id: `${ANTHROPIC_COMPATIBLE_PREFIX}${sanitizedPrefix}`,
       type: "anthropic-compatible",
-      prefix: (prefix as string).trim(),
+      prefix: sanitizedPrefix,
       baseUrl: cleanBaseUrl,
       name: (name as string).trim(),
     });

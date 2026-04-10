@@ -1,17 +1,13 @@
 // Core embeddings handler — written from scratch in TypeScript.
 
 import { HTTP_STATUS } from "../config/runtimeConfig.ts";
+import type { RequestContext } from "../../lib/requestContext.ts";
 
 export interface EmbeddingsCoreOptions {
+  ctx?: RequestContext;
   body: Record<string, unknown>;
   modelInfo: { provider: string; model: string };
   credentials: Record<string, unknown>;
-  log?: {
-    debug?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    info?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    warn?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-    error?: (ctx: string, msg: string, data?: Record<string, unknown>) => void;
-  };
   onCredentialsRefreshed?: (creds: Record<string, unknown>) => Promise<void>;
   onRequestSuccess?: () => Promise<void>;
   onUsage?: (usage: {
@@ -28,7 +24,7 @@ export interface EmbeddingsCoreResult {
 }
 
 export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise<EmbeddingsCoreResult> {
-  const { body, modelInfo, credentials, log } = opts;
+  const { body, modelInfo, credentials, ctx } = opts;
   const { provider, model } = modelInfo;
 
   // ── Input validation ─────────────────────────────────────────────────────────
@@ -48,7 +44,10 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
     "Authorization": `Bearer ${credentials.apiKey ?? credentials.accessToken ?? ""}`,
   };
 
-  log?.debug?.("EMBED", `${provider} → ${upstreamUrl}`);
+  // Import logger dynamically to avoid circular dependency
+  const log = await import("../../lib/logger.ts");
+
+  log.debug(ctx ?? null, "EMBED", `${provider} → ${upstreamUrl}`);
 
   try {
     const upstream = await fetch(upstreamUrl, {
@@ -59,7 +58,7 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
 
     if (!upstream.ok) {
       const errorText = await upstream.text().catch(() => "");
-      log?.error?.("EMBED", `Upstream error ${upstream.status}: ${errorText}`);
+      log.error(ctx ?? null, "EMBED", `Upstream error ${upstream.status}: ${errorText}`);
       return { success: false, status: upstream.status, error: errorText };
     }
 
@@ -74,7 +73,7 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
         };
       }
     } catch {
-      log?.error?.("EMBED", "Provider response is not valid JSON");
+      log.error(ctx ?? null, "EMBED", "Provider response is not valid JSON");
       return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: "Provider response is not valid JSON" };
     }
     const response = new globalThis.Response(responseBody, {
@@ -87,7 +86,7 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
     return { success: true, response };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log?.error?.("EMBED", `Fetch error: ${msg}`);
+    log.error(ctx ?? null, "EMBED", `Fetch error: ${msg}`);
     return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: msg };
   }
 }
