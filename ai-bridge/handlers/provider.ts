@@ -62,6 +62,10 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     baseUrl: "https://aiplatform.googleapis.com",
     format: FORMATS.VERTEX,
   },
+  "vertex-partner": {
+    baseUrl: "https://aiplatform.googleapis.com",
+    format: FORMATS.VERTEX,
+  },
 
   // ── API Key providers ─────────────────────────────────────────────────────────────
   openai: {
@@ -322,7 +326,7 @@ export function buildUpstreamUrl(
   }
 
   // Handle streaming for Gemini formats
-  if (config.format === FORMATS.GEMINI || config.format === FORMATS.GEMINI_CLI) {
+  if (config.format === FORMATS.GEMINI || config.format === FORMATS.GEMINI_CLI || config.format === FORMATS.VERTEX) {
     const action = stream ? "streamGenerateContent" : "generateContent";
     return `${config.baseUrl ?? ""}/${model}:${action}`;
   }
@@ -397,6 +401,10 @@ export function buildUpstreamHeaders(
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
   } else if (ACCESS_TOKEN_ONLY_PROVIDERS.has(provider)) {
+    headers["Authorization"] = `Bearer ${accessToken ?? ""}`;
+  } else if (provider === "vertex" || provider === "vertex-partner") {
+    // Vertex providers use OAuth token from accessToken (minted from service account JSON)
+    // Prefer accessToken over apiKey since apiKey contains the raw service account JSON
     headers["Authorization"] = `Bearer ${accessToken ?? ""}`;
   } else {
     // Default: Bearer token with API key or access token

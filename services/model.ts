@@ -1,7 +1,7 @@
 // Model parsing, alias resolution, and combo handling.
 // Native TypeScript — no open-sse dependency.
 
-import { getModelAliases, getComboByName, getComboConfig, getProviderNodes, type ComboModelConfig } from "../db/index.ts";
+import { getModelAliases, getComboByName, getComboConfig, getProviderConnections, getProviderNodes, type ComboModelConfig } from "../db/index.ts";
 import {
   parseModel as _parseModel,
   resolveModelAliasFromMap,
@@ -9,6 +9,25 @@ import {
 } from "../ai-bridge/services/model.ts";
 
 export { parseModel as parseModel } from "../ai-bridge/services/model.ts";
+
+async function getStoredComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
+  const comboConfig = await getComboConfig(modelStr);
+  if (comboConfig && comboConfig.models.length > 0) {
+    return comboConfig.models;
+  }
+
+  const combo = await getComboByName(modelStr);
+  if (combo && combo.models && combo.models.length > 0) {
+    return combo.models.map(model => ({ model, weight: 1 }));
+  }
+
+  return null;
+}
+
+async function getActiveProviderIds(): Promise<Set<string>> {
+  const connections = await getProviderConnections({ isActive: true });
+  return new Set(connections.map(connection => connection.provider));
+}
 
 /**
  * Resolve model alias from DB
@@ -63,24 +82,47 @@ export async function getComboModels(modelStr: string): Promise<string[] | null>
 }
 
 /**
- * Get combo model configs with weights.
+ * Get combo model configs with weights (pure lookup, no availability filtering).
  * Returns array of {model, weight} or null if not a combo.
  * Falls back to legacy string array (weight=1 for all).
  */
 export async function getComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
   if (modelStr.includes("/")) return null;
+  return getStoredComboModelConfigs(modelStr);
+}
 
-  // Try extended config first
-  const comboConfig = await getComboConfig(modelStr);
-  if (comboConfig && comboConfig.models.length > 0) {
-    return comboConfig.models;
+/**
+ * Get combo model configs filtered to only models whose providers have
+ * at least one active connection. Returns null if the name is not a combo
+ * or if no models have an active provider.
+ */
+export async function getAvailableComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
+  if (modelStr.includes("/")) return null;
+
+  const comboModels = await getStoredComboModelConfigs(modelStr);
+  if (!comboModels) {
+    return null;
   }
 
-  // Fallback to legacy string array
-  const models = await getComboModels(modelStr);
-  if (models) {
-    return models.map(model => ({ model, weight: 1 }));
+  const activeProviderIds = await getActiveProviderIds();
+  if (activeProviderIds.size === 0) {
+    return null;
   }
 
-  return null;
+  const filteredModels = await Promise.all(
+    comboModels.map(async comboModel => {
+      try {
+        const modelInfo = await getModelInfo(comboModel.model);
+        if (!modelInfo.provider || !activeProviderIds.has(modelInfo.provider)) {
+          return null;
+        }
+        return comboModel;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const result = filteredModels.filter((comboModel): comboModel is ComboModelConfig => comboModel !== null);
+  return result.length > 0 ? result : null;
 }

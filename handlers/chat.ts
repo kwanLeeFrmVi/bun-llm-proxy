@@ -324,12 +324,18 @@ function wrapStreamingResponse(
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.usage && typeof data.usage === 'object') {
+                // Read usage from top-level (OpenAI/Gemini) or nested in message (Claude message_start)
+                const usageSource = (data.usage && typeof data.usage === 'object')
+                  ? data.usage
+                  : (data.message?.usage && typeof data.message.usage === 'object')
+                    ? data.message.usage
+                    : null;
+                if (usageSource) {
                   finalUsage = {
-                    prompt_tokens: (data.usage.prompt_tokens ?? data.usage.input_tokens) ?? 0,
-                    completion_tokens: (data.usage.completion_tokens ?? data.usage.output_tokens) ?? 0,
-                    reasoning_tokens: (data.usage.reasoning_tokens ?? data.usage.thinking_tokens) ?? 0,
-                    cached_tokens: data.usage.prompt_tokens_details?.cached_tokens ?? 0,
+                    prompt_tokens: (usageSource.prompt_tokens ?? usageSource.input_tokens) ?? 0,
+                    completion_tokens: (usageSource.completion_tokens ?? usageSource.output_tokens) ?? 0,
+                    reasoning_tokens: (usageSource.reasoning_tokens ?? usageSource.thinking_tokens) ?? 0,
+                    cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
                   };
                 }
               } catch { /* skip non-JSON SSE lines */ }
@@ -338,8 +344,13 @@ function wrapStreamingResponse(
 
           controller.enqueue(value);
         }
+        const durationMs = Date.now() - startTime;
+        log.stream("COMPLETE", { provider, model, duration: `${durationMs}ms`, usage: finalUsage });
         controller.close();
       } catch (err) {
+        const durationMs = Date.now() - startTime;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.stream("ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
         controller.error(err);
       } finally {
         reader.releaseLock();

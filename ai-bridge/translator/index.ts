@@ -73,10 +73,54 @@ function register(
 function identity(_modelName: string, raw: Uint8Array): Uint8Array {
   return raw;
 }
+
+function normalizeClaudeStreamingUsage(raw: Uint8Array): Uint8Array {
+  try {
+    const text = new TextDecoder().decode(raw);
+    if (!text.startsWith("event:")) return raw;
+
+    const lines = text.split("\n");
+    const dataLineIndex = lines.findIndex((line) => line.startsWith("data: "));
+    if (dataLineIndex === -1) return raw;
+
+    const dataLine = lines[dataLineIndex];
+    if (!dataLine) return raw;
+
+    const parsed = JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
+
+    if (parsed.type === "message_delta" && (parsed.usage === undefined || parsed.usage === null)) {
+      lines[dataLineIndex] = `data: ${JSON.stringify({
+        ...parsed,
+        usage: { input_tokens: 0, output_tokens: 0 },
+      })}`;
+      return new TextEncoder().encode(lines.join("\n"));
+    }
+
+    if (parsed.type === "message_start") {
+      const message = parsed.message as Record<string, unknown> | undefined;
+      if (message && (message.usage === undefined || message.usage === null)) {
+        lines[dataLineIndex] = `data: ${JSON.stringify({
+          ...parsed,
+          message: {
+            ...message,
+            usage: { input_tokens: 0, output_tokens: 0 },
+          },
+        })}`;
+        return new TextEncoder().encode(lines.join("\n"));
+      }
+    }
+  } catch {
+    return raw;
+  }
+
+  return raw;
+}
+
 function identityResponse(_ctx: unknown, _m: string, _o: Uint8Array, _r: Uint8Array, raw: Uint8Array): Uint8Array[] {
   // For streaming, pass through as-is but ensure usage data is added if present
-  return [raw];
+  return [normalizeClaudeStreamingUsage(raw)];
 }
+
 function identityResponseNS(_ctx: unknown, _m: string, _o: Uint8Array, _r: Uint8Array, raw: Uint8Array): Uint8Array {
   // For non-streaming, ensure usage field exists with defaults if missing
   try {
@@ -85,6 +129,10 @@ function identityResponseNS(_ctx: unknown, _m: string, _o: Uint8Array, _r: Uint8
     // Only add usage to responses that have choices (valid chat completions)
     if (parsed.choices && Array.isArray(parsed.choices) && !parsed.usage) {
       parsed.usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+      return new TextEncoder().encode(JSON.stringify(parsed));
+    }
+    if (parsed.type === "message" && !parsed.usage) {
+      parsed.usage = { input_tokens: 0, output_tokens: 0 };
       return new TextEncoder().encode(JSON.stringify(parsed));
     }
   } catch {

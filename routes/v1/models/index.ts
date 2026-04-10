@@ -2,6 +2,7 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "ai-bridge/config/providerModels.ts";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/providers.ts";
 import { getProviderConnections, getCombos, getAllProviderEnabledModels, type Combo } from "db/index.ts";
+import { getAvailableComboModelConfigs } from "services/model.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
 import { parseOpenAIStyleModels, extractModelIds, normalizeBaseUrl } from "lib/utils.ts";
@@ -112,17 +113,22 @@ export async function GET(_req: Request): Promise<Response> {
     const timestamp = Math.floor(Date.now() / 1000);
 
     for (const combo of combos) {
-      models.push({
-        id: combo.name,
-        object: "model",
-        created: timestamp,
-        owned_by: "combo",
-        permission: [],
-        root: combo.name,
-        parent: null,
-        combo_id: combo.id,
-        combo_models: combo.models ?? [],
-      });
+      const filteredComboModels = await getAvailableComboModelConfigs(combo.name);
+      const comboModelIds = filteredComboModels?.map(m => m.model) ?? [];
+      // Only include combo if it has at least one available model
+      if (comboModelIds.length > 0) {
+        models.push({
+          id: combo.name,
+          object: "model",
+          created: timestamp,
+          owned_by: "combo",
+          permission: [],
+          root: combo.name,
+          parent: null,
+          combo_id: combo.id,
+          combo_models: comboModelIds,
+        });
+      }
     }
 
     if (connections.length === 0) {
