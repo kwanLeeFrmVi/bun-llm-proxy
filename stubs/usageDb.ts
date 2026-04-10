@@ -304,12 +304,12 @@ export function getUsageStats(period: string): UsageStats {
 
   const byProvider = db().query<{ provider: string; requests: number; cost: number; tokens: number }, []>(
     `SELECT provider, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
-     FROM usage_log WHERE ${baseFilter} AND provider IS NOT NULL GROUP BY provider ORDER BY cost DESC`
+     FROM usage_log WHERE ${baseFilter} AND provider IS NOT NULL GROUP BY provider ORDER BY tokens DESC`
   ).all();
 
   const byModel = db().query<{ model: string; requests: number; cost: number; tokens: number }, []>(
     `SELECT model, COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
-     FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL GROUP BY model ORDER BY cost DESC`
+     FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL GROUP BY model ORDER BY tokens DESC`
   ).all();
 
   const byApiKeyRaw = db().query<{ api_key_id: string; requests: number; cost: number }, []>(

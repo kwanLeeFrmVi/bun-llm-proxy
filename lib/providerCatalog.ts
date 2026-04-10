@@ -117,10 +117,31 @@ export const ALL_PROVIDERS: Record<string, ProviderMeta> = {
 export const PROVIDER_CONFIGS: Record<string, ProviderMeta> = ALL_PROVIDERS;
 
 export function getProviderConfig(providerId: string): ProviderMeta {
-  return ALL_PROVIDERS[providerId] ?? ALL_PROVIDERS[providerId.toLowerCase()] ?? {
+  // Check static catalog first
+  const staticConfig = ALL_PROVIDERS[providerId] ?? ALL_PROVIDERS[providerId.toLowerCase()];
+  if (staticConfig) return staticConfig;
+
+  // Handle custom compatible providers
+  if (isAnthropicCompatibleProvider(providerId)) {
+    return {
+      color: "#D97757",
+      textIcon: "AC",
+      name: "Anthropic Compatible",
+    };
+  }
+  if (isOpenAICompatibleProvider(providerId)) {
+    return {
+      color: "#10A37F",
+      textIcon: "OC",
+      name: "OpenAI Compatible",
+    };
+  }
+
+  // Fallback for truly unknown providers
+  return {
     color: "#6B7280",
     textIcon: "??",
-    name: "Unknown",
+    name: providerId,
   };
 }
 

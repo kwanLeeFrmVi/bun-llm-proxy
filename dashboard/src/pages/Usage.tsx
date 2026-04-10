@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api.ts";
 import type { UsageStats, UsageRecord, ApiKeyRecord } from "@/lib/types.ts";
+import type { ProviderNode } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +34,14 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  BarController,
+  Tooltip,
+  Legend,
+);
 
 const PERIODS = ["24h", "7d", "30d", "all"] as const;
 type Period = (typeof PERIODS)[number];
@@ -76,7 +84,7 @@ function BreakdownChart({
   rows: BreakdownRow[];
   view: ViewOption;
 }) {
-  const top = rows.slice(0, 10);
+  const top = rows.slice(0, 10).reverse();
   if (top.length === 0) return null;
 
   const isApiKey = view === "apikey";
@@ -200,11 +208,13 @@ function OverviewTab({
   stats,
   recentRows,
   apiKeyMap,
+  nodes,
 }: {
   period: Period;
   stats: UsageStats;
   recentRows: UsageRecord[];
   apiKeyMap: Map<string, string>;
+  nodes: ProviderNode[];
 }) {
   const s = stats;
   const [view, setView] = useState<ViewOption>("model");
@@ -304,6 +314,7 @@ function OverviewTab({
           <ProviderTopology
             providers={stats.byProvider}
             lastProvider={recentRows[0]?.provider}
+            nodes={nodes}
           />
         </div>
 
@@ -817,6 +828,7 @@ export default function Usage() {
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [recentRows, setRecentRows] = useState<UsageRecord[]>([]);
   const [apiKeyMap, setApiKeyMap] = useState<Map<string, string>>(new Map());
+  const [nodes, setNodes] = useState<ProviderNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const esRef = useRef<EventSource | null>(null);
@@ -859,6 +871,15 @@ export default function Usage() {
     }
   }, []);
 
+  const loadNodes = useCallback(async () => {
+    try {
+      const data = (await api.providers.nodes()) as { nodes: ProviderNode[] };
+      setNodes(data.nodes ?? []);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
     loadStats(period);
     const id = setInterval(() => loadStats(period), 30_000);
@@ -868,7 +889,8 @@ export default function Usage() {
   useEffect(() => {
     loadRecent();
     loadApiKeys();
-  }, [loadRecent, loadApiKeys]);
+    loadNodes();
+  }, [loadRecent, loadApiKeys, loadNodes]);
 
   useEffect(() => {
     const es = new EventSource("/api/usage/stream");
@@ -946,6 +968,7 @@ export default function Usage() {
               stats={stats}
               recentRows={recentRows}
               apiKeyMap={apiKeyMap}
+              nodes={nodes}
             />
           ) : null}
         </TabsContent>
