@@ -8,6 +8,7 @@ import ProviderDetail from "@/pages/ProviderDetail";
 import ApiKeys from "@/pages/ApiKeys";
 import Usage from "@/pages/Usage";
 import MavisUsage from "@/pages/MavisUsage";
+import ZaiUsage from "@/pages/ZaiUsage";
 import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
@@ -99,6 +100,7 @@ function ProtectedLayout() {
             <Route path='/usage' element={<Usage />} />
             <Route path='/leaderboard' element={<Leaderboard />} />
             <Route path='/mavis-usage' element={<MavisUsage />} />
+            <Route path='/zai-usage' element={<ZaiUsage />} />
             <Route path='/prox-usage' element={<ProxUsage />} />
             <Route path='/logs' element={<Logs />} />
             <Route path='/models' element={<Models />} />

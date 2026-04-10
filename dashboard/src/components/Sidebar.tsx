@@ -12,6 +12,7 @@ import {
   Cloud,
   Zap,
   Trophy,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: "/models", label: "Models", Icon: Box },
     { to: "/usage", label: "Usage", Icon: BarChart2 },
     { to: "/mavis-usage", label: "Mavis", Icon: Cloud },
+    { to: "/zai-usage", label: "ZAI", Icon: Sparkles },
     { to: "/prox-usage", label: "Pro-X", Icon: Zap },
     { to: "/logs", label: "Console", Icon: Terminal },
     ...(isAdmin ? [{ to: "/users", label: "Users", Icon: Users }] : []),

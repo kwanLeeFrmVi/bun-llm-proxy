@@ -259,6 +259,19 @@ export const api = {
     remove:  (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
 
+  // ─── ZAI (upstream api.z.ai) ───────────────────────────────────────────────
+  zai: {
+    getQuota: () => request<import("./zaiTypes.ts").ZaiQuotaResponse>("/api/zai/quota"),
+    getPerformance: (start: string, end: string) =>
+      request<import("./zaiTypes.ts").ZaiPerformanceResponse>(
+        `/api/zai/performance?startTime=${encodeURIComponent(start)}&endTime=${encodeURIComponent(end)}`
+      ),
+    getUsage: (start: string, end: string) =>
+      request<import("./zaiTypes.ts").ZaiUsageResponse>(
+        `/api/zai/usage?startTime=${encodeURIComponent(start)}&endTime=${encodeURIComponent(end)}`
+      ),
+  },
+
   // ─── Pro-X (upstream pro-x.io.vn) ───────────────────────────────────────
   prox: {
     listKeys:  () => request<{ keys: { id: string; maskedName: string }[] }>("/api/prox/keys"),
