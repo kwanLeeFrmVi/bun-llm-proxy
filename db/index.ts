@@ -497,7 +497,7 @@ export async function createProviderConnection(
       toStringOrNull(data.expiresAt),
       toStringOrNull(data.projectId),
       toInt(data.priority, 1),
-      toBool(data.isActive) ? 1 : 0,
+      data.isActive === undefined ? 1 : (toBool(data.isActive) ? 1 : 0),
       toStringOrNull(data.testStatus) ?? "unknown",
       toStringOrNull(data.lastError),
       toIntOrNull(data.errorCode),
@@ -578,9 +578,9 @@ export async function updateProviderConnection(
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
-  // Use columnFields from above (already declared)
-
+  // Process column fields, excluding providerSpecificData (handled separately below)
   for (const field of columnFields) {
+    if (field === "providerSpecificData") continue; // Skip - handled separately
     if (field in data) {
       updates.push(`${camelToSnake(field)} = ?`);
       params.push(
@@ -596,7 +596,7 @@ export async function updateProviderConnection(
     }
   }
 
-  // Always update provider_specific_data if changed
+  // Always update provider_specific_data (merged with model locks and other dynamic fields)
   updates.push("provider_specific_data = ?");
   params.push(
     Object.keys(mergedPsd).length > 0 ? JSON.stringify(mergedPsd) : null

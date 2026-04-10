@@ -1,4 +1,4 @@
-// GET /api/pricing — return current pricing data from KV store
+// GET /api/pricing — return current pricing data from pricing table
 import { getPricing } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
