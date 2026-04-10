@@ -6,6 +6,15 @@ const rrStateMap = new Map<string, { index: number; stickyCount: number }>();
 // Per-combo speed state: model, count
 const speedStateMap = new Map<string, { model: string; count: number }>();
 
+// Symbol to attach combo metadata to Response (private, non-enumerable)
+const COMBO_METADATA = Symbol.for("comboMetadata");
+
+export interface ComboMetadata {
+  comboName: string;
+  selectedModel: string;
+  startTime: number;
+}
+
 export interface ComboModelConfig {
   model: string;
   weight: number;
@@ -20,6 +29,19 @@ export interface ComboOptions {
   comboStrategy: string;
   settings: Record<string, unknown>;
   getAverageTTFT?: (comboName: string, model: string, sampleCount?: number) => Promise<number | null>;
+}
+
+function attachComboMetadata(resp: Response, comboName: string, selectedModel: string): Response {
+  (resp as unknown as { [COMBO_METADATA]?: ComboMetadata })[COMBO_METADATA] = {
+    comboName,
+    selectedModel,
+    startTime: Date.now(),
+  };
+  return resp;
+}
+
+export function getComboMetadata(resp: Response): ComboMetadata | undefined {
+  return (resp as unknown as { [COMBO_METADATA]?: ComboMetadata })[COMBO_METADATA];
 }
 
 /**
@@ -42,7 +64,8 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       rrStateMap.set(comboName, rrState);
       const selectedModel = models[rrState.index % models.length]!.model;
       log.info("COMBO", `Round-robin: using ${selectedModel} (index ${rrState.index}, sticky ${rrState.stickyCount}/${stickyLimit})`);
-      return await handleSingleModel(body, selectedModel);
+      const resp = await handleSingleModel(body, selectedModel);
+      return attachComboMetadata(resp, comboName, selectedModel);
     }
 
     // advance to next model
@@ -51,7 +74,8 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     rrStateMap.set(comboName, rrState);
     const selectedModel = models[rrState.index]!.model;
     log.info("COMBO", `Round-robin: advanced to ${selectedModel} (index ${rrState.index}, sticky 1/${stickyLimit})`);
-    return await handleSingleModel(body, selectedModel);
+    const resp = await handleSingleModel(body, selectedModel);
+    return attachComboMetadata(resp, comboName, selectedModel);
   }
 
   if (comboStrategy === "weight") {
@@ -85,7 +109,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         const resp = await handleSingleModel(body, m.model);
         if (resp.ok) {
           log.info("COMBO", `Weight: model ${m.model} succeeded`);
-          return resp;
+          return attachComboMetadata(resp, comboName, m.model);
         }
         lastError = `Model ${m.model} returned status ${resp.status}`;
       } catch (e) {
@@ -101,9 +125,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
 
   if (comboStrategy === "speed") {
     if (!getAverageTTFT) {
-      // Fallback to original order if no TTFT function provided
+      // Fallback to first model if no TTFT function provided
       const selectedModel = models[0]!.model;
-      return await handleSingleModel(body, selectedModel);
+      const resp = await handleSingleModel(body, selectedModel);
+      return attachComboMetadata(resp, comboName, selectedModel);
     }
 
     const stickyLimit = ((settings.comboStrategies as Record<string, Record<string, unknown>> | undefined)?.[comboName]?.stickySpeedLimit as number | undefined)
@@ -114,7 +139,8 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       state.count++;
       speedStateMap.set(comboName, state);
       log.info("COMBO", `Speed: using ${state.model} (sticky ${state.count}/${stickyLimit})`);
-      return await handleSingleModel(body, state.model);
+      const resp = await handleSingleModel(body, state.model);
+      return attachComboMetadata(resp, comboName, state.model);
     }
 
     // re-evaluate: pick model with lowest avg TTFT
@@ -130,7 +156,8 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     const fastest = modelSpeeds[0]!;
     speedStateMap.set(comboName, { model: fastest.model, count: 1 });
     log.info("COMBO", `Speed: selected ${fastest.model} (avg TTFT: ${fastest.avgMs ?? "no data"}ms)`);
-    return await handleSingleModel(body, fastest.model);
+    const resp = await handleSingleModel(body, fastest.model);
+    return attachComboMetadata(resp, comboName, fastest.model);
   }
 
   // fallback (default): try each model in order
@@ -142,7 +169,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       const resp = await handleSingleModel(body, m.model);
       if (resp.ok) {
         log.info("COMBO", `Fallback: model ${m.model} succeeded`);
-        return resp;
+        return attachComboMetadata(resp, comboName, m.model);
       }
       lastError = `Model ${m.model} returned status ${resp.status}`;
     } catch (e) {

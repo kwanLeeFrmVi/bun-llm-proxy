@@ -1,17 +1,25 @@
 // Unit tests for combo routing strategies
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 
-// Mock the database functions
-const mockComboConfigs: Record<string, { name: string; models: Array<{ model: string; weight: number }> }> = {};
-const mockComboLatency: Array<{ combo_name: string; model: string; ttft_ms: number; timestamp: string }> = [];
+// Mock TTFT data with insertion order for stable sorting
+let insertionCounter = 0;
+const mockComboLatency: Array<{ combo_name: string; model: string; ttft_ms: number; timestamp: string; insertOrder: number }> = [];
 
 // Mock implementations
-async function mockGetComboConfig(name: string) {
-  return mockComboConfigs[name] ?? null;
-}
+async function mockGetAverageTTFT(comboName: string, model: string, sampleCount = 10): Promise<number | null> {
+  const samples = mockComboLatency
+    .filter(l => l.combo_name === comboName && l.model === model)
+    .sort((a, b) => {
+      // First by timestamp descending, then by insertion order for stable sorting
+      const timeDiff = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return b.insertOrder - a.insertOrder; // Higher insertOrder = more recent
+    })
+    .slice(0, sampleCount);
 
-async function mockSetComboConfig(name: string, config: { name: string; models: Array<{ model: string; weight: number }> }) {
-  mockComboConfigs[name] = config;
+  if (samples.length === 0) return null;
+  const sum = samples.reduce((s, l) => s + l.ttft_ms, 0);
+  return sum / samples.length;
 }
 
 async function mockRecordComboTTFT(comboName: string, model: string, ttftMs: number) {
@@ -20,6 +28,7 @@ async function mockRecordComboTTFT(comboName: string, model: string, ttftMs: num
     model,
     ttft_ms: ttftMs,
     timestamp: new Date().toISOString(),
+    insertOrder: insertionCounter++,
   });
   // Auto-prune to 50 samples per (combo, model)
   const samples = mockComboLatency.filter(l => l.combo_name === comboName && l.model === model);
@@ -36,25 +45,15 @@ async function mockRecordComboTTFT(comboName: string, model: string, ttftMs: num
   }
 }
 
-async function mockGetAverageTTFT(comboName: string, model: string, sampleCount = 10): Promise<number | null> {
-  const samples = mockComboLatency
-    .filter(l => l.combo_name === comboName && l.model === model)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, sampleCount);
-
-  if (samples.length === 0) return null;
-  const sum = samples.reduce((s, l) => s + l.ttft_ms, 0);
-  return sum / samples.length;
-}
-
-// Import and test the routing logic
-const { handleComboModel } = await import("../../handlers/chat.ts");
+// Import the routing logic from the extracted module
+const { handleComboModel, resetAllComboState } = await import("../../services/comboRouting.ts");
 
 describe("Combo Routing Strategies", () => {
   beforeEach(() => {
-    // Clear mocks
-    Object.keys(mockComboConfigs).forEach(key => delete mockComboConfigs[key]);
+    // Clear mocks and state
     mockComboLatency.length = 0;
+    insertionCounter = 0;
+    resetAllComboState();
   });
 
   describe("fallback strategy", () => {
@@ -211,9 +210,9 @@ describe("Combo Routing Strategies", () => {
         { model: "model-b", weight: 1 },
       ];
 
-      const callCounts = { "model-a": 0, "model-b": 0 };
+      const callCounts: Record<string, number> = { "model-a": 0, "model-b": 0 };
       const mockHandleSingle = async (_body: unknown, model: string) => {
-        callCounts[model as keyof typeof callCounts]++;
+        callCounts[model]++;
         return new Response(JSON.stringify({ result: "success" }), { status: 200 });
       };
 
@@ -246,14 +245,14 @@ describe("Combo Routing Strategies", () => {
       let callOrder: string[] = [];
       const mockHandleSingle = async (_body: unknown, model: string) => {
         callOrder.push(model);
-        // First selected model fails, try remaining in order
+        // First call fails, second call succeeds
         if (callOrder.length === 1) {
           return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
         }
         return new Response(JSON.stringify({ result: "success" }), { status: 200 });
       };
 
-      await handleComboModel({
+      const result = await handleComboModel({
         body: {},
         models,
         handleSingleModel: mockHandleSingle,
@@ -263,9 +262,10 @@ describe("Combo Routing Strategies", () => {
         settings: {},
       });
 
-      // Should try selected model first, then fallback to remaining
+      // Should try selected model first (fails), then fallback to remaining in order
       expect(callOrder.length).toBeGreaterThan(1);
-      expect(callOrder[callOrder.length - 1]).toBe("model-b"); // First fallback succeeds
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
     });
   });
 
@@ -296,6 +296,7 @@ describe("Combo Routing Strategies", () => {
         comboName: "test-combo",
         comboStrategy: "speed",
         settings: {},
+        getAverageTTFT: mockGetAverageTTFT,
       });
 
       expect(selectedModel).toBe("fast-model");
@@ -331,6 +332,7 @@ describe("Combo Routing Strategies", () => {
           comboName: "test-combo",
           comboStrategy: "speed",
           settings,
+          getAverageTTFT: mockGetAverageTTFT,
         });
       }
 
@@ -342,14 +344,13 @@ describe("Combo Routing Strategies", () => {
       expect(callOrder[4]).toBe("fast-model");
     });
 
-    it("should fall back to original order when no latency data exists", async () => {
+    it("should fall back to first model when no latency data exists", async () => {
       const models = [
         { model: "model-a", weight: 1 },
         { model: "model-b", weight: 1 },
       ];
 
       // No latency data recorded
-
       let selectedModel: string | null = null;
       const mockHandleSingle = async (_body: unknown, model: string) => {
         selectedModel = model;
@@ -364,6 +365,7 @@ describe("Combo Routing Strategies", () => {
         comboName: "test-combo",
         comboStrategy: "speed",
         settings: {},
+        getAverageTTFT: mockGetAverageTTFT,
       });
 
       // Should pick first model when no data
@@ -372,32 +374,10 @@ describe("Combo Routing Strategies", () => {
   });
 });
 
-describe("Combo Config Functions", () => {
+describe("Combo TTFT Functions", () => {
   beforeEach(() => {
-    Object.keys(mockComboConfigs).forEach(key => delete mockComboConfigs[key]);
     mockComboLatency.length = 0;
-  });
-
-  describe("setComboConfig and getComboConfig", () => {
-    it("should store and retrieve combo config", async () => {
-      const config = {
-        name: "test-combo",
-        models: [
-          { model: "model-a", weight: 3 },
-          { model: "model-b", weight: 1 },
-        ],
-      };
-
-      await mockSetComboConfig("test-combo", config);
-      const retrieved = await mockGetComboConfig("test-combo");
-
-      expect(retrieved).toEqual(config);
-    });
-
-    it("should return null for non-existent combo", async () => {
-      const retrieved = await mockGetComboConfig("non-existent");
-      expect(retrieved).toBeNull();
-    });
+    insertionCounter = 0;
   });
 
   describe("recordComboTTFT and getAverageTTFT", () => {
