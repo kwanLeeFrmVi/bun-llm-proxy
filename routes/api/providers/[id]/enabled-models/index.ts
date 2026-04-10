@@ -66,7 +66,10 @@ export async function POST(req: Request): Promise<Response> {
   const currentModels = await getProviderEnabledModels(id);
 
   if (currentModels.includes(modelId)) {
-    return Response.json({ provider: id, models: currentModels, message: "Model already exists" }, { headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Model already exists in this provider" },
+      { status: 409, headers: CORS_HEADERS }
+    );
   }
 
   const models = await updateProviderEnabledModels(id, [...currentModels, modelId]);

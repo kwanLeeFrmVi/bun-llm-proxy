@@ -466,6 +466,20 @@ export default function ProviderDetail() {
   }
 
   async function handleAddModel(modelId: string) {
+    // Check for duplicate on client-side first
+    const normalizedModelId = normalizeModelId(modelId, [providerPrefix, decodedId]);
+    const existsInCustom = customModels.some(
+      (m) => normalizeModelId(m, [providerPrefix, decodedId]) === normalizedModelId
+    );
+    const existsInPredefined = predefinedModels.some(
+      (m) => normalizeModelId(m.id, [providerPrefix, decodedId]) === normalizedModelId
+    );
+
+    if (existsInCustom || existsInPredefined) {
+      toast.error("Model already exists in this provider");
+      return;
+    }
+
     // Update local state immediately for responsiveness
     setCustomModels((prev) => [...prev, modelId]);
 
@@ -474,7 +488,12 @@ export default function ProviderDetail() {
       await api.providers.addEnabledModel(decodedId, modelId);
     } catch (e) {
       console.error("Failed to persist model to database:", e);
-      toast.error("Model added locally but failed to sync to database");
+      // Check if it's a conflict error (duplicate)
+      if (e instanceof Error && e.message.includes("already exists")) {
+        toast.error("Model already exists in this provider");
+      } else {
+        toast.error("Failed to add model");
+      }
       await fetchPredefinedModels();
       setShowAddModel(false);
       return;
