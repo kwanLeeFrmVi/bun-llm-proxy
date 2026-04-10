@@ -311,19 +311,19 @@ export function buildUpstreamUrl(
   if (config.usesApiKeyInUrl) {
     const apiKey = credentials.apiKey as string | undefined;
     if (!apiKey) return null;
-    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const action = stream ? "streamGenerateContent" : "generateContent";
     return `${config.baseUrl}/${model}:${action}&key=${apiKey}`;
   }
 
   // Handle antigravity with multiple baseUrls
   if (config.baseUrls) {
-    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const action = stream ? "streamGenerateContent" : "generateContent";
     return `${config.baseUrls[0]}/v1beta/models/${model}:${action}`;
   }
 
   // Handle streaming for Gemini formats
   if (config.format === FORMATS.GEMINI || config.format === FORMATS.GEMINI_CLI) {
-    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const action = stream ? "streamGenerateContent" : "generateContent";
     return `${config.baseUrl ?? ""}/${model}:${action}`;
   }
 
