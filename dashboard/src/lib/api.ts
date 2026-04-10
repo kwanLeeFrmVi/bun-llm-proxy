@@ -197,6 +197,19 @@ export const api = {
       const qs = new URLSearchParams(params).toString();
       return request<{ rows: unknown[]; total: number }>(`/api/usage/request-details${qs ? `?${qs}` : ""}`);
     },
+    leaderboard:   (period = "24h") => request<{
+      leaderboard: Array<{
+        userId: string;
+        username: string;
+        role: string;
+        totalTokens: number;
+        promptTokens: number;
+        completionTokens: number;
+        reasoningTokens: number;
+        totalCost: number;
+        requestCount: number;
+      }>;
+    }>(`/api/usage/leaderboard?period=${period}`),
   },
 
   // ─── Console Logs ─────────────────────────────────────────────────────────

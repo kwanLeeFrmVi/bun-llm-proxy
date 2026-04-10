@@ -45,6 +45,8 @@ statsEmitter.setMaxListeners(50);
 function periodToTimestamp(period: string): string | null {
   const now = Date.now();
   switch (period) {
+    case "2h":  return new Date(now - 2 * 60 * 60 * 1000).toISOString();
+    case "5h":  return new Date(now - 5 * 60 * 60 * 1000).toISOString();
     case "24h": return new Date(now - 24 * 60 * 60 * 1000).toISOString();
     case "7d":  return new Date(now - 7  * 24 * 60 * 60 * 1000).toISOString();
     case "30d": return new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -397,4 +399,63 @@ export function getUsageDetails(opts: {
     })),
     total,
   };
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  role: string;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  totalCost: number;
+  requestCount: number;
+}
+
+/**
+ * Get per-user token usage leaderboard for a given period.
+ * Aggregates usage across all API keys owned by each user.
+ */
+export function getLeaderboard(period: string): LeaderboardEntry[] {
+  const since = periodToTimestamp(period);
+  const baseFilter = since ? `timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
+
+  const rows = db().query<{
+    user_id: string;
+    username: string;
+    role: string;
+    total_tokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    reasoning_tokens: number;
+    total_cost: number;
+    request_count: number;
+  }, []>(
+    `SELECT u.id as user_id, u.username, u.role,
+            SUM(ul.prompt_tokens + ul.completion_tokens) AS total_tokens,
+            SUM(ul.prompt_tokens) AS prompt_tokens,
+            SUM(ul.completion_tokens) AS completion_tokens,
+            COALESCE(SUM(ul.reasoning_tokens), 0) AS reasoning_tokens,
+            COALESCE(SUM(ul.cost), 0) AS total_cost,
+            COUNT(*) AS request_count
+     FROM usage_log ul
+     JOIN api_keys ak ON ul.api_key_id = ak.id
+     JOIN users u ON ak.user_id = u.id
+     WHERE ${baseFilter} AND ul.status != 'pending'
+     GROUP BY u.id
+     ORDER BY total_tokens DESC`
+  ).all();
+
+  return rows.map(r => ({
+    userId: r.user_id,
+    username: r.username,
+    role: r.role,
+    totalTokens: r.total_tokens ?? 0,
+    promptTokens: r.prompt_tokens ?? 0,
+    completionTokens: r.completion_tokens ?? 0,
+    reasoningTokens: r.reasoning_tokens ?? 0,
+    totalCost: r.total_cost ?? 0,
+    requestCount: r.request_count ?? 0,
+  }));
 }

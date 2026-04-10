@@ -12,6 +12,7 @@ import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
 import Users from "@/pages/Users";
+import Leaderboard from "@/pages/Leaderboard";
 import ChangePassword from "@/pages/ChangePassword";
 import OAuthCallback from "@/pages/OAuthCallback";
 import { Loader } from "@/components/Loader";
@@ -96,6 +97,7 @@ function ProtectedLayout() {
             {/* Shared routes */}
             <Route path='/keys' element={<ApiKeys />} />
             <Route path='/usage' element={<Usage />} />
+            <Route path='/leaderboard' element={<Leaderboard />} />
             <Route path='/mavis-usage' element={<MavisUsage />} />
             <Route path='/prox-usage' element={<ProxUsage />} />
             <Route path='/logs' element={<Logs />} />
