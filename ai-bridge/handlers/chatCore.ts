@@ -198,8 +198,7 @@ async function handleStreamingResponse(
           }
         }
 
-        // Flush any remaining state (stop events)
-        // Use SSE "data: " prefix so translator functions that strip it can detect [DONE]
+        // Normal completion: flush done events
         const doneChunks = translateChunk(targetFormat, sourceFormat, model, translatedBytes, encoder.encode("data: [DONE]"), state);
         for (const chunk of doneChunks.chunks) {
           controller.enqueue(chunk);
@@ -207,6 +206,17 @@ async function handleStreamingResponse(
 
         controller.close();
       } catch (streamErr) {
+        // Flush stop events so the client gets at least a partial signal
+        // (message_delta + message_stop) before the error, preventing crashes
+        // on missing input_tokens when the upstream connection drops mid-stream.
+        if (state !== undefined) {
+          try {
+            const doneChunks = translateChunk(targetFormat, sourceFormat, model, translatedBytes, encoder.encode("data: [DONE]"), state);
+            for (const chunk of doneChunks.chunks) {
+              controller.enqueue(chunk);
+            }
+          } catch { /* ignore flush errors */ }
+        }
         controller.error(streamErr);
       } finally {
         reader.releaseLock();

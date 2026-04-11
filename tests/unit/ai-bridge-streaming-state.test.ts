@@ -251,6 +251,67 @@ describe("Ollama → Claude streaming (multi-chunk)", () => {
   });
 });
 
+// ─── OpenAI → Claude: mid-stream termination (no finish_reason) ─────────────────
+
+describe("OpenAI → Claude: mid-stream termination", () => {
+  it("emits message_delta with zero usage even when finish_reason was never received (stream cut off)", () => {
+    const state = newStreamingState();
+
+    // Chunk 1: message role
+    const c1 = enc.encode(`data: {"id":"chatcmpl_cutoff","model":"claude-opus-4","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n`);
+    const r1 = convertOpenAIResponseToClaude(null, "claude-opus-4", NO_RAW, NO_RAW, c1, state);
+    expect(decodeAll(r1)).toContain("event: message_start");
+
+    // Chunk 2: some text content
+    const c2 = enc.encode(`data: {"id":"chatcmpl_cutoff","model":"claude-opus-4","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}\n\n`);
+    const r2 = convertOpenAIResponseToClaude(null, "claude-opus-4", NO_RAW, NO_RAW, c2, state);
+    expect(decodeAll(r2)).toContain("event: content_block_delta");
+    expect(decodeAll(r2)).toContain("Hello");
+
+    // Simulate stream cut off: [DONE] arrives but NO finish_reason or usage chunk was ever sent.
+    // The provider may have sent text chunks and then the connection dropped.
+    const cDone = enc.encode("data: [DONE]\n\n");
+    const rDone = convertOpenAIResponseToClaude(null, "claude-opus-4", NO_RAW, NO_RAW, cDone, state);
+    const tDone = decodeAll(rDone);
+
+    // message_delta MUST be present with zero usage (fix: was previously skipped when finishReason was empty)
+    expect(tDone).toContain("event: message_delta");
+    expect(tDone).toContain('"input_tokens":0');
+    expect(tDone).toContain('"output_tokens":0');
+    expect(tDone).toContain("event: message_stop");
+  });
+
+  it("does not double-send message_delta when finish_reason+usage were already received", () => {
+    const state = newStreamingState();
+
+    // role chunk
+    const c1 = enc.encode(`data: {"id":"c1","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n`);
+    convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, c1, state);
+
+    // content chunk
+    const c2 = enc.encode(`data: {"id":"c1","model":"gpt-4o","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}\n\n`);
+    convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, c2, state);
+
+    // finish_reason chunk (no usage here — that's a separate chunk in real OpenAI streams)
+    const cFinish = enc.encode(`data: {"id":"c1","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n`);
+    const rFinish = convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, cFinish, state);
+    // finish_reason stops open blocks but does NOT emit message_delta yet (no usage)
+    expect(decodeAll(rFinish)).not.toContain("event: message_delta");
+
+    // usage chunk (separate in OpenAI streaming)
+    const cUsage = enc.encode(`data: {"id":"c1","model":"gpt-4o","choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n`);
+    const rUsage = convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, cUsage, state);
+    expect(decodeAll(rUsage)).toContain("event: message_delta");
+    expect(decodeAll(rUsage)).toContain("event: message_stop");
+
+    // [DONE] — both messageDeltaSent and messageStopSent are already true,
+    // so buildDoneEvents returns [] (nothing to double-send)
+    const cDone = enc.encode("data: [DONE]\n\n");
+    const rDone = convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, cDone, state);
+    expect(decodeAll(rDone)).toBe(""); // no-op: all events already sent
+  });
+});
+
 // ─── OpenAI → Gemini: multi-chunk streaming ────────────────────────────────────
 
 describe("OpenAI → Gemini streaming (multi-chunk)", () => {

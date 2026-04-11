@@ -575,18 +575,24 @@ function buildDoneEvents(state: StreamingState): Uint8Array[] {
     }
   }
 
-  // message_delta if not yet sent
-  if (state.finishReason && !state.messageDeltaSent) {
+  // message_delta: always send, even if finishReason was never received from the
+  // provider (stream may have cut off mid-way, e.g. connection drop). This ensures
+  // the client always receives usage data and never crashes on missing input_tokens.
+  if (!state.messageDeltaSent) {
+    const stopReason = state.finishReason
+      ? mapFinishReason(state.finishReason)
+      : "end_turn"; // fallback: stream died before provider sent stop_reason
     results.push(appendSSEEventBytes(
       new Uint8Array(),
       "message_delta",
       {
         type: "message_delta",
-        delta: { stop_reason: mapFinishReason(state.finishReason), stop_sequence: null },
+        delta: { stop_reason: stopReason, stop_sequence: null },
         usage: { input_tokens: 0, output_tokens: 0 },
       },
       2
     ));
+    state.messageDeltaSent = true;
   }
 
   emitMessageStop(state, results);

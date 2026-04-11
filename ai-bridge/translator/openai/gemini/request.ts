@@ -106,6 +106,8 @@ export function convertOpenAIRequestToGemini(
 
   // safetySettings (passthrough if present)
   // Note: streaming is controlled by the endpoint (generateContent vs streamGenerateContent), not by a request body parameter
+  // but we still surface it in the body for consistency with OpenAI clients that read it
+  if (stream) out.stream = true;
 
   return new TextEncoder().encode(JSON.stringify(out));
 }
