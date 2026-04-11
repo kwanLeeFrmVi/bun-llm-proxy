@@ -303,10 +303,10 @@ export function getUsageStats(period: string): UsageStats {
   ).all();
 
   const byModel = db.query<{ model: string; requests: number; cost: number; tokens: number }, []>(
-    `SELECT COALESCE(provider || '/' || model, model) as model,
+    `SELECT model,
        COUNT(*) as requests, SUM(cost) as cost, SUM(prompt_tokens + completion_tokens) as tokens
      FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL
-     GROUP BY provider, model ORDER BY tokens DESC`
+     GROUP BY model ORDER BY tokens DESC`
   ).all();
 
   const byApiKeyRaw = db.query<{ api_key_id: string; requests: number; cost: number }, []>(
