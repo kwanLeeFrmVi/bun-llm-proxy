@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api.ts";
-import { Users as UsersIcon, Plus, ShieldCheck, User, Trash2 } from "lucide-react";
+import { Users as UsersIcon, Plus, ShieldCheck, User, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 export default function Users() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -252,13 +253,10 @@ export default function Users() {
                         variant="outline"
                         size="sm"
                         className="h-8 px-3 text-xs font-medium"
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setPwValue("");
-                          setShowPwModal(true);
-                        }}
+                        onClick={() => navigate(`/users/${u.id}`)}
                       >
-                        Change Password
+                        <KeyRound className="w-3 h-3 mr-1" />
+                        Manage Keys
                       </Button>
                       <Button
                         variant="ghost"

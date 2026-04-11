@@ -13,6 +13,7 @@ import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
 import Users from "@/pages/Users";
+import UserDetail from "@/pages/UserDetail";
 import Leaderboard from "@/pages/Leaderboard";
 import ChangePassword from "@/pages/ChangePassword";
 import OAuthCallback from "@/pages/OAuthCallback";
@@ -93,6 +94,7 @@ function ProtectedLayout() {
                   element={<ProviderDetail />}
                 />
                 <Route path='/users' element={<Users />} />
+                <Route path='/users/:userId' element={<UserDetail />} />
               </>
             )}
             {/* Shared routes */}

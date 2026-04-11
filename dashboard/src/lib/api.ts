@@ -221,6 +221,15 @@ export const api = {
   // ─── Users ────────────────────────────────────────────────────────────────
   users: {
     list: () => request<{ users: { id: string; username: string; role: string; createdAt: string }[] }>("/api/users"),
+    get: (id: string) => request<{
+      user: { id: string; username: string; role: string; createdAt: string };
+      assignedKeys: Array<{
+        id: string; name: string; key: string; isActive: boolean; createdAt: string; userId: string | null; ownerUsername: string | null;
+      }>;
+      unassignedKeys: Array<{
+        id: string; name: string; key: string; isActive: boolean; createdAt: string; userId: null; ownerUsername: null;
+      }>;
+    }>(`/api/users/${id}`),
     create: (username: string, password: string, role: string) =>
       request<{ id: string; username: string; role: string; createdAt: string }>("/api/users", {
         method: "POST",
@@ -279,8 +288,9 @@ export const api = {
 
   // ─── Combos ───────────────────────────────────────────────────────────────
   combos: {
-    list:    () => request<{ combos: { id: string; name: string; models: string[]; createdAt?: string; updatedAt?: string }[] }>("/api/combos"),
-    create:  (data: { name: string; models?: Array<{ model: string; weight: number }> }) => request("/api/combos", { method: "POST", body: JSON.stringify(data) }),
+    list:    () => request<{ combos: { id: string; name: string; models: { model: string; weight: number }[]; createdAt?: string; updatedAt?: string }[] }>("/api/combos"),
+    get:     (id: string) => request<{ id: string; name: string; models: { model: string; weight: number }[]; createdAt?: string; updatedAt?: string }>(`/api/combos/${id}`),
+    create:  (data: { name: string; models?: Array<{ model: string; weight: number }> }) => request<{ id: string; name: string; models: { model: string; weight: number }[] }>("/api/combos", { method: "POST", body: JSON.stringify(data) }),
     update:  (id: string, data: { name?: string; models?: Array<{ model: string; weight: number }> }) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove:  (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
