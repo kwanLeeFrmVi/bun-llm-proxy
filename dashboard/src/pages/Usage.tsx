@@ -183,6 +183,14 @@ function relTime(ts: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+// Extract model name from provider/model format (e.g., "openrouter/claude-sonnet-4-5" -> "claude-sonnet-4-5")
+function getModelName(fullModel: string): string {
+  if (fullModel.includes("/")) {
+    return fullModel.split("/").slice(1).join("/");
+  }
+  return fullModel;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const ok = status === "success" || status === "200";
   return (
@@ -220,14 +228,28 @@ function OverviewTab({
   const [view, setView] = useState<ViewOption>("model");
 
   const tableRows = (() => {
-    if (view === "model")
-      return s.byModel.map((r) => ({
-        key: r.model,
-        label: r.model,
-        requests: r.requests,
-        tokens: r.tokens,
-        cost: r.cost,
-      }));
+    if (view === "model") {
+      // Aggregate by model name (strip provider prefix)
+      const modelAggregates = new Map<string, { requests: number; tokens: number; cost: number }>();
+      for (const r of s.byModel) {
+        const modelName = getModelName(r.model);
+        const existing = modelAggregates.get(modelName) ?? { requests: 0, tokens: 0, cost: 0 };
+        modelAggregates.set(modelName, {
+          requests: existing.requests + r.requests,
+          tokens: existing.tokens + r.tokens,
+          cost: existing.cost + r.cost,
+        });
+      }
+      return Array.from(modelAggregates.entries())
+        .map(([name, data]) => ({
+          key: name,
+          label: name,
+          requests: data.requests,
+          tokens: data.tokens,
+          cost: data.cost,
+        }))
+        .sort((a, b) => b.tokens - a.tokens);
+    }
     if (view === "provider")
       return s.byProvider.map((r) => ({
         key: r.provider,
