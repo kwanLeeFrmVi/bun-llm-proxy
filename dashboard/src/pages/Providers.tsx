@@ -119,7 +119,8 @@ export default function ProvidersPage() {
     const conns = connections.filter(c => c.provider === providerId);
     const active = conns.filter(c => (c.isActive !== false) && (c.testStatus === "active" || c.testStatus === "success"));
     const error = conns.filter(c => (c.isActive !== false) && (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable"));
-    return { connected: active.length, error: error.length, total: conns.length, connections: conns };
+    // Use total count for "connected" to match ProviderDetail page behavior
+    return { connected: conns.length, error: error.length, total: conns.length, connections: conns };
   }
 
   // Toggle provider active state

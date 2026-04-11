@@ -5,7 +5,7 @@
 
 import type { Database } from "bun:sqlite";
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export interface Migration {
   version: number;
@@ -551,5 +551,99 @@ function extractProviderSpecificData(
   return result;
 }
 
+/**
+ * Migration v3: Migrate enabled models from connection-specific to provider-level storage
+ *
+ * Previously, custom models were stored in provider_connections.provider_specific_data.enabledModels
+ * Now they are stored in settings table with key pattern "providerEnabledModels:{providerId}"
+ *
+ * This migration:
+ * 1. Finds all connections with enabledModels in provider_specific_data
+ * 2. Extracts the nodeName to identify the provider
+ * 3. Migrates enabledModels to settings table with key "providerEnabledModels:{nodeName}"
+ * 4. Uses INSERT OR IGNORE to avoid overwriting existing provider-level models
+ */
+const migrationV3: Migration = {
+  version: 3,
+  name: "migrate-enabled-models-to-provider-level",
+  up: (db: Database) => {
+    console.log("[Migration v3] Starting enabled models migration...");
+
+    // Get all connections with enabledModels in provider_specific_data
+    const connections = db
+      .query<{ id: string; provider_specific_data: string }, []>(
+        `SELECT id, provider_specific_data FROM provider_connections
+         WHERE provider_specific_data IS NOT NULL
+         AND provider_specific_data LIKE '%enabledModels%'`
+      )
+      .all();
+
+    if (connections.length === 0) {
+      console.log("[Migration v3] No connections with enabledModels found, skipping.");
+      return;
+    }
+
+    let migratedCount = 0;
+    const providerModels = new Map<string, string[]>();
+
+    // First, collect all enabled models by provider (nodeName)
+    for (const conn of connections) {
+      let psd: Record<string, unknown>;
+      try {
+        psd = JSON.parse(conn.provider_specific_data) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
+      const enabledModels = psd.enabledModels;
+      const nodeName = typeof psd.nodeName === "string" ? psd.nodeName : null;
+
+      if (!nodeName || !Array.isArray(enabledModels) || enabledModels.length === 0) {
+        continue;
+      }
+
+      // Filter to ensure we have strings only
+      const modelIds = enabledModels.filter(
+        (m): m is string => typeof m === "string" && m.trim() !== ""
+      );
+
+      if (modelIds.length === 0) {
+        continue;
+      }
+
+      // Merge models for this provider (deduplicate)
+      const existing = providerModels.get(nodeName) ?? [];
+      const merged = [...new Set([...existing, ...modelIds])];
+      providerModels.set(nodeName, merged);
+    }
+
+    // Now insert into settings table
+    for (const [nodeName, modelIds] of providerModels.entries()) {
+      const key = `providerEnabledModels:${nodeName}`;
+
+      // Check if already exists (don't overwrite)
+      const existing = db
+        .query<{ value: string }, [string]>("SELECT value FROM settings WHERE key = ?")
+        .get(key);
+
+      if (existing) {
+        console.log(`[Migration v3] Provider ${nodeName} already has provider-level models, skipping.`);
+        continue;
+      }
+
+      // Insert new entry
+      db.run(
+        "INSERT INTO settings (key, value) VALUES (?, ?)",
+        [key, JSON.stringify(modelIds)]
+      );
+
+      console.log(`[Migration v3] Migrated ${modelIds.length} models for provider "${nodeName}":`, modelIds);
+      migratedCount++;
+    }
+
+    console.log(`[Migration v3] Completed: migrated ${migratedCount} providers.`);
+  },
+};
+
 // All migrations in order
-export const migrations: Migration[] = [migrationV2];
+export const migrations: Migration[] = [migrationV2, migrationV3];
