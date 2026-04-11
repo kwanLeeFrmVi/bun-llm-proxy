@@ -1,12 +1,23 @@
 // Provider-level enabled models CRUD
 // This endpoint manages custom models at the provider level, independent of connections.
 
-import { getProviderEnabledModels, updateProviderEnabledModels } from "db/index.ts";
+import { getProviderEnabledModels, updateProviderEnabledModels, getProviderNodeById } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
+import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
+
+// Helper function to get the provider name from the ID
+// For compatible providers, the ID is a UUID but models are stored under the node's name
+async function getProviderName(id: string): Promise<string> {
+  if (isOpenAICompatibleProvider(id) || isAnthropicCompatibleProvider(id)) {
+    const node = await getProviderNodeById(id);
+    return node?.name || id;
+  }
+  return id;
+}
 
 // GET /api/providers/:id/enabled-models
 export async function GET(req: Request): Promise<Response> {
@@ -14,7 +25,8 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const id = (req as BunRequest).params.id ?? "";
-  const models = await getProviderEnabledModels(id);
+  const providerName = await getProviderName(id);
+  const models = await getProviderEnabledModels(providerName);
 
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
 }
@@ -26,6 +38,7 @@ export async function PUT(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const id = (req as BunRequest).params.id ?? "";
+  const providerName = await getProviderName(id);
 
   let body: { models?: unknown };
   try {
@@ -38,7 +51,7 @@ export async function PUT(req: Request): Promise<Response> {
     return Response.json({ error: "models array is required" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const models = await updateProviderEnabledModels(id, body.models);
+  const models = await updateProviderEnabledModels(providerName, body.models);
 
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
 }
@@ -50,6 +63,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const id = (req as BunRequest).params.id ?? "";
+  const providerName = await getProviderName(id);
 
   let body: { model?: unknown };
   try {
@@ -63,7 +77,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const modelId = body.model.trim();
-  const currentModels = await getProviderEnabledModels(id);
+  const currentModels = await getProviderEnabledModels(providerName);
 
   if (currentModels.includes(modelId)) {
     return Response.json(
@@ -72,7 +86,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const models = await updateProviderEnabledModels(id, [...currentModels, modelId]);
+  const models = await updateProviderEnabledModels(providerName, [...currentModels, modelId]);
 
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
 }
@@ -84,6 +98,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const id = (req as BunRequest).params.id ?? "";
+  const providerName = await getProviderName(id);
 
   let body: { model?: unknown };
   try {
@@ -97,10 +112,10 @@ export async function DELETE(req: Request): Promise<Response> {
   }
 
   const modelId = body.model.trim();
-  const currentModels = await getProviderEnabledModels(id);
+  const currentModels = await getProviderEnabledModels(providerName);
   const models = currentModels.filter(m => m !== modelId);
 
-  await updateProviderEnabledModels(id, models);
+  await updateProviderEnabledModels(providerName, models);
 
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
 }

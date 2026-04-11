@@ -1,7 +1,7 @@
 // Port of src/app/api/v1/models/route.js
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "ai-bridge/config/providerModels.ts";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getCombos, getAllProviderEnabledModels, type Combo } from "db/index.ts";
+import { getProviderConnections, getCombos, getAllProviderEnabledModels, getProviderNodeById, type Combo } from "db/index.ts";
 import { getAvailableComboModelConfigs } from "services/model.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
@@ -157,14 +157,15 @@ export async function GET(_req: Request): Promise<Response> {
         const staticAlias = providerIdToAlias[providerId] ?? providerId;
         const psd = (conn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
 
-        // For compatible providers, get prefix from provider_nodes table
+        // For compatible providers, get prefix and name from provider_nodes table
         let nodePrefix: string | undefined;
+        let nodeName: string | undefined;
         const isCompatibleProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
         if (isCompatibleProvider) {
           try {
-            const { getProviderNodeById } = await import("../../../db/index.ts");
             const node = await getProviderNodeById(providerId);
             nodePrefix = node?.prefix as string | undefined;
+            nodeName = node?.name as string | undefined;
           } catch {
             // ignore error
           }
@@ -172,8 +173,9 @@ export async function GET(_req: Request): Promise<Response> {
 
         const outputAlias = (nodePrefix ?? (psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
         const pModels = providerModels[staticAlias] ?? [];
-        // Use provider-level enabled models only (not connection-specific)
-        const enabledModels = persistedEnabledModelsByProvider[providerId] ?? [];
+        // Use provider-level enabled models with the provider's name (not UUID)
+        const providerName = nodeName ?? providerId;
+        const enabledModels = persistedEnabledModelsByProvider[providerName] ?? [];
         const prefixes = [outputAlias, staticAlias, providerId].filter(
           (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index,
         );

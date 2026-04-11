@@ -1,9 +1,9 @@
-import { getProviderConnections, updateProviderEnabledModels } from "db/index.ts";
+import { getProviderConnections, updateProviderEnabledModels, getProviderNodeById } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { PROVIDERS } from "ai-bridge/handlers/provider.ts";
-import { getProviderAlias } from "lib/providers.ts";
+import { getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
 import { X_API_KEY_PROVIDERS, ANTHROPIC_API_VERSION } from "lib/constants.ts";
 import {
   parseOpenAIStyleModels,
@@ -12,6 +12,16 @@ import {
 } from "lib/utils.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
+
+// Helper function to get the provider name from the ID
+// For compatible providers, the ID is a UUID but models are stored under the node's name
+async function getProviderName(id: string): Promise<string> {
+  if (isOpenAICompatibleProvider(id) || isAnthropicCompatibleProvider(id)) {
+    const node = await getProviderNodeById(id);
+    return node?.name || id;
+  }
+  return id;
+}
 
 /**
  * POST /api/providers/:id/fetch-models
@@ -113,8 +123,9 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Persist enabledModels at provider level only (not connection-specific)
-  await updateProviderEnabledModels(id, modelIds);
+  // Persist enabledModels at provider level using the provider's name
+  const providerName = await getProviderName(id);
+  await updateProviderEnabledModels(providerName, modelIds);
 
   const prefix = (psd.prefix as string | undefined) ?? getProviderAlias(id) ?? id;
 

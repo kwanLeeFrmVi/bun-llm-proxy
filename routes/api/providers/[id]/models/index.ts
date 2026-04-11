@@ -79,18 +79,22 @@ export async function GET(req: Request): Promise<Response> {
 
     // Determine output alias: prefer provider node prefix, then connection prefix, then alias
     let outputAlias = alias;
+    let providerName = id; // Default to using id as the provider name
     if (isCompatible) {
       const node = await getProviderNodeById(id);
       if (node?.prefix) {
         outputAlias = node.prefix;
+      }
+      if (node?.name) {
+        providerName = node.name;
       }
     }
     if (typeof psd.prefix === "string" && psd.prefix.trim()) {
       outputAlias = psd.prefix.trim();
     }
 
-    // Get enabled models from provider-level storage only
-    const enabledModels = await getProviderEnabledModels(id);
+    // Get enabled models from provider-level storage using the provider's name
+    const enabledModels = await getProviderEnabledModels(providerName);
 
     // For compatible providers, try fetching models from the remote endpoint
     if (isCompatible) {
