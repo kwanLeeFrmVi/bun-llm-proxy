@@ -53,8 +53,8 @@ export const DEFAULT_MIN_TOKENS = 32000;
 export const DEFAULT_BUDGET_TOKENS = 10000;
 
 export const BACKOFF_CONFIG = {
-  base:    1000,      // 1 second
-  max:     120_000,   // 2 minutes
+  base:    200,       // 200ms - faster recovery
+  max:     10_000,    // 10s max (was 2min)
   maxLevel: 15,
 } as const;
 
