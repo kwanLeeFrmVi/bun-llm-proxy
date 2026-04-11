@@ -8,8 +8,12 @@ import { convertOpenAIRequestToGemini } from "../gemini/request.ts";
  * Strip Vertex-incompatible fields from Gemini format:
  * 1. Remove `id` from functionCall and functionResponse (Vertex rejects these)
  * 2. Remove synthetic thoughtSignature parts
+ * 3. Remove `stream` (Vertex uses endpoint path, not body field)
  */
 function stripVertexIncompatibleFields(body: Record<string, unknown>): Record<string, unknown> {
+  // Vertex AI controls streaming via endpoint (streamGenerateContent vs generateContent), not body
+  delete body.stream;
+
   if (!body.contents) return body;
 
   const contents = body.contents as Array<Record<string, unknown>>;

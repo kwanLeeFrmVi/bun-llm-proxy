@@ -6,22 +6,13 @@ import {
   isAnthropicCompatibleProvider,
 } from "@/constants/providers";
 import { ProviderCard } from "@/components/ProviderCard";
+import type { ProviderStats } from "@/components/ProviderCard";
 import { AddOpenAICompatibleModal } from "@/components/AddOpenAICompatibleModal";
 import { AddAnthropicCompatibleModal } from "@/components/AddAnthropicCompatibleModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-
-// Fix the typo in import
-import { isOpenAICompatibleProvider as isOpenAICompatible, isAnthropicCompatibleProvider as isAnthropicCompatible } from "@/constants/providers";
-
-interface ProviderStats {
-  connected: number;
-  error: number;
-  total: number;
-  connections?: ProviderConnection[];
-}
 
 // ─── Section header ─────────────────────────────────────────────────────────────
 
@@ -154,7 +145,7 @@ export default function ProvidersPage() {
 
   // Toggle provider active state
   const compatibleNodes = nodes.filter(n =>
-    isOpenAICompatible(n.id) || isAnthropicCompatible(n.id)
+    isOpenAICompatibleProvider(n.id) || isAnthropicCompatibleProvider(n.id)
   );
 
   // OAuth/free providers (from free + freeTier)
@@ -201,8 +192,8 @@ export default function ProvidersPage() {
             providerId={id}
             catalog={meta}
             stats={getStats(id)}
-            authType="oauth"
             onToggle={(active) => handleToggleProvider(id, active)}
+            onRefresh={fetchData}
           />
         ))}
       </ProviderSection>
@@ -215,8 +206,8 @@ export default function ProvidersPage() {
             providerId={id}
             catalog={meta}
             stats={getStats(id)}
-            authType="free"
             onToggle={(active) => handleToggleProvider(id, active)}
+            onRefresh={fetchData}
           />
         ))}
       </ProviderSection>
@@ -229,8 +220,8 @@ export default function ProvidersPage() {
             providerId={id}
             catalog={meta}
             stats={getStats(id)}
-            authType="apikey"
             onToggle={(active) => handleToggleProvider(id, active)}
+            onRefresh={fetchData}
           />
         ))}
       </ProviderSection>
@@ -274,8 +265,8 @@ export default function ProvidersPage() {
                   providerId={node.id}
                   node={node}
                   stats={getStats(node.id)}
-                  authType="apikey"
                   onToggle={(active) => handleToggleProvider(node.id, active)}
+                  onRefresh={fetchData}
                 />
               ))}
             </div>

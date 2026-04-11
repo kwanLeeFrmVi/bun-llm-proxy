@@ -76,6 +76,7 @@ export default function ProviderDetail() {
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestStatus>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   // Determine provider info
   const isCompatible =
@@ -182,6 +183,10 @@ export default function ProviderDetail() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    api.settings.get().then(s => setSettings(s as Record<string, unknown>)).catch(console.error);
+  }, []);
 
   useEffect(() => {
     fetchPredefinedModels();
@@ -582,6 +587,40 @@ export default function ProviderDetail() {
     }
   }
 
+  // ─── Request Routing settings ─────────────────────────────────────────────────
+  const providerStrategies = (settings.providerStrategies as Record<string, Record<string, unknown>> | undefined) ?? {};
+  const currentStrategy = (providerStrategies[decodedId]?.fallbackStrategy as string) ?? (settings.fallbackStrategy as string) ?? "fill-first";
+  const currentStickyLimit = (providerStrategies[decodedId]?.stickyRoundRobinLimit as number) ?? (settings.stickyRoundRobinLimit as number) ?? 3;
+
+  async function handleStrategyChange(value: string) {
+    const updated = {
+      providerStrategies: {
+        ...providerStrategies,
+        [decodedId]: {
+          ...(providerStrategies[decodedId] ?? {}),
+          fallbackStrategy: value,
+        },
+      },
+    };
+    await api.settings.update(updated);
+    setSettings(prev => ({ ...prev, providerStrategies: updated.providerStrategies }));
+    toast.success(`Strategy set to ${value}`);
+  }
+
+  async function handleStickyLimitChange(value: number) {
+    const updated = {
+      providerStrategies: {
+        ...providerStrategies,
+        [decodedId]: {
+          ...(providerStrategies[decodedId] ?? {}),
+          stickyRoundRobinLimit: value,
+        },
+      },
+    };
+    await api.settings.update(updated);
+    setSettings(prev => ({ ...prev, providerStrategies: updated.providerStrategies }));
+  }
+
   async function handleUpdateProvider(updatedNode: ProviderNode) {
     setShowEditProvider(false);
     setEditingNode(null);
@@ -812,6 +851,62 @@ export default function ProviderDetail() {
           </div>
         )}
       </div>
+
+      {/* Request Routing card */}
+      {connections.length > 1 && (
+        <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[rgba(203,213,225,0.4)]">
+            <h2 className="text-sm font-semibold text-[--on-surface]">Request Routing</h2>
+            <p className="text-xs text-[--on-surface-variant] mt-0.5">
+              How concurrent requests are distributed across {connections.length} connections
+            </p>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-[--on-surface-variant] mb-2">Fallback Strategy</p>
+              <div className="flex rounded-lg border border-[rgba(203,213,225,0.6)] overflow-hidden w-fit">
+                {(["fill-first", "round-robin"] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleStrategyChange(s)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      currentStrategy === s
+                        ? "bg-[#0F172A] text-white"
+                        : "bg-transparent text-[--on-surface-variant] hover:bg-[--surface-container-low]"
+                    }`}
+                  >
+                    {s === "fill-first" ? "Fill-first" : "Round-robin"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-[--on-surface-variant] mt-2">
+                {currentStrategy === "round-robin"
+                  ? "Distributes requests across accounts — use when running multiple Claude Code instances."
+                  : "Uses first available account. May cause contention with concurrent requests."}
+              </p>
+            </div>
+            {currentStrategy === "round-robin" && (
+              <div>
+                <p className="text-xs font-medium text-[--on-surface-variant] mb-2">
+                  Sticky limit: <span className="text-[--on-surface] font-semibold">{currentStickyLimit}</span>
+                </p>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={currentStickyLimit}
+                  onChange={e => handleStickyLimitChange(parseInt(e.target.value))}
+                  className="w-48 h-1.5 rounded-full appearance-none bg-[rgba(203,213,225,0.6)] accent-[#0F172A] cursor-pointer"
+                />
+                <p className="text-xs text-[--on-surface-variant] mt-1">
+                  Max consecutive requests on one account before switching. Set to 1 for maximum distribution.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Available Models card */}
       <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">

@@ -328,6 +328,20 @@ export function buildUpstreamUrl(
   // Handle streaming for Gemini formats
   if (config.format === FORMATS.GEMINI || config.format === FORMATS.GEMINI_CLI || config.format === FORMATS.VERTEX) {
     const action = stream ? "streamGenerateContent" : "generateContent";
+
+    // Vertex AI requires full path: /v1/projects/{project}/locations/{location}/publishers/{publisher}/models/{model}
+    if (config.format === FORMATS.VERTEX) {
+      const projectId = credentials.projectId as string | undefined;
+      const region = (psd?.region as string) ?? "global";
+      if (projectId) {
+        // Model format: "publisher/model" (e.g., "zai-org/glm-5-maas") or plain model name
+        const slashIdx = model.indexOf("/");
+        const publisher = slashIdx >= 0 ? model.slice(0, slashIdx) : model;
+        const modelName = slashIdx >= 0 ? model.slice(slashIdx + 1) : model;
+        return `${config.baseUrl}/v1/projects/${projectId}/locations/${region}/publishers/${publisher}/models/${modelName}:${action}`;
+      }
+    }
+
     return `${config.baseUrl ?? ""}/${model}:${action}`;
   }
 

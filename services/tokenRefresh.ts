@@ -753,6 +753,10 @@ export async function checkAndRefreshToken(
         } else if (cached?.token) {
           // Use cached token
           creds.accessToken = cached.token;
+          // Ensure projectId is set (needed for Vertex URL construction)
+          if (!creds.projectId && saJson.project_id) {
+            creds.projectId = saJson.project_id;
+          }
         }
       }
     }
