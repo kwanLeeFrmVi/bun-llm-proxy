@@ -48,6 +48,8 @@ export default function ComboFormDialog({
   initialName,
   initialModels,
   allModels,
+  allCombos,
+  allModelTypes,
   onSave,
   onClose,
 }: {
@@ -56,6 +58,8 @@ export default function ComboFormDialog({
   initialName: string;
   initialModels: ModelWithWeight[];
   allModels: string[];
+  allCombos?: string[];  // List of combo names for nested support
+  allModelTypes?: Record<string, "combo" | "model">;  // Mark which models are combos
   onSave: (name: string, models: ModelWithWeight[]) => Promise<void>;
   onClose: () => void;
 }) {
@@ -130,12 +134,15 @@ export default function ComboFormDialog({
   };
 
   // Filter available models (not already selected) by search
+  // Also exclude current combo being edited to prevent self-reference
   const available = useMemo(() => {
     const q = modelSearch.toLowerCase();
+    const currentComboName = comboId ? initialName : null;
     return allModels
       .filter((m) => !selected.some((s) => s.model === m))
+      .filter((m) => m !== currentComboName) // Prevent self-reference
       .filter((m) => m.toLowerCase().includes(q));
-  }, [allModels, selected, modelSearch]);
+  }, [allModels, selected, modelSearch, comboId, initialName]);
 
   const isEdit = !!comboId;
 
@@ -218,6 +225,11 @@ export default function ComboFormDialog({
                         <code className='flex-1 min-w-0 text-xs font-mono text-foreground truncate'>
                           {item.model}
                         </code>
+                        {allModelTypes?.[item.model] === "combo" && (
+                          <Badge variant='outline' className='text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0'>
+                            Combo
+                          </Badge>
+                        )}
                         {(strategy === "weight" || strategy === "speed") && (
                           <Input
                             type="number"
@@ -308,22 +320,30 @@ export default function ComboFormDialog({
                   No matching models
                 </CommandEmpty>
                 <CommandGroup>
-                  {available.slice(0, 50).map((modelId) => (
-                    <CommandItem
-                      key={modelId}
-                      value={modelId}
-                      onSelect={() => {
-                        toggleModel(modelId);
-                        setModelSearch("");
-                      }}
-                      className='text-xs cursor-pointer'
-                    >
-                      <Plus className='w-3.5 h-3.5 text-primary shrink-0 mr-2 opacity-70' />
-                      <code className='font-mono text-foreground truncate'>
-                        {modelId}
-                      </code>
-                    </CommandItem>
-                  ))}
+                  {available.slice(0, 50).map((modelId) => {
+                    const isCombo = allModelTypes?.[modelId] === "combo";
+                    return (
+                      <CommandItem
+                        key={modelId}
+                        value={modelId}
+                        onSelect={() => {
+                          toggleModel(modelId);
+                          setModelSearch("");
+                        }}
+                        className='text-xs cursor-pointer'
+                      >
+                        <Plus className='w-3.5 h-3.5 text-primary shrink-0 mr-2 opacity-70' />
+                        <code className='font-mono text-foreground truncate flex-1'>
+                          {modelId}
+                        </code>
+                        {isCombo && (
+                          <Badge variant='outline' className='text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0'>
+                            Combo
+                          </Badge>
+                        )}
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
             </Command>

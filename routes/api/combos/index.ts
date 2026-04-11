@@ -33,7 +33,26 @@ export async function GET(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
   const combos = await getCombos();
-  return Response.json({ combos }, { headers: CORS_HEADERS });
+
+  // Fetch combo configs for all combos to get weights
+  const combosWithWeights = await Promise.all(
+    combos.map(async (combo) => {
+      const config = await getComboConfig(combo.name);
+      if (config && config.models.length > 0) {
+        return {
+          ...combo,
+          models: config.models,  // { model, weight }[]
+        };
+      }
+      // Fall back to plain models array with weight=1
+      return {
+        ...combo,
+        models: combo.models.map(m => ({ model: m, weight: 1 })),
+      };
+    })
+  );
+
+  return Response.json({ combos: combosWithWeights }, { headers: CORS_HEADERS });
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -58,12 +77,14 @@ export async function POST(req: Request): Promise<Response> {
   const models = normalizeModels(rawModels);
   const combo = await createCombo({ name, models });
 
+  // Save combo config with weights
   const configModels = normalizeComboConfig(rawModels);
   if (configModels) {
     await setComboConfig(name, { name, models: configModels });
   }
 
-  return Response.json(combo, { status: 201, headers: CORS_HEADERS });
+  // Return combo with models (including weights)
+  return Response.json({ ...combo, models: configModels ?? models.map(m => ({ model: m, weight: 1 })) }, { status: 201, headers: CORS_HEADERS });
 }
 
 export function OPTIONS(): Response {

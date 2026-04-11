@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "@/lib/api.ts";
+import { useComboStore } from "@/lib/comboStore.ts";
 import { PROVIDER_NAMES } from "@/lib/constants.ts";
+
+interface LocalModelWithWeight {
+  model: string;
+  weight: number;
+}
 import {
   Box,
   Search,
@@ -55,6 +61,8 @@ type ModelEntry = {
 };
 
 export default function Models() {
+  // Combo store for managing combo state
+  const { deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +78,8 @@ export default function Models() {
       .then((data) => setModels(data.data ?? []))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
+    // Load combos for combo management
+    useComboStore.getState().loadCombos();
   }, []);
 
   function getAlias(m: { id: string; owned_by?: string }) {
@@ -182,7 +192,7 @@ export default function Models() {
   const [comboDialogOpen, setComboDialogOpen] = useState(false);
   const [editingComboId, setEditingComboId] = useState<string | null>(null);
   const [editingComboName, setEditingComboName] = useState<string>("");
-  const [editingComboModels, setEditingComboModels] = useState<import("../components/ComboFormDialog").ModelWithWeight[]>([]);
+  const [editingComboModels, setEditingComboModels] = useState<LocalModelWithWeight[]>([]);
 
   const refreshModels = useCallback(() => {
     api.models
@@ -194,12 +204,12 @@ export default function Models() {
   const openCreateCombo = useCallback(() => {
     setEditingComboId(null);
     setEditingComboName("");
-    setEditingComboModels([] as import("../components/ComboFormDialog").ModelWithWeight[]);
+    setEditingComboModels([] as LocalModelWithWeight[]);
     setComboDialogOpen(true);
   }, []);
 
   const openEditCombo = useCallback(
-    (comboId: string, comboName: string, comboModels: import("../components/ComboFormDialog").ModelWithWeight[]) => {
+    (comboId: string, comboName: string, comboModels: LocalModelWithWeight[]) => {
       setEditingComboId(comboId);
       setEditingComboName(comboName);
       setEditingComboModels([...comboModels]);
@@ -212,13 +222,13 @@ export default function Models() {
     async (comboId: string) => {
       if (!confirm("Delete this combo?")) return;
       try {
-        await api.combos.remove(comboId);
+        await deleteComboFromStore(comboId);
         refreshModels();
       } catch (e) {
         alert(e instanceof Error ? e.message : "Failed to delete");
       }
     },
-    [refreshModels],
+    [deleteComboFromStore, refreshModels],
   );
 
   // ── Inline table action buttons (live inside Models so they close over state) ──
@@ -259,7 +269,7 @@ export default function Models() {
   }: {
     comboId: string;
     comboName: string;
-    comboModels: import("../components/ComboFormDialog").ModelWithWeight[];
+    comboModels: LocalModelWithWeight[];
   }) {
     return (
       <Tooltip>
@@ -300,15 +310,13 @@ export default function Models() {
   }
 
   const handleComboSaved = useCallback(
-    async (name: string, comboModels: import("../components/ComboFormDialog").ModelWithWeight[]) => {
+    async (name: string, comboModels: LocalModelWithWeight[]) => {
       try {
+        const store = useComboStore.getState();
         if (editingComboId) {
-          await api.combos.update(editingComboId, {
-            name: name.trim(),
-            models: comboModels,
-          });
+          await store.updateCombo(editingComboId, name.trim(), comboModels);
         } else {
-          await api.combos.create({ name: name.trim(), models: comboModels });
+          await store.createCombo(name.trim(), comboModels);
         }
         setComboDialogOpen(false);
         refreshModels();
@@ -534,9 +542,18 @@ export default function Models() {
         comboId={editingComboId}
         initialName={editingComboName}
         initialModels={editingComboModels}
-        allModels={models
-          .filter((m) => getAlias(m) !== "combo")
-          .map((m) => m.id)}
+        allModels={[...models.map((m) => m.id), ...useComboStore.getState().combos.map((c) => c.name)]}
+        allCombos={useComboStore.getState().combos.map((c) => c.name)}
+        allModelTypes={(() => {
+          const map = {} as Record<string, "combo" | "model">;
+          models.forEach((m) => {
+            map[m.id] = getAlias(m) === "combo" ? "combo" : "model";
+          });
+          useComboStore.getState().combos.forEach((c) => {
+            map[c.name] = "combo";
+          });
+          return map;
+        })()}
         onSave={handleComboSaved}
         onClose={() => setComboDialogOpen(false)}
       />

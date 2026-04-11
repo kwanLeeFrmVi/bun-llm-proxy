@@ -95,6 +95,8 @@ export async function getComboModelConfigs(modelStr: string): Promise<ComboModel
  * Get combo model configs filtered to only models whose providers have
  * at least one active connection. Returns null if the name is not a combo
  * or if no models have an active provider.
+ *
+ * Handles nested combos by recursively resolving them.
  */
 export async function getAvailableComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
   if (modelStr.includes("/")) return null;
@@ -109,20 +111,36 @@ export async function getAvailableComboModelConfigs(modelStr: string): Promise<C
     return null;
   }
 
-  const filteredModels = await Promise.all(
-    comboModels.map(async comboModel => {
-      try {
-        const modelInfo = await getModelInfo(comboModel.model);
-        if (!modelInfo.provider || !activeProviderIds.has(modelInfo.provider)) {
-          return null;
-        }
-        return comboModel;
-      } catch {
-        return null;
-      }
-    })
-  );
+  const expandedModels: ComboModelConfig[] = [];
 
-  const result = filteredModels.filter((comboModel): comboModel is ComboModelConfig => comboModel !== null);
-  return result.length > 0 ? result : null;
+  for (const comboModel of comboModels) {
+    try {
+      // Check if this model is itself a combo (nested combo)
+      const nestedCombo = await getComboByName(comboModel.model);
+
+      if (nestedCombo) {
+        // Recursively get the nested combo's available models
+        const nestedModels = await getAvailableComboModelConfigs(comboModel.model);
+        if (nestedModels && nestedModels.length > 0) {
+          // Add nested models with their weights multiplied by the outer reference weight
+          for (const nested of nestedModels) {
+            expandedModels.push({
+              model: nested.model,
+              weight: nested.weight * comboModel.weight,
+            });
+          }
+        }
+      } else {
+        // Not a combo - check if the provider is active
+        const modelInfo = await getModelInfo(comboModel.model);
+        if (modelInfo.provider && activeProviderIds.has(modelInfo.provider)) {
+          expandedModels.push(comboModel);
+        }
+      }
+    } catch {
+      // Skip models that fail to resolve
+    }
+  }
+
+  return expandedModels.length > 0 ? expandedModels : null;
 }

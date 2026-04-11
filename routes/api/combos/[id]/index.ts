@@ -37,7 +37,17 @@ export async function GET(req: Request): Promise<Response> {
   const id = (req as BunRequest).params.id ?? "";
   const combo = await getComboById(id);
   if (!combo) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
-  return Response.json(combo, { headers: CORS_HEADERS });
+
+  // Get weights from combo_configs
+  const config = await getComboConfig(combo.name);
+  let models;
+  if (config && config.models.length > 0) {
+    models = config.models;  // { model, weight }[]
+  } else {
+    models = combo.models.map(m => ({ model: m, weight: 1 }));
+  }
+
+  return Response.json({ ...combo, models }, { headers: CORS_HEADERS });
 }
 
 export async function PUT(req: Request): Promise<Response> {
