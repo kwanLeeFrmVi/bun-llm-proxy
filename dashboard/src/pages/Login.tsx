@@ -115,8 +115,7 @@ export default function Login() {
             inset: 0,
             zIndex: 0,
             pointerEvents: "none",
-            backgroundImage:
-              "radial-gradient(circle at 2px 2px, #dde3e9 1px, transparent 0)",
+            backgroundImage: "radial-gradient(circle at 2px 2px, #dde3e9 1px, transparent 0)",
             backgroundSize: "32px 32px",
           }}
         />
@@ -168,8 +167,8 @@ export default function Login() {
         >
           {/* Brand */}
           <div style={{ textAlign: "center", marginBottom: "40px" }}>
-            <div className='inline-flex items-center justify-center w-[52px] h-[52px] rounded-[10px] bg-[#0F172A] mb-5 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'>
-              <img src='/logo.svg' alt='LLM Gateway' className='h-14 w-14' />
+            <div className="inline-flex items-center justify-center w-[52px] h-[52px] rounded-[10px] bg-[#0F172A] mb-5 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
+              <img src="/logo.svg" alt="LLM Gateway" className="h-14 w-14" />
             </div>
             <h1
               style={{
@@ -229,15 +228,13 @@ export default function Login() {
                     animation: "slideIn 0.3s ease-out",
                   }}
                 >
-                  <AlertCircle
-                    style={{ width: 18, height: 18, flexShrink: 0 }}
-                  />
+                  <AlertCircle style={{ width: 18, height: 18, flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>
                     {error === "Invalid credentials" || error === "Unauthorized"
                       ? "Invalid username or password. Please try again."
                       : error === "Missing username or password"
-                      ? "Please enter both username and password."
-                      : error}
+                        ? "Please enter both username and password."
+                        : error}
                   </span>
                   <button
                     type="button"
@@ -261,7 +258,14 @@ export default function Login() {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <line x1="18" y1="6" x2="6" y2="18"></line>
                       <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -270,9 +274,7 @@ export default function Login() {
               )}
 
               {/* Username */}
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <label
                   style={{
                     fontSize: "0.6875rem",
@@ -281,7 +283,7 @@ export default function Login() {
                     textTransform: "uppercase",
                     color: "#64748b",
                   }}
-                  htmlFor='username'
+                  htmlFor="username"
                 >
                   Username
                 </label>
@@ -299,16 +301,16 @@ export default function Login() {
                     }}
                   />
                   <input
-                    id='username'
-                    type='text'
+                    id="username"
+                    type="text"
                     required
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);
                       if (showError) setShowError(false);
                     }}
-                    placeholder='admin'
-                    autoComplete='username'
+                    placeholder="admin"
+                    autoComplete="username"
                     style={showError ? errorInputStyle : inputStyle}
                     onFocus={focusInput}
                     onBlur={blurInput}
@@ -317,9 +319,7 @@ export default function Login() {
               </div>
 
               {/* Password */}
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div
                   style={{
                     display: "flex",
@@ -335,7 +335,7 @@ export default function Login() {
                       textTransform: "uppercase",
                       color: "#64748b",
                     }}
-                    htmlFor='password'
+                    htmlFor="password"
                   >
                     Password
                   </label>
@@ -348,7 +348,7 @@ export default function Login() {
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
                     }}
-                    href='#'
+                    href="#"
                   >
                     Forgot password?
                   </a>
@@ -367,16 +367,16 @@ export default function Login() {
                     }}
                   />
                   <input
-                    id='password'
-                    type='password'
+                    id="password"
+                    type="password"
                     required
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
                       if (showError) setShowError(false);
                     }}
-                    placeholder='••••••••'
-                    autoComplete='current-password'
+                    placeholder="••••••••"
+                    autoComplete="current-password"
                     style={showError ? errorInputStyle : inputStyle}
                     onFocus={focusInput}
                     onBlur={blurInput}
@@ -385,12 +385,10 @@ export default function Login() {
               </div>
 
               {/* Remember me */}
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Checkbox
-                  id='remember-me'
-                  className='border-slate-300 data-[state=checked]:bg-[#0F172A] data-[state=checked]:border-[#0F172A]'
+                  id="remember-me"
+                  className="border-slate-300 data-[state=checked]:bg-[#0F172A] data-[state=checked]:border-[#0F172A]"
                 />
                 <Label
                   style={{
@@ -399,7 +397,7 @@ export default function Login() {
                     color: "#475569",
                     cursor: "pointer",
                   }}
-                  htmlFor='remember-me'
+                  htmlFor="remember-me"
                 >
                   Remember me
                 </Label>
@@ -407,7 +405,7 @@ export default function Login() {
 
               {/* Submit */}
               <button
-                type='submit'
+                type="submit"
                 disabled={loading}
                 style={{
                   width: "100%",
@@ -428,9 +426,7 @@ export default function Login() {
                   justifyContent: "center",
                   gap: "8px",
                   transition: "all 0.2s ease",
-                  boxShadow: loading
-                    ? "none"
-                    : "0 4px 12px rgba(15, 23, 42, 0.2)",
+                  boxShadow: loading ? "none" : "0 4px 12px rgba(15, 23, 42, 0.2)",
                   transform: loading ? "scale(0.98)" : "scale(1)",
                 }}
                 onMouseEnter={(e) => {
@@ -487,7 +483,7 @@ export default function Login() {
                     fontWeight: 700,
                     textDecoration: "none",
                   }}
-                  href='#'
+                  href="#"
                 >
                   Request access
                 </a>
@@ -538,24 +534,22 @@ export default function Login() {
           &copy; 2024 Logic. All rights reserved.
         </span>
         <div style={{ display: "flex", gap: "24px" }}>
-          {["Privacy Policy", "Terms of Service", "Security Documentation"].map(
-            (link) => (
-              <a
-                key={link}
-                href='#'
-                style={{
-                  fontSize: "0.6875rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: "#94a3b8",
-                  fontWeight: 500,
-                  textDecoration: "none",
-                }}
-              >
-                {link}
-              </a>
-            ),
-          )}
+          {["Privacy Policy", "Terms of Service", "Security Documentation"].map((link) => (
+            <a
+              key={link}
+              href="#"
+              style={{
+                fontSize: "0.6875rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "#94a3b8",
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              {link}
+            </a>
+          ))}
         </div>
       </footer>
 

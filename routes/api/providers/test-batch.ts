@@ -9,21 +9,15 @@ export async function POST(req: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json() as Record<string, unknown>;
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return Response.json(
-      { error: "Invalid JSON" },
-      { status: 400, headers: CORS_HEADERS }
-    );
+    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   const { mode, providerId } = body;
 
   if (!mode || typeof mode !== "string") {
-    return Response.json(
-      { error: "mode is required" },
-      { status: 400, headers: CORS_HEADERS }
-    );
+    return Response.json({ error: "mode is required" }, { status: 400, headers: CORS_HEADERS });
   }
 
   const validModes = ["provider", "oauth", "free", "apikey", "compatible", "all"];
@@ -42,10 +36,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json(result, { headers: CORS_HEADERS });
   } catch (error) {
     console.log("Error in batch test:", error);
-    return Response.json(
-      { error: "Batch test failed" },
-      { status: 500, headers: CORS_HEADERS }
-    );
+    return Response.json({ error: "Batch test failed" }, { status: 500, headers: CORS_HEADERS });
   }
 }
 

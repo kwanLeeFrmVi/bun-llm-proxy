@@ -1,4 +1,8 @@
-import { getProviderConnectionById, updateProviderConnection, deleteProviderConnection } from "@/lib/localDb";
+import {
+  getProviderConnectionById,
+  updateProviderConnection,
+  deleteProviderConnection,
+} from "@/lib/localDb";
 import { testProviderConnection } from "../../../../lib/providerTest";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
@@ -11,7 +15,8 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const id = (req as BunRequest).params.id ?? "";
   const connection = await getProviderConnectionById(id);
-  if (!connection) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!connection)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
   return Response.json(connection, { headers: CORS_HEADERS });
 }
 
@@ -21,10 +26,13 @@ export async function PUT(req: Request): Promise<Response> {
 
   const id = (req as BunRequest).params.id ?? "";
   const existing = await getProviderConnectionById(id);
-  if (!existing) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!existing)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
 
   let body: Record<string, unknown>;
-  try { body = await req.json() as Record<string, unknown>; } catch {
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -36,11 +44,15 @@ export async function DELETE(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
   if (auth.role !== "admin") {
-    return Response.json({ error: "Forbidden: only admins can delete providers" }, { status: 403, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Forbidden: only admins can delete providers" },
+      { status: 403, headers: CORS_HEADERS }
+    );
   }
   const id = (req as BunRequest).params.id ?? "";
   const existing = await getProviderConnectionById(id);
-  if (!existing) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!existing)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
   await deleteProviderConnection(id);
   return Response.json({ success: true }, { headers: CORS_HEADERS });
 }
@@ -51,7 +63,10 @@ export async function POST(req: Request): Promise<Response> {
 
   const id = (req as BunRequest).params.id ?? "";
   if (!id) {
-    return Response.json({ error: "Connection ID is required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Connection ID is required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   try {

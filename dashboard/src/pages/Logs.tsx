@@ -75,13 +75,13 @@ export default function Logs() {
   }
 
   return (
-    <div className='space-y-6 h-full flex flex-col'>
+    <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
       <div>
-        <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]">
           Console
         </h1>
-        <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium'>
+        <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium">
           Real-time request logs
         </p>
       </div>
@@ -89,39 +89,33 @@ export default function Logs() {
       {/* Toolbar + Terminal in a card */}
       <div className={cardStyle + " flex-1 flex flex-col overflow-hidden"}>
         {/* Toolbar */}
-        <div className='px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[rgba(203,213,225,0.4)] shrink-0'>
-          <div className='flex items-center gap-3'>
-            <span className='inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[--primary-fixed] text-[--on-primary-fixed]'>
-              <Terminal className='w-4 h-4' />
+        <div className="px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[rgba(203,213,225,0.4)] shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[--primary-fixed] text-[--on-primary-fixed]">
+              <Terminal className="w-4 h-4" />
             </span>
-            <span className='text-sm font-semibold text-[--on-surface]'>
-              Console Logs
-            </span>
-            <Badge variant='secondary' className='text-xs font-medium'>
+            <span className="text-sm font-semibold text-[--on-surface]">Console Logs</span>
+            <Badge variant="secondary" className="text-xs font-medium">
               {logs.length} lines
             </Badge>
           </div>
-          <div className='flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end'>
-            <div className='flex items-center gap-2'>
-              <Switch
-                id='auto-scroll'
-                checked={autoScroll}
-                onCheckedChange={setAutoScroll}
-              />
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2">
+              <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
               <Label
-                htmlFor='auto-scroll'
-                className='text-xs text-[--on-surface-variant] font-medium cursor-pointer'
+                htmlFor="auto-scroll"
+                className="text-xs text-[--on-surface-variant] font-medium cursor-pointer"
               >
                 Auto-scroll
               </Label>
             </div>
             <Button
-              variant='outline'
-              size='sm'
+              variant="outline"
+              size="sm"
               onClick={() => setLogs([])}
-              className='h-8 text-xs font-medium border-[rgba(203,213,225,0.6)]'
+              className="h-8 text-xs font-medium border-[rgba(203,213,225,0.6)]"
             >
-              <Trash2 className='w-3.5 h-3.5 mr-1.5' /> Clear
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Clear
             </Button>
           </div>
         </div>
@@ -130,27 +124,20 @@ export default function Logs() {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className='flex-1 overflow-y-auto bg-[#0d1117] p-4 font-mono text-sm leading-relaxed'
+          className="flex-1 overflow-y-auto bg-[#0d1117] p-4 font-mono text-sm leading-relaxed"
           style={{ borderRadius: "0 0 0.625rem 0.625rem" }}
         >
           {logs.map((entry) => (
-            <div
-              key={entry.id}
-              className={`${LEVEL_COLORS[entry.level] ?? "text-slate-100"}`}
-            >
-              <span className='text-gray-600'>
+            <div key={entry.id} className={`${LEVEL_COLORS[entry.level] ?? "text-slate-100"}`}>
+              <span className="text-gray-600">
                 [{entry.timestamp.split("T")[1]?.split(".")[0]}]
               </span>{" "}
-              <span className='text-gray-500 uppercase text-xs mr-1'>
-                [{entry.level}]
-              </span>
+              <span className="text-gray-500 uppercase text-xs mr-1">[{entry.level}]</span>
               {entry.message}
             </div>
           ))}
           {logs.length === 0 && (
-            <div className='text-gray-600 italic'>
-              No logs yet. Waiting for output…
-            </div>
+            <div className="text-gray-600 italic">No logs yet. Waiting for output…</div>
           )}
         </div>
       </div>

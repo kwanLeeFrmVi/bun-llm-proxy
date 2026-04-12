@@ -36,7 +36,8 @@ export async function DELETE(req: Request): Promise<Response> {
 
   const id = (req as BunRequest).params.id ?? "";
   const deleted = await deleteProviderNode(id);
-  if (!deleted) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!deleted)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
   return Response.json({ success: true }, { headers: CORS_HEADERS });
 }
 

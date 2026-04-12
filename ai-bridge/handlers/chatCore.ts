@@ -4,7 +4,12 @@
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
 import { HTTP_STATUS } from "../config/runtimeConfig.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
-import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "./provider.js";
+import {
+  detectFormat,
+  getTargetFormat,
+  buildUpstreamUrl,
+  buildUpstreamHeaders,
+} from "./provider.js";
 import { errorResponse } from "../utils/error.ts";
 import * as log from "../../lib/logger.ts";
 import type { RequestContext } from "../../lib/requestContext.ts";
@@ -14,7 +19,11 @@ export interface ChatCoreOptions {
   body: Record<string, unknown>;
   modelInfo: { provider: string; model: string };
   credentials: Record<string, unknown>;
-  clientRawRequest?: { endpoint: string; body: Record<string, unknown>; headers: Record<string, string> };
+  clientRawRequest?: {
+    endpoint: string;
+    body: Record<string, unknown>;
+    headers: Record<string, string>;
+  };
   connectionId?: string;
   userAgent?: string;
   apiKey?: string | null;
@@ -59,7 +68,7 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
 
   // Determine streaming mode
   const streamProvider = STREAM_PROVIDERS.has(provider);
-  const stream = streamProvider ? true : (body.stream !== false);
+  const stream = streamProvider ? true : body.stream !== false;
 
   log.debug(ctx ?? null, "CHAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
 
@@ -69,7 +78,10 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     ? Request(sourceFormat, targetFormat, model, bodyBytes, stream !== false)
     : bodyBytes;
 
-  const translatedBody = JSON.parse(new TextDecoder().decode(translatedBytes)) as Record<string, unknown>;
+  const translatedBody = JSON.parse(new TextDecoder().decode(translatedBytes)) as Record<
+    string,
+    unknown
+  >;
   // Vertex AI (Gemini format) uses model in URL path, not body — skip setting model field
   // vertex-partner uses OpenAI-compatible endpoint which needs model in body
   if (provider !== "vertex") {
@@ -80,13 +92,21 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   const upstreamUrl = buildUpstreamUrl(provider, model, stream !== false, credentials);
   if (!upstreamUrl) {
     const errorMsg = `Unknown provider: ${provider}`;
-    return { success: false, status: HTTP_STATUS.BAD_REQUEST, error: errorMsg, response: errorResponse(HTTP_STATUS.BAD_REQUEST, errorMsg) };
+    return {
+      success: false,
+      status: HTTP_STATUS.BAD_REQUEST,
+      error: errorMsg,
+      response: errorResponse(HTTP_STATUS.BAD_REQUEST, errorMsg),
+    };
   }
 
   const headers = buildUpstreamHeaders(provider, credentials);
 
   // Calculate message count for upstream logging
-  const messages = (body.messages as unknown[] | undefined)?.length ?? (body.input as unknown[] | undefined)?.length ?? 0;
+  const messages =
+    (body.messages as unknown[] | undefined)?.length ??
+    (body.input as unknown[] | undefined)?.length ??
+    0;
 
   log.debug(ctx ?? null, "CHAT", `${provider.toUpperCase()} → ${upstreamUrl}`);
   log.info(ctx ?? null, "REQUEST", `${provider.toUpperCase()} | ${model} | ${messages} msgs`);
@@ -111,17 +131,40 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       if (errResult) return errResult;
       // For other non-ok statuses, return a generic error (don't continue to read body again)
       const errorMsg = errorText || `Upstream error: ${upstream.status}`;
-      return { success: false, status: upstream.status, error: errorMsg, response: errorResponse(upstream.status, `Provider ${provider} returned ${upstream.status}: ${errorMsg}`) };
+      return {
+        success: false,
+        status: upstream.status,
+        error: errorMsg,
+        response: errorResponse(
+          upstream.status,
+          `Provider ${provider} returned ${upstream.status}: ${errorMsg}`
+        ),
+      };
     }
 
     if (stream) {
-      const response = await handleStreamingResponse(upstream, sourceFormat, targetFormat, model, translatedBytes, opts);
+      const response = await handleStreamingResponse(
+        upstream,
+        sourceFormat,
+        targetFormat,
+        model,
+        translatedBytes,
+        opts
+      );
       opts.onRequestSuccess?.().catch(() => {});
       return { success: true, response };
     } else {
       const responseBody = await upstream.text();
       const translated = NeedsTranslation(targetFormat, sourceFormat)
-        ? ResponseNonStream(targetFormat, sourceFormat, null, model, translatedBytes, translatedBytes, new TextEncoder().encode(responseBody))
+        ? ResponseNonStream(
+            targetFormat,
+            sourceFormat,
+            null,
+            model,
+            translatedBytes,
+            translatedBytes,
+            new TextEncoder().encode(responseBody)
+          )
         : new TextEncoder().encode(responseBody);
 
       // Extract usage from non-streaming response
@@ -141,7 +184,9 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
             cached_tokens: parsed.usage.prompt_tokens_details?.cached_tokens,
           };
         }
-      } catch { /* non-JSON response, skip usage */ }
+      } catch {
+        /* non-JSON response, skip usage */
+      }
 
       const response = new globalThis.Response(translated, {
         status: upstream.status || 200,
@@ -158,10 +203,20 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     if (msg === "The operation was aborted" || msg === "aborted") {
       log.error(ctx ?? null, "CHAT", `Request timed out after ${TIMEOUT_MS / 1000}s`);
       const timeoutMsg = `Request timed out after ${TIMEOUT_MS / 1000}s`;
-      return { success: false, status: HTTP_STATUS.GATEWAY_TIMEOUT, error: timeoutMsg, response: errorResponse(HTTP_STATUS.GATEWAY_TIMEOUT, timeoutMsg) };
+      return {
+        success: false,
+        status: HTTP_STATUS.GATEWAY_TIMEOUT,
+        error: timeoutMsg,
+        response: errorResponse(HTTP_STATUS.GATEWAY_TIMEOUT, timeoutMsg),
+      };
     }
     log.error(ctx ?? null, "CHAT", `Upstream error: ${msg}`);
-    return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: msg, response: errorResponse(HTTP_STATUS.BAD_GATEWAY, msg) };
+    return {
+      success: false,
+      status: HTTP_STATUS.BAD_GATEWAY,
+      error: msg,
+      response: errorResponse(HTTP_STATUS.BAD_GATEWAY, msg),
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -243,7 +298,14 @@ async function handleStreamingResponse(
 
             for (const jsonStr of jsonObjects) {
               const chunkRaw = encoder.encode(jsonStr);
-              const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, chunkRaw, state);
+              const translated = translateChunk(
+                targetFormat,
+                sourceFormat,
+                model,
+                translatedBytes,
+                chunkRaw,
+                state
+              );
               state = translated.state;
               for (const chunk of translated.chunks) {
                 controller.enqueue(chunk);
@@ -262,7 +324,14 @@ async function handleStreamingResponse(
               ndjsonBuffer = ndjsonBuffer.slice(lineEnd + 1);
               if (!line.trim()) continue;
               const lineRaw = encoder.encode(line);
-              const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, lineRaw, state);
+              const translated = translateChunk(
+                targetFormat,
+                sourceFormat,
+                model,
+                translatedBytes,
+                lineRaw,
+                state
+              );
               state = translated.state;
               for (const chunk of translated.chunks) {
                 controller.enqueue(chunk);
@@ -283,7 +352,14 @@ async function handleStreamingResponse(
             sseBuffer = sseBuffer.slice(eventEnd + 2);
 
             const eventRaw = encoder.encode(eventText);
-            const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, eventRaw, state);
+            const translated = translateChunk(
+              targetFormat,
+              sourceFormat,
+              model,
+              translatedBytes,
+              eventRaw,
+              state
+            );
             state = translated.state;
             for (const chunk of translated.chunks) {
               controller.enqueue(chunk);
@@ -294,7 +370,14 @@ async function handleStreamingResponse(
         // Process any remaining buffered data
         if (ndjsonBuffer.trim()) {
           const remainingRaw = encoder.encode(ndjsonBuffer.trim());
-          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, remainingRaw, state);
+          const translated = translateChunk(
+            targetFormat,
+            sourceFormat,
+            model,
+            translatedBytes,
+            remainingRaw,
+            state
+          );
           state = translated.state;
           for (const chunk of translated.chunks) {
             controller.enqueue(chunk);
@@ -303,7 +386,14 @@ async function handleStreamingResponse(
         }
         if (sseBuffer.trim()) {
           const remainingRaw = encoder.encode(sseBuffer.trim());
-          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, remainingRaw, state);
+          const translated = translateChunk(
+            targetFormat,
+            sourceFormat,
+            model,
+            translatedBytes,
+            remainingRaw,
+            state
+          );
           state = translated.state;
           for (const chunk of translated.chunks) {
             controller.enqueue(chunk);
@@ -312,7 +402,14 @@ async function handleStreamingResponse(
         }
 
         // Normal completion: flush done events
-        const doneChunks = translateChunk(targetFormat, sourceFormat, model, translatedBytes, encoder.encode("data: [DONE]"), state);
+        const doneChunks = translateChunk(
+          targetFormat,
+          sourceFormat,
+          model,
+          translatedBytes,
+          encoder.encode("data: [DONE]"),
+          state
+        );
         for (const chunk of doneChunks.chunks) {
           controller.enqueue(chunk);
         }
@@ -324,11 +421,20 @@ async function handleStreamingResponse(
         // on missing input_tokens when the upstream connection drops mid-stream.
         if (state !== undefined) {
           try {
-            const doneChunks = translateChunk(targetFormat, sourceFormat, model, translatedBytes, encoder.encode("data: [DONE]"), state);
+            const doneChunks = translateChunk(
+              targetFormat,
+              sourceFormat,
+              model,
+              translatedBytes,
+              encoder.encode("data: [DONE]"),
+              state
+            );
             for (const chunk of doneChunks.chunks) {
               controller.enqueue(chunk);
             }
-          } catch { /* ignore flush errors */ }
+          } catch {
+            /* ignore flush errors */
+          }
         }
         controller.error(streamErr);
       } finally {
@@ -345,7 +451,7 @@ async function handleStreamingResponse(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
   });
@@ -366,9 +472,29 @@ function translateChunk(
 ): TranslateChunkResult {
   // Import the Response function lazily to avoid circular dependency at module level
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Response: translate } = require("../translator/index.ts") as { Response: (from: string, to: string, ctx: unknown, modelName: string, origReq: Uint8Array, req: Uint8Array, raw: Uint8Array, state: unknown) => Uint8Array[] };
+  const { Response: translate } = require("../translator/index.ts") as {
+    Response: (
+      from: string,
+      to: string,
+      ctx: unknown,
+      modelName: string,
+      origReq: Uint8Array,
+      req: Uint8Array,
+      raw: Uint8Array,
+      state: unknown
+    ) => Uint8Array[];
+  };
 
-  const chunks = translate(sourceFormat, targetFormat, null, model, requestBytes, requestBytes, raw, state);
+  const chunks = translate(
+    sourceFormat,
+    targetFormat,
+    null,
+    model,
+    requestBytes,
+    requestBytes,
+    raw,
+    state
+  );
   // Do NOT replace state with output chunks — translator functions mutate the state
   // object in-place via the `param` argument, so we preserve the same reference.
   // Previously this was `chunks[chunks.length - 1]` which corrupted state with a Uint8Array.
@@ -377,18 +503,37 @@ function translateChunk(
 
 // ─── Error handling ─────────────────────────────────────────────────────────────
 
-function handleUpstreamError(status: number, errorText: string, provider: string): ChatCoreResult | null {
+function handleUpstreamError(
+  status: number,
+  errorText: string,
+  provider: string
+): ChatCoreResult | null {
   if (status === 401 || status === 403) {
     const errorMsg = "Authentication failed";
-    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
+    return {
+      success: false,
+      status,
+      error: errorMsg,
+      response: errorResponse(status, `Provider ${provider}: ${errorMsg}`),
+    };
   }
   if (status === 429) {
     const errorMsg = `Rate limited: ${errorText}`;
-    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
+    return {
+      success: false,
+      status,
+      error: errorMsg,
+      response: errorResponse(status, `Provider ${provider}: ${errorMsg}`),
+    };
   }
   if (status >= 500) {
     const errorMsg = `Upstream error: ${status}`;
-    return { success: false, status, error: errorMsg, response: errorResponse(status, `Provider ${provider}: ${errorMsg}`) };
+    return {
+      success: false,
+      status,
+      error: errorMsg,
+      response: errorResponse(status, `Provider ${provider}: ${errorMsg}`),
+    };
   }
   return null;
 }

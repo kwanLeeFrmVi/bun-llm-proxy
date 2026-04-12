@@ -20,10 +20,7 @@ function makeKey(connectionId: string, model: string): string {
 /**
  * Returns true if the circuit is open (failure count >= maxAttempts).
  */
-export async function isCircuitOpen(
-  connectionId: string,
-  model: string
-): Promise<boolean> {
+export async function isCircuitOpen(connectionId: string, model: string): Promise<boolean> {
   const key = makeKey(connectionId, model);
 
   // Try Redis first
@@ -67,15 +64,11 @@ export async function incrementCircuitBreaker(
   const redis = getRedis();
   if (redis) {
     try {
-      const result = await withLock(
-        `circuit-lock:${connectionId}:${model}`,
-        2,
-        async () => {
-          const count = await redis.incr(key);
-          await redis.expire(key, CIRCUIT_TTL_SEC);
-          return count;
-        }
-      );
+      const result = await withLock(`circuit-lock:${connectionId}:${model}`, 2, async () => {
+        const count = await redis.incr(key);
+        await redis.expire(key, CIRCUIT_TTL_SEC);
+        return count;
+      });
       if (result.executed) return result.result ?? 1;
     } catch (err) {
       log.debug(null, "CIRCUIT", `Redis lock error for ${key}: ${(err as Error).message}`);
@@ -85,8 +78,7 @@ export async function incrementCircuitBreaker(
   // Fallback: in-memory
   const now = Date.now();
   const entry = inMemoryCircuit.get(key);
-  const current =
-    entry && Date.now() <= entry.expiresAt ? entry.count : 0;
+  const current = entry && Date.now() <= entry.expiresAt ? entry.count : 0;
   const next = current + 1;
   inMemoryCircuit.set(key, {
     count: next,
@@ -101,10 +93,7 @@ export async function incrementCircuitBreaker(
 /**
  * Clear the circuit breaker counter on a successful response.
  */
-export async function resetCircuitBreaker(
-  connectionId: string,
-  model: string
-): Promise<void> {
+export async function resetCircuitBreaker(connectionId: string, model: string): Promise<void> {
   const key = makeKey(connectionId, model);
   const redis = getRedis();
   if (redis) {

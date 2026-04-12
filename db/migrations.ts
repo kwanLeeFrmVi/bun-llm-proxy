@@ -20,7 +20,10 @@ export interface Migration {
 export function getSchemaVersion(db: Database): number {
   try {
     const row = db
-      .query<{ version: number }, []>("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+      .query<
+        { version: number },
+        []
+      >("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
       .get();
     return row?.version ?? 0;
   } catch {
@@ -49,10 +52,10 @@ export function runMigrations(db: Database): void {
       try {
         migration.up(db);
         // Record version
-        db.run(
-          "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
-          [migration.version, new Date().toISOString()]
-        );
+        db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [
+          migration.version,
+          new Date().toISOString(),
+        ]);
         db.run("COMMIT");
         console.log(`[DB] Migration v${migration.version} completed`);
       } catch (error) {
@@ -86,19 +89,26 @@ const migrationV2: Migration = {
     // 1. Migrate provider_connections
     // Check if old schema exists
     const oldPCExists = db
-      .query<{ name: string }, []>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_connections'"
-      )
+      .query<
+        { name: string },
+        []
+      >("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_connections'")
       .get();
 
     if (oldPCExists) {
       const pcColumns = db
-        .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_connections'")
+        .query<
+          { sql: string },
+          []
+        >("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_connections'")
         .get();
 
       // Check if using old JSON blob schema (data column exists)
       // Look for the actual column name in the schema - SQLite returns SQL with varying whitespace
-      const isOldSchema = pcColumns?.sql.includes("data") && pcColumns?.sql.includes("TEXT") && !pcColumns?.sql.includes("display_name");
+      const isOldSchema =
+        pcColumns?.sql.includes("data") &&
+        pcColumns?.sql.includes("TEXT") &&
+        !pcColumns?.sql.includes("display_name");
 
       if (isOldSchema) {
         console.log("[Migration v2] Migrating provider_connections from JSON blob to columnar");
@@ -140,9 +150,10 @@ const migrationV2: Migration = {
 
         // Migrate data from old table
         const oldRows = db
-          .query<{ id: string; provider: string; data: string }, []>(
-            "SELECT id, provider, data FROM provider_connections_old"
-          )
+          .query<
+            { id: string; provider: string; data: string },
+            []
+          >("SELECT id, provider, data FROM provider_connections_old")
           .all();
 
         for (const row of oldRows) {
@@ -231,18 +242,25 @@ const migrationV2: Migration = {
 
     // 2. Migrate proxy_pools
     const oldPPExists = db
-      .query<{ name: string }, []>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='proxy_pools'"
-      )
+      .query<
+        { name: string },
+        []
+      >("SELECT name FROM sqlite_master WHERE type='table' AND name='proxy_pools'")
       .get();
 
     if (oldPPExists) {
       const ppColumns = db
-        .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type='table' AND name='proxy_pools'")
+        .query<
+          { sql: string },
+          []
+        >("SELECT sql FROM sqlite_master WHERE type='table' AND name='proxy_pools'")
         .get();
 
       // Check if using old JSON blob schema (data column exists)
-      const isOldSchema = ppColumns?.sql.includes("data") && ppColumns?.sql.includes("TEXT") && !ppColumns?.sql.includes("proxy_url");
+      const isOldSchema =
+        ppColumns?.sql.includes("data") &&
+        ppColumns?.sql.includes("TEXT") &&
+        !ppColumns?.sql.includes("proxy_url");
 
       if (isOldSchema) {
         console.log("[Migration v2] Migrating proxy_pools from JSON blob to columnar");
@@ -371,7 +389,10 @@ const migrationV2: Migration = {
 
     // 4. Migrate data from kv table to new tables
     const kvExists = db
-      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table' AND name='kv'")
+      .query<
+        { name: string },
+        []
+      >("SELECT name FROM sqlite_master WHERE type='table' AND name='kv'")
       .get();
 
     if (kvExists) {
@@ -385,10 +406,10 @@ const migrationV2: Migration = {
         try {
           const settings = JSON.parse(settingsRow.value) as Record<string, unknown>;
           for (const [key, value] of Object.entries(settings)) {
-            db.run(
-              "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-              [key, JSON.stringify(value)]
-            );
+            db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [
+              key,
+              JSON.stringify(value),
+            ]);
           }
           console.log(`[Migration v2] Migrated ${Object.keys(settings).length} settings`);
         } catch {
@@ -404,7 +425,10 @@ const migrationV2: Migration = {
         try {
           const aliases = JSON.parse(aliasesRow.value) as Record<string, string>;
           for (const [alias, model] of Object.entries(aliases)) {
-            db.run("INSERT OR REPLACE INTO model_aliases (alias, model) VALUES (?, ?)", [alias, model]);
+            db.run("INSERT OR REPLACE INTO model_aliases (alias, model) VALUES (?, ?)", [
+              alias,
+              model,
+            ]);
           }
           console.log(`[Migration v2] Migrated ${Object.keys(aliases).length} model aliases`);
         } catch {
@@ -512,9 +536,7 @@ function toBool(value: unknown): boolean {
   return false;
 }
 
-function extractProviderSpecificData(
-  data: Record<string, unknown>
-): Record<string, unknown> {
+function extractProviderSpecificData(data: Record<string, unknown>): Record<string, unknown> {
   const specificFields = [
     "id",
     "provider",
@@ -627,17 +649,19 @@ const migrationV3: Migration = {
         .get(key);
 
       if (existing) {
-        console.log(`[Migration v3] Provider ${nodeName} already has provider-level models, skipping.`);
+        console.log(
+          `[Migration v3] Provider ${nodeName} already has provider-level models, skipping.`
+        );
         continue;
       }
 
       // Insert new entry
-      db.run(
-        "INSERT INTO settings (key, value) VALUES (?, ?)",
-        [key, JSON.stringify(modelIds)]
-      );
+      db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [key, JSON.stringify(modelIds)]);
 
-      console.log(`[Migration v3] Migrated ${modelIds.length} models for provider "${nodeName}":`, modelIds);
+      console.log(
+        `[Migration v3] Migrated ${modelIds.length} models for provider "${nodeName}":`,
+        modelIds
+      );
       migratedCount++;
     }
 

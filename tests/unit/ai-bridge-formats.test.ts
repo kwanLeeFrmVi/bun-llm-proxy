@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { FORMATS, ALL_FORMATS, fromString, detectFormatByEndpoint } from "../../ai-bridge/translator/formats.ts";
+import {
+  FORMATS,
+  ALL_FORMATS,
+  fromString,
+  detectFormatByEndpoint,
+} from "../../ai-bridge/translator/formats.ts";
 
 // ─── FORMATS constants ────────────────────────────────────────────────────────
 

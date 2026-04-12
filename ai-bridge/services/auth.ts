@@ -116,14 +116,19 @@ export function getModelLockKey(model: string | null): string {
   return model ? `${MODEL_LOCK_PREFIX}${model}` : MODEL_LOCK_ALL;
 }
 
-export function isModelLockActive(connection: Record<string, unknown>, model: string | null): boolean {
+export function isModelLockActive(
+  connection: Record<string, unknown>,
+  model: string | null
+): boolean {
   const key = getModelLockKey(model);
   const expiry = (connection[key] ?? connection[MODEL_LOCK_ALL]) as string | undefined;
   if (!expiry) return false;
   return new Date(expiry).getTime() > Date.now();
 }
 
-export function getEarliestModelLockUntil(connection: Record<string, unknown> | null): string | null {
+export function getEarliestModelLockUntil(
+  connection: Record<string, unknown> | null
+): string | null {
   if (!connection) return null;
   let earliest: number | null = null;
   const now = Date.now();
@@ -136,12 +141,17 @@ export function getEarliestModelLockUntil(connection: Record<string, unknown> | 
   return earliest !== null ? new Date(earliest).toISOString() : null;
 }
 
-export function buildModelLockUpdate(model: string | null, cooldownMs: number): Record<string, string> {
+export function buildModelLockUpdate(
+  model: string | null,
+  cooldownMs: number
+): Record<string, string> {
   const key = getModelLockKey(model);
   return { [key]: new Date(Date.now() + cooldownMs).toISOString() };
 }
 
-export function buildClearModelLocksUpdate(connection: Record<string, unknown>): Record<string, null> {
+export function buildClearModelLocksUpdate(
+  connection: Record<string, unknown>
+): Record<string, null> {
   const cleared: Record<string, null> = {};
   for (const key of Object.keys(connection)) {
     if (key.startsWith(MODEL_LOCK_PREFIX)) cleared[key] = null;
@@ -182,12 +192,11 @@ export function getEarliestRateLimitedUntil(
 
 // ─── Account Filtering ─────────────────────────────────────────────────────────
 
-export function filterAvailableAccounts<T extends { id?: string; rateLimitedUntil?: string | null }>(
-  accounts: T[],
-  excludeId: string | null = null
-): T[] {
+export function filterAvailableAccounts<
+  T extends { id?: string; rateLimitedUntil?: string | null },
+>(accounts: T[], excludeId: string | null = null): T[] {
   const now = Date.now();
-  return accounts.filter(acc => {
+  return accounts.filter((acc) => {
     if (excludeId && acc.id === excludeId) return false;
     if (acc.rateLimitedUntil) {
       const until = new Date(acc.rateLimitedUntil).getTime();

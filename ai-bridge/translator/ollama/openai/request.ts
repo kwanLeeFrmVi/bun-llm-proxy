@@ -4,7 +4,10 @@ export function convertOllamaRequestToOpenAI(
   inputRaw: Uint8Array,
   stream: boolean
 ): Uint8Array {
-  const raw = typeof inputRaw === "string" ? JSON.parse(inputRaw) : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
   const out: Record<string, unknown> = {
     model: modelName,
     stream,

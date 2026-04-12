@@ -48,7 +48,7 @@ export interface EditConnectionModalProps {
       priority: number;
       refreshToken?: string;
       apiKey?: string;
-    },
+    }
   ) => void;
   onClose: () => void;
 }
@@ -56,7 +56,7 @@ export interface EditConnectionModalProps {
 export interface AddCustomModelModalProps {
   isOpen: boolean;
   providerId: string;
-  providerPrefix?: string;  // Effective prefix for showing the full model ID preview
+  providerPrefix?: string; // Effective prefix for showing the full model ID preview
   onAdd: (modelId: string) => void;
   onClose: () => void;
 }

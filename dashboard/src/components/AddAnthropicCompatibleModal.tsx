@@ -28,7 +28,11 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
   const [checkModel, setCheckModel] = useState("");
   const [validating, setValidating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; error?: string; method?: string } | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    error?: string;
+    method?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,7 +56,10 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
       });
       setValidationResult(res as { valid: boolean; error?: string; method?: string });
     } catch (e) {
-      setValidationResult({ valid: false, error: e instanceof Error ? e.message : "Network error" });
+      setValidationResult({
+        valid: false,
+        error: e instanceof Error ? e.message : "Network error",
+      });
     } finally {
       setValidating(false);
     }
@@ -64,7 +71,10 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
     try {
       const res = await fetch("/api/provider-nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
         body: JSON.stringify({ ...form, type: "anthropic-compatible" }),
       });
       const data = await res.json();
@@ -83,45 +93,61 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline text-lg font-bold">Add Anthropic Compatible</DialogTitle>
+          <DialogTitle className="font-headline text-lg font-bold">
+            Add Anthropic Compatible
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Name</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Name
+            </Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Anthropic Compatible (Prod)"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Required. A friendly label for this node.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Required. A friendly label for this node.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Prefix</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Prefix
+            </Label>
             <Input
               value={form.prefix}
               onChange={(e) => setForm((f) => ({ ...f, prefix: e.target.value }))}
               placeholder="ac-prod"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Required. Used as the provider prefix for model IDs.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Required. Used as the provider prefix for model IDs.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Base URL</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Base URL
+            </Label>
             <Input
               value={form.baseUrl}
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
               placeholder="https://api.anthropic.com/v1"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Use the base URL (ending in /v1). The system appends /messages.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Use the base URL (ending in /v1). The system appends /messages.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">API Key (for Check)</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              API Key (for Check)
+            </Label>
             <Input
               type="password"
               value={checkKey}
@@ -132,7 +158,9 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Model ID (optional)</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Model ID (optional)
+            </Label>
             <Input
               value={checkModel}
               onChange={(e) => setCheckModel(e.target.value)}
@@ -150,15 +178,14 @@ export function AddAnthropicCompatibleModal({ isOpen, onClose, onCreated }: Prop
             >
               {validating ? "Checking..." : "Check"}
             </Button>
-            {validationResult && (
-              validationResult.valid ? (
+            {validationResult &&
+              (validationResult.valid ? (
                 <span className="text-xs text-green-600 font-medium">
                   ✓ Valid{validationResult.method === "chat" ? " (via chat)" : ""}
                 </span>
               ) : (
                 <span className="text-xs text-red-500">{validationResult.error}</span>
-              )
-            )}
+              ))}
           </div>
         </div>
 

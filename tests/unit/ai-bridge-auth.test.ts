@@ -3,10 +3,7 @@
  * Uses Bun's native test runner.
  */
 
-import {
-  checkFallbackError,
-  getQuotaCooldown,
-} from "../../ai-bridge/services/auth.ts";
+import { checkFallbackError, getQuotaCooldown } from "../../ai-bridge/services/auth.ts";
 
 // ─── checkFallbackError ──────────────────────────────────────────────────────
 

@@ -12,7 +12,11 @@ export function ProviderIconWrapper({
   catalog?: ProviderCatalog;
   node?: ProviderNode;
 }) {
-  const { logoPath, isAnthropicCompat, isOpenAICompat } = useProviderMeta(providerId, catalog, node);
+  const { logoPath, isAnthropicCompat, isOpenAICompat } = useProviderMeta(
+    providerId,
+    catalog,
+    node
+  );
 
   let fallbackColor = "#6B7280";
   let fallbackText = "??";

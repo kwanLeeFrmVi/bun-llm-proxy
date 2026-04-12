@@ -11,8 +11,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <TooltipProvider>
       <AuthProvider>
         <App />
-        <Toaster position='top-right' richColors />
+        <Toaster position="top-right" richColors />
       </AuthProvider>
     </TooltipProvider>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

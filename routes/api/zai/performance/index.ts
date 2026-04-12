@@ -12,10 +12,7 @@ export async function GET(req: Request): Promise<Response> {
   const endTime = url.searchParams.get("endTime");
 
   if (!startTime || !endTime) {
-    return Response.json(
-      { error: "Missing startTime or endTime parameter" },
-      { status: 400 },
-    );
+    return Response.json({ error: "Missing startTime or endTime parameter" }, { status: 400 });
   }
 
   try {

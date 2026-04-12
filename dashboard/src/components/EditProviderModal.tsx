@@ -80,37 +80,49 @@ export function EditProviderModal({ isOpen, node, onClose, onUpdated }: Props) {
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Name</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Name
+            </Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Provider Name"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">A friendly label for this provider.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              A friendly label for this provider.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Base URL</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Base URL
+            </Label>
             <Input
               value={form.baseUrl}
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
               placeholder="https://api.example.com/v1"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">The base URL for the provider API.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              The base URL for the provider API.
+            </p>
           </div>
 
           {showApiType && (
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">API Type</Label>
+              <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+                API Type
+              </Label>
               <select
                 value={form.apiType}
                 onChange={(e) => setForm((f) => ({ ...f, apiType: e.target.value }))}
                 className="h-11 w-full bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm px-3"
               >
                 {API_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
                 ))}
               </select>
             </div>

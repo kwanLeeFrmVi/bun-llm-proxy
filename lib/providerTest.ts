@@ -1,4 +1,8 @@
-import { getProviderConnectionById, updateProviderConnection, getProviderNodeById } from "@/lib/localDb";
+import {
+  getProviderConnectionById,
+  updateProviderConnection,
+  getProviderNodeById,
+} from "@/lib/localDb";
 import {
   isOpenAICompatibleProvider,
   isAnthropicCompatibleProvider,
@@ -48,9 +52,7 @@ async function testAnthropic(apiKey: string): Promise<boolean> {
 }
 
 async function testGemini(apiKey: string): Promise<boolean> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
-  );
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
   return res.ok;
 }
 
@@ -170,21 +172,18 @@ async function testGLM(apiKey: string): Promise<boolean> {
 }
 
 async function testGLMCN(apiKey: string): Promise<boolean> {
-  const res = await fetch(
-    "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "glm-4.7",
-        max_tokens: 1,
-        messages: [{ role: "user", content: "test" }],
-      }),
-    }
-  );
+  const res = await fetch("https://open.bigmodel.cn/api/coding/paas/v4/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "glm-4.7",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "test" }],
+    }),
+  });
   return res.status !== 401 && res.status !== 403;
 }
 
@@ -240,40 +239,34 @@ async function testClaudeCN(apiKey: string): Promise<boolean> {
 }
 
 async function testAliCode(apiKey: string): Promise<boolean> {
-  const res = await fetch(
-    "https://coding.dashscope.aliyuncs.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "qwen-coding-plus",
-        max_tokens: 1,
-        messages: [{ role: "user", content: "test" }],
-      }),
-    }
-  );
+  const res = await fetch("https://coding.dashscope.aliyuncs.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen-coding-plus",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "test" }],
+    }),
+  });
   return res.status !== 401 && res.status !== 403;
 }
 
 async function testAliCodeIntl(apiKey: string): Promise<boolean> {
-  const res = await fetch(
-    "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "qwen-coding-plus",
-        max_tokens: 1,
-        messages: [{ role: "user", content: "test" }],
-      }),
-    }
-  );
+  const res = await fetch("https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen-coding-plus",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "test" }],
+    }),
+  });
   return res.status !== 401 && res.status !== 403;
 }
 
@@ -420,15 +413,14 @@ async function testAnthropicCompatible(
 
 // ─── Main test function ─────────────────────────────────────────────────────────
 
-async function testApiKeyConnection(
-  connection: ConnectionForTest
-): Promise<TestResult> {
+async function testApiKeyConnection(connection: ConnectionForTest): Promise<TestResult> {
   const { provider, apiKey } = connection;
   const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
   let baseUrl = (psd?.baseUrl ?? connection.baseUrl ?? "") as string;
 
   // For compatible providers, if baseUrl is not in connection, look up the provider node
-  const isCompatible = isOpenAICompatibleProvider(provider) || isAnthropicCompatibleProvider(provider);
+  const isCompatible =
+    isOpenAICompatibleProvider(provider) || isAnthropicCompatibleProvider(provider);
   if (!baseUrl && isCompatible) {
     const node = await getProviderNodeById(provider);
     if (node?.baseUrl) {
@@ -574,17 +566,11 @@ async function testApiKeyConnection(
         break;
       default:
         if (isOpenAICompatibleProvider(provider)) {
-          const result = await testOpenAICompatible(
-            apiKey,
-            baseUrl as string
-          );
+          const result = await testOpenAICompatible(apiKey, baseUrl as string);
           valid = result.valid;
           error = result.error;
         } else if (isAnthropicCompatibleProvider(provider)) {
-          const result = await testAnthropicCompatible(
-            apiKey,
-            baseUrl as string
-          );
+          const result = await testAnthropicCompatible(apiKey, baseUrl as string);
           valid = result.valid;
           error = result.error;
         } else {
@@ -688,9 +674,13 @@ export async function testProviderConnection(id: string): Promise<TestResult> {
 
   // Log test result
   if (result.valid) {
-    console.log(`[PROVIDER_TEST] Connection ${id} (${connection.provider}) PASSED (${result.latencyMs}ms)`);
+    console.log(
+      `[PROVIDER_TEST] Connection ${id} (${connection.provider}) PASSED (${result.latencyMs}ms)`
+    );
   } else {
-    console.log(`[PROVIDER_TEST] Connection ${id} (${connection.provider}) FAILED - ${result.error}`);
+    console.log(
+      `[PROVIDER_TEST] Connection ${id} (${connection.provider}) FAILED - ${result.error}`
+    );
   }
 
   return result;

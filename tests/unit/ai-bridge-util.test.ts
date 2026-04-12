@@ -39,9 +39,11 @@ describe("sanitizeClaudeToolID", () => {
 
 describe("toolNameMapFromRequest", () => {
   it("extracts map from Uint8Array with _toolNameMap", () => {
-    const raw = new TextEncoder().encode(JSON.stringify({
-      _toolNameMap: { "get_weather": "getWeather", "search_web": "searchWeb" },
-    }));
+    const raw = new TextEncoder().encode(
+      JSON.stringify({
+        _toolNameMap: { get_weather: "getWeather", search_web: "searchWeb" },
+      })
+    );
     const map = toolNameMapFromRequest(raw);
     expect(map.get("get_weather")).toBe("getWeather");
     expect(map.get("search_web")).toBe("searchWeb");
@@ -181,32 +183,42 @@ describe("isValidJSON", () => {
 describe("ensureToolCallIds", () => {
   it("adds id to tool_calls without id", () => {
     const body = {
-      messages: [{
-        role: "assistant",
-        content: [{
-          type: "tool_calls",
-          tool_calls: [{ function: { name: "fn1", arguments: "{}" } }],
-        }],
-      }],
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_calls",
+              tool_calls: [{ function: { name: "fn1", arguments: "{}" } }],
+            },
+          ],
+        },
+      ],
     };
     ensureToolCallIds(body);
-    const calls = (body.messages[0].content as Array<Record<string, unknown>>)[0].tool_calls as Array<Record<string, unknown>>;
+    const calls = (body.messages[0].content as Array<Record<string, unknown>>)[0]
+      .tool_calls as Array<Record<string, unknown>>;
     expect(calls[0].id).toBeDefined();
     expect(calls[0].id).toMatch(/^call_/);
   });
 
   it("does not overwrite existing tool call ids", () => {
     const body = {
-      messages: [{
-        role: "assistant",
-        content: [{
-          type: "tool_calls",
-          tool_calls: [{ id: "existing_id", function: { name: "fn1", arguments: "{}" } }],
-        }],
-      }],
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_calls",
+              tool_calls: [{ id: "existing_id", function: { name: "fn1", arguments: "{}" } }],
+            },
+          ],
+        },
+      ],
     };
     ensureToolCallIds(body);
-    const calls = (body.messages[0].content as Array<Record<string, unknown>>)[0].tool_calls as Array<Record<string, unknown>>;
+    const calls = (body.messages[0].content as Array<Record<string, unknown>>)[0]
+      .tool_calls as Array<Record<string, unknown>>;
     expect(calls[0].id).toBe("existing_id");
   });
 

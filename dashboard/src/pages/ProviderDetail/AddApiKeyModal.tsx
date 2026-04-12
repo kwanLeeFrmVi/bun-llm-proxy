@@ -20,9 +20,7 @@ export function AddApiKeyModal({
 }: AddApiKeyModalProps) {
   const [form, setForm] = useState({ name: "", apiKey: "", priority: 1 });
   const [checking, setChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<"success" | "failed" | null>(
-    null,
-  );
+  const [checkResult, setCheckResult] = useState<"success" | "failed" | null>(null);
 
   useEffect(() => {
     if (isOpen) setForm({ name: "", apiKey: "", priority: 1 });
@@ -46,33 +44,33 @@ export function AddApiKeyModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
+      <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
-          <DialogTitle className='font-headline text-lg font-bold'>
+          <DialogTitle className="font-headline text-lg font-bold">
             Add {providerName} API Key
           </DialogTitle>
         </DialogHeader>
 
-        <div className='space-y-4 py-2'>
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               Name
             </Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder='Production Key'
-              className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
+              placeholder="Production Key"
+              className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
 
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               API Key
             </Label>
-            <div className='flex gap-2'>
+            <div className="flex gap-2">
               <Input
-                type='password'
+                type="password"
                 value={form.apiKey}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -81,13 +79,13 @@ export function AddApiKeyModal({
                     checkResult: null,
                   }))
                 }
-                placeholder='sk-...'
-                className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm flex-1'
+                placeholder="sk-..."
+                className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm flex-1"
               />
               <Button
-                variant='outline'
-                size='sm'
-                className='h-11 shrink-0 px-3'
+                variant="outline"
+                size="sm"
+                className="h-11 shrink-0 px-3"
                 onClick={handleCheck}
                 disabled={!form.apiKey || checking}
               >
@@ -98,19 +96,17 @@ export function AddApiKeyModal({
               <p
                 className={`text-xs font-medium ${checkResult === "success" ? "text-green-600" : "text-red-500"}`}
               >
-                {checkResult === "success"
-                  ? "Key looks valid"
-                  : "Key looks invalid"}
+                {checkResult === "success" ? "Key looks valid" : "Key looks invalid"}
               </p>
             )}
           </div>
 
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               Priority
             </Label>
             <Input
-              type='number'
+              type="number"
               min={1}
               value={form.priority}
               onChange={(e) =>
@@ -119,23 +115,23 @@ export function AddApiKeyModal({
                   priority: parseInt(e.target.value) || 1,
                 }))
               }
-              className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
+              className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
         </div>
 
-        <DialogFooter className='gap-2'>
+        <DialogFooter className="gap-2">
           <Button
-            variant='outline'
+            variant="outline"
             onClick={onClose}
-            className='h-10 px-4 rounded font-medium text-sm'
+            className="h-10 px-4 rounded font-medium text-sm"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             disabled={!form.name || !form.apiKey}
-            className='h-10 px-5 rounded font-semibold text-sm bg-[#0F172A] text-white hover:bg-[#1e293b]'
+            className="h-10 px-5 rounded font-semibold text-sm bg-[#0F172A] text-white hover:bg-[#1e293b]"
           >
             Save
           </Button>

@@ -12,14 +12,14 @@ export async function GET(req: Request): Promise<Response> {
   const p = url.searchParams;
 
   const result = getUsageDetails({
-    limit:     parseInt(p.get("limit")     ?? "20"),
-    offset:    parseInt(p.get("offset")    ?? "0"),
-    provider:  p.get("provider")           ?? undefined,
-    model:     p.get("model")              ?? undefined,
-    apiKeyId:  p.get("apiKeyId")           ?? undefined,
-    startDate: p.get("startDate")          ?? undefined,
-    endDate:   p.get("endDate")            ?? undefined,
-    period:    p.get("period")             ?? undefined,
+    limit: parseInt(p.get("limit") ?? "20"),
+    offset: parseInt(p.get("offset") ?? "0"),
+    provider: p.get("provider") ?? undefined,
+    model: p.get("model") ?? undefined,
+    apiKeyId: p.get("apiKeyId") ?? undefined,
+    startDate: p.get("startDate") ?? undefined,
+    endDate: p.get("endDate") ?? undefined,
+    period: p.get("period") ?? undefined,
   });
 
   return Response.json(result, { headers: CORS_HEADERS });

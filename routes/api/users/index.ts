@@ -51,9 +51,15 @@ export async function POST(req: Request): Promise<Response> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("UNIQUE")) {
-      return Response.json({ error: "Username already exists" }, { status: 409, headers: CORS_HEADERS });
+      return Response.json(
+        { error: "Username already exists" },
+        { status: 409, headers: CORS_HEADERS }
+      );
     }
-    return Response.json({ error: "Failed to create user" }, { status: 500, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Failed to create user" },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 }
 

@@ -158,8 +158,26 @@ export interface GitHubConfig {
   editorPluginVersion: string;
 }
 
-export type OAuthConfig = QwenConfig | KiroConfig | GeminiCliConfig | IflowConfig | ClaudeConfig | CodexConfig | OpenAIConfig | AntigravityConfig | GitHubConfig;
-export type OAuthProviderId = "claude" | "codex" | "openai" | "gemini-cli" | "antigravity" | "qwen" | "kiro" | "iflow" | "github";
+export type OAuthConfig =
+  | QwenConfig
+  | KiroConfig
+  | GeminiCliConfig
+  | IflowConfig
+  | ClaudeConfig
+  | CodexConfig
+  | OpenAIConfig
+  | AntigravityConfig
+  | GitHubConfig;
+export type OAuthProviderId =
+  | "claude"
+  | "codex"
+  | "openai"
+  | "gemini-cli"
+  | "antigravity"
+  | "qwen"
+  | "kiro"
+  | "iflow"
+  | "github";
 
 // ─── Provider OAuth Configs ───────────────────────────────────────────────────────
 

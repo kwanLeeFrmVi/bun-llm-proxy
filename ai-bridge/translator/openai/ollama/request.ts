@@ -4,7 +4,10 @@ export function convertOpenAIRequestToOllama(
   inputRaw: Uint8Array,
   stream: boolean
 ): Uint8Array {
-  const raw = typeof inputRaw === "string" ? JSON.parse(inputRaw) : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
   const out: Record<string, unknown> = {
     model: modelName,
     stream,
@@ -14,10 +17,10 @@ export function convertOpenAIRequestToOllama(
   // system message → Ollama system field
   const msgs = raw.messages as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(msgs)) {
-    const systemMsgs = msgs.filter(m => (m.role as string) === "system");
+    const systemMsgs = msgs.filter((m) => (m.role as string) === "system");
     if (systemMsgs.length > 0) {
-      out.system = systemMsgs.map(m => m.content).join("\n");
-      out.messages = msgs.filter(m => (m.role as string) !== "system");
+      out.system = systemMsgs.map((m) => m.content).join("\n");
+      out.messages = msgs.filter((m) => (m.role as string) !== "system");
     }
   }
 

@@ -193,24 +193,32 @@ export function convertAntigravityResponseToOpenAINonStream(
 
   const usageMeta = response.usageMetadata as Record<string, unknown> | undefined;
 
-  return new TextEncoder().encode(JSON.stringify({
-    id: response.responseId ?? `chatcmpl-${Date.now()}`,
-    object: "chat.completion",
-    model: response.modelVersion ?? "",
-    choices: [{ index: 0, message, finish_reason: mapAntigravityFinishReason(finishReason ?? "STOP") }],
-    usage: {
-      prompt_tokens: (usageMeta?.promptTokenCount as number) ?? 0,
-      completion_tokens: (usageMeta?.candidatesTokenCount as number) ?? 0,
-      total_tokens: (usageMeta?.totalTokenCount as number) ?? 0,
-    },
-  }));
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id: response.responseId ?? `chatcmpl-${Date.now()}`,
+      object: "chat.completion",
+      model: response.modelVersion ?? "",
+      choices: [
+        { index: 0, message, finish_reason: mapAntigravityFinishReason(finishReason ?? "STOP") },
+      ],
+      usage: {
+        prompt_tokens: (usageMeta?.promptTokenCount as number) ?? 0,
+        completion_tokens: (usageMeta?.candidatesTokenCount as number) ?? 0,
+        total_tokens: (usageMeta?.totalTokenCount as number) ?? 0,
+      },
+    })
+  );
 }
 
 function mapAntigravityFinishReason(reason: string): string {
   switch (reason) {
-    case "STOP": return "stop";
-    case "MAX_TOKENS": return "length";
-    case "SAFETY": return "content_filter";
-    default: return "stop";
+    case "STOP":
+      return "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case "SAFETY":
+      return "content_filter";
+    default:
+      return "stop";
   }
 }

@@ -20,12 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { X, ChevronUp, ChevronDownIcon, Plus } from "lucide-react";
 
 const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
@@ -58,14 +53,14 @@ export default function ComboFormDialog({
   initialName: string;
   initialModels: ModelWithWeight[];
   allModels: string[];
-  allCombos?: string[];  // List of combo names for nested support
-  allModelTypes?: Record<string, "combo" | "model">;  // Mark which models are combos
+  allCombos?: string[]; // List of combo names for nested support
+  allModelTypes?: Record<string, "combo" | "model">; // Mark which models are combos
   onSave: (name: string, models: ModelWithWeight[]) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<ModelWithWeight[]>([]);
-  const [strategy, setStrategy] = useState<typeof STRATEGIES[number]["value"]>("fallback");
+  const [strategy, setStrategy] = useState<(typeof STRATEGIES)[number]["value"]>("fallback");
   const [modelSearch, setModelSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -98,7 +93,7 @@ export default function ComboFormDialog({
     setSelected((prev) =>
       prev.some((m) => m.model === modelId)
         ? prev.filter((m) => m.model !== modelId)
-        : [...prev, { model: modelId, weight: 1 }],
+        : [...prev, { model: modelId, weight: 1 }]
     );
   };
 
@@ -108,7 +103,7 @@ export default function ComboFormDialog({
 
   const updateWeight = (modelId: string, weight: number) => {
     setSelected((prev) =>
-      prev.map((m) => (m.model === modelId ? { ...m, weight: Math.max(1, Math.round(weight)) } : m)),
+      prev.map((m) => (m.model === modelId ? { ...m, weight: Math.max(1, Math.round(weight)) } : m))
     );
   };
 
@@ -153,7 +148,7 @@ export default function ComboFormDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className='sm:max-w-md max-h-[85vh] flex flex-col'>
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Combo" : "Create Combo"}</DialogTitle>
           <DialogDescription>
@@ -163,38 +158,38 @@ export default function ComboFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='flex flex-col gap-4 py-2 overflow-y-auto flex-1 min-h-0'>
+        <div className="flex flex-col gap-4 py-2 overflow-y-auto flex-1 min-h-0">
           {/* Name */}
-          <div className='space-y-1.5'>
-            <Label htmlFor='combo-name'>Combo Name</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="combo-name">Combo Name</Label>
             <Input
-              id='combo-name'
+              id="combo-name"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
                 if (e.target.value) validateName(e.target.value);
                 else setNameError("");
               }}
-              placeholder='my-combo'
+              placeholder="my-combo"
               aria-invalid={!!nameError}
             />
             {nameError ? (
-              <p className='text-[10px] text-destructive mt-0.5'>{nameError}</p>
+              <p className="text-[10px] text-destructive mt-0.5">{nameError}</p>
             ) : (
-              <p className='text-[10px] text-muted-foreground mt-0.5'>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 Only a-z, A-Z, 0-9, -, _ and . allowed
               </p>
             )}
           </div>
 
           {/* Strategy */}
-          <div className='space-y-1.5'>
-            <Label htmlFor='combo-strategy'>Routing Strategy</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="combo-strategy">Routing Strategy</Label>
             <select
-              id='combo-strategy'
+              id="combo-strategy"
               value={strategy}
-              onChange={(e) => setStrategy(e.target.value as typeof STRATEGIES[number]["value"])}
-              className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+              onChange={(e) => setStrategy(e.target.value as (typeof STRATEGIES)[number]["value"])}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {STRATEGIES.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -205,28 +200,31 @@ export default function ComboFormDialog({
           </div>
 
           {/* Selected models (ordered list with weights) */}
-          <div className='space-y-1.5'>
+          <div className="space-y-1.5">
             <Label>Selected Models ({selected.length})</Label>
             {selected.length > 0 ? (
-              <ScrollArea className='h-45 rounded-md border border-input bg-card/50 shadow-sm p-2'>
+              <ScrollArea className="h-45 rounded-md border border-input bg-card/50 shadow-sm p-2">
                 <TooltipProvider delayDuration={300}>
-                  <div className='flex flex-col gap-1'>
+                  <div className="flex flex-col gap-1">
                     {selected.map((item, index) => (
                       <div
                         key={item.model}
-                        className='flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 hover:bg-muted transition-colors border border-transparent hover:border-border/50'
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 hover:bg-muted transition-colors border border-transparent hover:border-border/50"
                       >
                         <Badge
-                          variant='secondary'
-                          className='text-[10px] h-4 w-4 p-0 flex items-center justify-center shrink-0 font-mono bg-background text-muted-foreground shadow-sm'
+                          variant="secondary"
+                          className="text-[10px] h-4 w-4 p-0 flex items-center justify-center shrink-0 font-mono bg-background text-muted-foreground shadow-sm"
                         >
                           {index + 1}
                         </Badge>
-                        <code className='flex-1 min-w-0 text-xs font-mono text-foreground truncate'>
+                        <code className="flex-1 min-w-0 text-xs font-mono text-foreground truncate">
                           {item.model}
                         </code>
                         {allModelTypes?.[item.model] === "combo" && (
-                          <Badge variant='outline' className='text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0'>
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0"
+                          >
                             Combo
                           </Badge>
                         )}
@@ -236,23 +234,25 @@ export default function ComboFormDialog({
                             min={1}
                             step={1}
                             value={item.weight}
-                            onChange={(e) => updateWeight(item.model, parseInt(e.target.value) || 1)}
+                            onChange={(e) =>
+                              updateWeight(item.model, parseInt(e.target.value) || 1)
+                            }
                             className="w-16 h-6 text-xs"
                           />
                         )}
-                        <div className='flex items-center gap-0.5'>
+                        <div className="flex items-center gap-0.5">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                variant='ghost'
-                                size='icon-xs'
+                                variant="ghost"
+                                size="icon-xs"
                                 onClick={() => moveUp(index)}
                                 disabled={index === 0}
                               >
-                                <ChevronUp className='w-3.5 h-3.5' />
+                                <ChevronUp className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent side='top' className='text-[10px]'>
+                            <TooltipContent side="top" className="text-[10px]">
                               Move up
                             </TooltipContent>
                           </Tooltip>
@@ -260,15 +260,15 @@ export default function ComboFormDialog({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                variant='ghost'
-                                size='icon-xs'
+                                variant="ghost"
+                                size="icon-xs"
                                 onClick={() => moveDown(index)}
                                 disabled={index === selected.length - 1}
                               >
-                                <ChevronDownIcon className='w-3.5 h-3.5' />
+                                <ChevronDownIcon className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent side='top' className='text-[10px]'>
+                            <TooltipContent side="top" className="text-[10px]">
                               Move down
                             </TooltipContent>
                           </Tooltip>
@@ -276,15 +276,15 @@ export default function ComboFormDialog({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                variant='ghost'
-                                size='icon-xs'
-                                className='hover:bg-destructive/10 hover:text-destructive'
+                                variant="ghost"
+                                size="icon-xs"
+                                className="hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => removeModel(item.model)}
                               >
-                                <X className='w-3.5 h-3.5' />
+                                <X className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent side='top' className='text-[10px]'>
+                            <TooltipContent side="top" className="text-[10px]">
                               Remove
                             </TooltipContent>
                           </Tooltip>
@@ -295,11 +295,9 @@ export default function ComboFormDialog({
                 </TooltipProvider>
               </ScrollArea>
             ) : (
-              <div className='flex flex-col items-center justify-center h-45 rounded-md border border-dashed border-input bg-card/30 p-4 text-center'>
-                <p className='text-xs text-muted-foreground italic'>
-                  No models selected
-                </p>
-                <p className='text-[10px] text-muted-foreground/70 mt-1'>
+              <div className="flex flex-col items-center justify-center h-45 rounded-md border border-dashed border-input bg-card/30 p-4 text-center">
+                <p className="text-xs text-muted-foreground italic">No models selected</p>
+                <p className="text-[10px] text-muted-foreground/70 mt-1">
                   Search and pick from the list below
                 </p>
               </div>
@@ -307,16 +305,16 @@ export default function ComboFormDialog({
           </div>
 
           {/* Search & pick models */}
-          <div className='space-y-1.5'>
+          <div className="space-y-1.5">
             <Label>Add Models</Label>
-            <Command className='rounded-lg border border-input shadow-sm bg-card'>
+            <Command className="rounded-lg border border-input shadow-sm bg-card">
               <CommandInput
-                placeholder='Search models...'
+                placeholder="Search models..."
                 value={modelSearch}
                 onValueChange={setModelSearch}
               />
               <CommandList>
-                <CommandEmpty className='py-4 text-center text-xs text-muted-foreground'>
+                <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
                   No matching models
                 </CommandEmpty>
                 <CommandGroup>
@@ -330,14 +328,15 @@ export default function ComboFormDialog({
                           toggleModel(modelId);
                           setModelSearch("");
                         }}
-                        className='text-xs cursor-pointer'
+                        className="text-xs cursor-pointer"
                       >
-                        <Plus className='w-3.5 h-3.5 text-primary shrink-0 mr-2 opacity-70' />
-                        <code className='font-mono text-foreground truncate flex-1'>
-                          {modelId}
-                        </code>
+                        <Plus className="w-3.5 h-3.5 text-primary shrink-0 mr-2 opacity-70" />
+                        <code className="font-mono text-foreground truncate flex-1">{modelId}</code>
                         {isCombo && (
-                          <Badge variant='outline' className='text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0'>
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1.5 py-0 h-4 ml-2 bg-primary/10 text-primary border-primary/30 shrink-0"
+                          >
                             Combo
                           </Badge>
                         )}
@@ -351,14 +350,10 @@ export default function ComboFormDialog({
         </div>
 
         <DialogFooter>
-          <Button variant='outline' size='sm' onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            size='sm'
-            onClick={handleSave}
-            disabled={!name.trim() || !!nameError || saving}
-          >
+          <Button size="sm" onClick={handleSave} disabled={!name.trim() || !!nameError || saving}>
             {saving ? "Saving…" : isEdit ? "Save" : "Create"}
           </Button>
         </DialogFooter>

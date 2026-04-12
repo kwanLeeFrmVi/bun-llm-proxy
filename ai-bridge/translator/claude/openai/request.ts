@@ -11,9 +11,10 @@ export function convertClaudeRequestToOpenAI(
   inputRaw: Uint8Array,
   stream: boolean
 ): Uint8Array {
-  const raw = typeof inputRaw === "string"
-    ? JSON.parse(inputRaw)
-    : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
 
   const out: Record<string, unknown> = {
     model: modelName,
@@ -34,9 +35,7 @@ export function convertClaudeRequestToOpenAI(
 
   // stop_sequences → stop
   if (Array.isArray(raw.stop_sequences) && raw.stop_sequences.length > 0) {
-    out.stop = raw.stop_sequences.length === 1
-      ? raw.stop_sequences[0]
-      : raw.stop_sequences;
+    out.stop = raw.stop_sequences.length === 1 ? raw.stop_sequences[0] : raw.stop_sequences;
   }
 
   out.stream = stream;
@@ -48,9 +47,8 @@ export function convertClaudeRequestToOpenAI(
 
     if (thinkingType === "enabled") {
       const budgetTokens = thinkingConfig.budget_tokens as number | undefined;
-      const { effort } = budgetTokens !== undefined
-        ? convertBudgetToLevel(budgetTokens)
-        : convertBudgetToLevel(-1); // default enabled
+      const { effort } =
+        budgetTokens !== undefined ? convertBudgetToLevel(budgetTokens) : convertBudgetToLevel(-1); // default enabled
       if (effort) out.reasoning_effort = effort;
     } else if (thinkingType === "disabled") {
       const { effort } = convertBudgetToLevel(0);
@@ -105,7 +103,7 @@ export function convertClaudeRequestToOpenAI(
   // ── Tools: Anthropic tools → OpenAI functions ─────────────────────────────────
   const tools = raw.tools as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(tools) && tools.length > 0) {
-    out.tools = tools.map(tool => ({
+    out.tools = tools.map((tool) => ({
       type: "function",
       function: {
         name: tool.name,
@@ -119,8 +117,8 @@ export function convertClaudeRequestToOpenAI(
   const toolChoice = raw.tool_choice as Record<string, unknown> | undefined;
   if (toolChoice) {
     const choiceType = toolChoice.type as string;
-    if (choiceType === "auto")      out.tool_choice = "auto";
-    else if (choiceType === "any")  out.tool_choice = "required";
+    if (choiceType === "auto") out.tool_choice = "auto";
+    else if (choiceType === "any") out.tool_choice = "required";
     else if (choiceType === "tool") {
       const name = toolChoice.name as string | undefined;
       if (name) out.tool_choice = { type: "function", function: { name } };
@@ -143,7 +141,7 @@ function buildContentArray(system: unknown): Array<Record<string, unknown>> {
   }
   if (Array.isArray(system)) {
     return system
-      .map(part => convertClaudeContentPart(part as Record<string, unknown>))
+      .map((part) => convertClaudeContentPart(part as Record<string, unknown>))
       .filter(Boolean) as Array<Record<string, unknown>>;
   }
   return [];
@@ -215,12 +213,16 @@ function processClaudeContent(
 
   // Build reasoning_content if present
   if (hasReasoning) {
-    (openaiContent[openaiContent.length - 1] as Record<string, unknown> | undefined)
-      && Object.defineProperty(openaiContent[openaiContent.length - 1] as Record<string, unknown>, "reasoning_content", {
-        value: reasoningTexts.join("\n\n"),
-        writable: true,
-        enumerable: true,
-      });
+    (openaiContent[openaiContent.length - 1] as Record<string, unknown> | undefined) &&
+      Object.defineProperty(
+        openaiContent[openaiContent.length - 1] as Record<string, unknown>,
+        "reasoning_content",
+        {
+          value: reasoningTexts.join("\n\n"),
+          writable: true,
+          enumerable: true,
+        }
+      );
   }
 
   // Build content + tool_calls in one message for assistant
@@ -236,9 +238,7 @@ function processClaudeContent(
   return { openaiContent: openaiContent.length > 0 ? openaiContent : null, toolResults };
 }
 
-function convertClaudeContentPart(
-  part: Record<string, unknown>
-): Record<string, unknown> | null {
+function convertClaudeContentPart(part: Record<string, unknown>): Record<string, unknown> | null {
   const partType = part.type as string;
 
   if (partType === "text") {
@@ -272,9 +272,7 @@ function extractImageURL(part: Record<string, unknown>): string {
   return (part.url as string | undefined) ?? "";
 }
 
-function extractToolResultContent(
-  content: unknown
-): { content: string; isRaw: boolean } {
+function extractToolResultContent(content: unknown): { content: string; isRaw: boolean } {
   if (!content) return { content: "", isRaw: false };
 
   if (typeof content === "string") {

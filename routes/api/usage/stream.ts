@@ -8,7 +8,9 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const qToken = url.searchParams.get("token");
   const authReq = qToken
-    ? new Request(req.url, { headers: { ...Object.fromEntries(req.headers), Authorization: `Bearer ${qToken}` } })
+    ? new Request(req.url, {
+        headers: { ...Object.fromEntries(req.headers), Authorization: `Bearer ${qToken}` },
+      })
     : req;
   const auth = await checkAdminAuth(authReq);
   if (!auth.ok) return auth.response;
@@ -31,7 +33,10 @@ export async function GET(req: Request): Promise<Response> {
 
       // Heartbeat every 15s to keep connection alive
       const heartbeat = setInterval(() => {
-        if (!controller) { clearInterval(heartbeat); return; }
+        if (!controller) {
+          clearInterval(heartbeat);
+          return;
+        }
         try {
           controller.enqueue(new TextEncoder().encode(": ping\n\n"));
         } catch {
@@ -52,16 +57,19 @@ export async function GET(req: Request): Promise<Response> {
 
   return new Response(stream, {
     headers: {
-      "Content-Type":  "text/event-stream",
+      "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection":    "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
   });
 }
 
 export function OPTIONS(): Response {
-  return new Response(null, { status: 204, headers: { ...{ "Access-Control-Allow-Origin": "*" } } });
+  return new Response(null, {
+    status: 204,
+    headers: { ...{ "Access-Control-Allow-Origin": "*" } },
+  });
 }
 
 register("/api/usage/stream", { GET, OPTIONS });

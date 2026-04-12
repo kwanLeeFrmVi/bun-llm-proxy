@@ -86,9 +86,7 @@ export function convertOpenAIResponseToClaude(
   const rawText = new TextDecoder().decode(raw);
 
   // Strip "data: " prefix
-  const stripped = rawText.startsWith("data: ")
-    ? rawText.slice(5).trim()
-    : rawText.trim();
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(5).trim() : rawText.trim();
 
   // Handle [DONE] marker
   if (stripped === "[DONE]") {
@@ -126,23 +124,27 @@ export function convertOpenAIResponseToClaude(
         const blockIndex = state.toolBlockIndexes.get(index);
         if (blockIndex === undefined || state.toolBlockStopped.get(index)) continue;
         if (accum.arguments) {
-          results.push(appendSSEEventBytes(
-            new Uint8Array(),
-            "content_block_delta",
-            {
-              type: "content_block_delta",
-              index: blockIndex,
-              delta: { type: "input_json_delta", partial_json: fixPartialJSON(accum.arguments) },
-            },
-            2
-          ));
+          results.push(
+            appendSSEEventBytes(
+              new Uint8Array(),
+              "content_block_delta",
+              {
+                type: "content_block_delta",
+                index: blockIndex,
+                delta: { type: "input_json_delta", partial_json: fixPartialJSON(accum.arguments) },
+              },
+              2
+            )
+          );
         }
-        results.push(appendSSEEventBytes(
-          new Uint8Array(),
-          "content_block_stop",
-          { type: "content_block_stop", index: blockIndex },
-          2
-        ));
+        results.push(
+          appendSSEEventBytes(
+            new Uint8Array(),
+            "content_block_stop",
+            { type: "content_block_stop", index: blockIndex },
+            2
+          )
+        );
         state.toolBlockStopped.set(index, true);
       }
       state.contentBlocksStopped = true;
@@ -159,19 +161,21 @@ export function convertOpenAIResponseToClaude(
     };
     if (cachedTokens > 0) usageObj.cache_read_input_tokens = cachedTokens;
 
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "message_delta",
-      {
-        type: "message_delta",
-        delta: {
-          stop_reason: mapFinishReason(state.finishReason),
-          stop_sequence: null,
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "message_delta",
+        {
+          type: "message_delta",
+          delta: {
+            stop_reason: mapFinishReason(state.finishReason),
+            stop_sequence: null,
+          },
+          usage: usageObj,
         },
-        usage: usageObj,
-      },
-      2
-    ));
+        2
+      )
+    );
     state.messageDeltaSent = true;
     emitMessageStop(state, results);
   }
@@ -180,24 +184,26 @@ export function convertOpenAIResponseToClaude(
 
   // ── message_start: send on very first chunk ─────────────────────────────────
   if (!state.messageStarted) {
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "message_start",
-      {
-        type: "message_start",
-        message: {
-          id: state.messageId,
-          type: "message",
-          role: "assistant",
-          model: state.model,
-          content: [],
-          stop_reason: null,
-          stop_sequence: null,
-          usage: { input_tokens: 0, output_tokens: 0 },
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "message_start",
+        {
+          type: "message_start",
+          message: {
+            id: state.messageId,
+            type: "message",
+            role: "assistant",
+            model: state.model,
+            content: [],
+            stop_reason: null,
+            stop_sequence: null,
+            usage: { input_tokens: 0, output_tokens: 0 },
+          },
         },
-      },
-      2
-    ));
+        2
+      )
+    );
     state.messageStarted = true;
   }
 
@@ -212,29 +218,33 @@ export function convertOpenAIResponseToClaude(
 
       if (!state.thinkingBlockStarted) {
         state.thinkingBlockIndex = state.nextBlockIndex++;
-        results.push(appendSSEEventBytes(
-          new Uint8Array(),
-          "content_block_start",
-          {
-            type: "content_block_start",
-            index: state.thinkingBlockIndex,
-            content_block: { type: "thinking", thinking: "" },
-          },
-          2
-        ));
+        results.push(
+          appendSSEEventBytes(
+            new Uint8Array(),
+            "content_block_start",
+            {
+              type: "content_block_start",
+              index: state.thinkingBlockIndex,
+              content_block: { type: "thinking", thinking: "" },
+            },
+            2
+          )
+        );
         state.thinkingBlockStarted = true;
       }
 
-      results.push(appendSSEEventBytes(
-        new Uint8Array(),
-        "content_block_delta",
-        {
-          type: "content_block_delta",
-          index: state.thinkingBlockIndex,
-          delta: { type: "thinking_delta", thinking: text },
-        },
-        2
-      ));
+      results.push(
+        appendSSEEventBytes(
+          new Uint8Array(),
+          "content_block_delta",
+          {
+            type: "content_block_delta",
+            index: state.thinkingBlockIndex,
+            delta: { type: "thinking_delta", thinking: text },
+          },
+          2
+        )
+      );
     }
   }
 
@@ -245,29 +255,33 @@ export function convertOpenAIResponseToClaude(
 
     if (!state.textBlockStarted) {
       state.textBlockIndex = state.nextBlockIndex++;
-      results.push(appendSSEEventBytes(
-        new Uint8Array(),
-        "content_block_start",
-        {
-          type: "content_block_start",
-          index: state.textBlockIndex,
-          content_block: { type: "text", text: "" },
-        },
-        2
-      ));
+      results.push(
+        appendSSEEventBytes(
+          new Uint8Array(),
+          "content_block_start",
+          {
+            type: "content_block_start",
+            index: state.textBlockIndex,
+            content_block: { type: "text", text: "" },
+          },
+          2
+        )
+      );
       state.textBlockStarted = true;
     }
 
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "content_block_delta",
-      {
-        type: "content_block_delta",
-        index: state.textBlockIndex,
-        delta: { type: "text_delta", text: content },
-      },
-      2
-    ));
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "content_block_delta",
+        {
+          type: "content_block_delta",
+          index: state.textBlockIndex,
+          delta: { type: "text_delta", text: content },
+        },
+        2
+      )
+    );
     state.contentAccumulator += content;
   }
 
@@ -309,21 +323,23 @@ export function convertOpenAIResponseToClaude(
         state.toolBlockIndexes.set(index, blockIndex);
         state.toolBlockStopped.set(index, false);
 
-        results.push(appendSSEEventBytes(
-          new Uint8Array(),
-          "content_block_start",
-          {
-            type: "content_block_start",
-            index: blockIndex,
-            content_block: {
-              type: "tool_use",
-              id: sanitizeClaudeToolID(accum.id),
-              name: accum.name,
-              input: {},
+        results.push(
+          appendSSEEventBytes(
+            new Uint8Array(),
+            "content_block_start",
+            {
+              type: "content_block_start",
+              index: blockIndex,
+              content_block: {
+                type: "tool_use",
+                id: sanitizeClaudeToolID(accum.id),
+                name: accum.name,
+                input: {},
+              },
             },
-          },
-          2
-        ));
+            2
+          )
+        );
       }
     }
   }
@@ -368,71 +384,79 @@ export function convertOpenAIResponseToClaudeNonStream(
 
     const message = choice.message as Record<string, unknown> | undefined;
     if (message) {
-    // reasoning_content → thinking blocks
-    const reasoning = message.reasoning_content;
-    if (reasoning) {
-      for (const text of collectReasoningTexts(reasoning)) {
-        if (text) (out.content as unknown[]).push({ type: "thinking", thinking: text });
+      // reasoning_content → thinking blocks
+      const reasoning = message.reasoning_content;
+      if (reasoning) {
+        for (const text of collectReasoningTexts(reasoning)) {
+          if (text) (out.content as unknown[]).push({ type: "thinking", thinking: text });
+        }
       }
-    }
 
-    // content → text blocks
-    const content = message.content;
-    if (typeof content === "string" && content) {
-      (out.content as unknown[]).push({ type: "text", text: content });
-    } else if (Array.isArray(content)) {
-      for (const item of content) {
-        if (item && typeof item === "object") {
-          const obj = item as Record<string, unknown>;
-          const itemType = obj.type as string;
-          if (itemType === "text") {
-            const text = obj.text as string | undefined;
-            if (text) (out.content as unknown[]).push({ type: "text", text });
-          } else if (itemType === "tool_calls") {
-            const calls = obj.tool_calls as Array<Record<string, unknown>> | undefined;
-            if (Array.isArray(calls)) {
-              for (const tc of calls) {
-                const fn = tc.function as Record<string, unknown>;
-                const argsRaw = fn?.arguments as string | undefined;
-                let input: Record<string, unknown> = {};
-                if (argsRaw) {
-                  try { input = JSON.parse(argsRaw); } catch { /* ignore */ }
+      // content → text blocks
+      const content = message.content;
+      if (typeof content === "string" && content) {
+        (out.content as unknown[]).push({ type: "text", text: content });
+      } else if (Array.isArray(content)) {
+        for (const item of content) {
+          if (item && typeof item === "object") {
+            const obj = item as Record<string, unknown>;
+            const itemType = obj.type as string;
+            if (itemType === "text") {
+              const text = obj.text as string | undefined;
+              if (text) (out.content as unknown[]).push({ type: "text", text });
+            } else if (itemType === "tool_calls") {
+              const calls = obj.tool_calls as Array<Record<string, unknown>> | undefined;
+              if (Array.isArray(calls)) {
+                for (const tc of calls) {
+                  const fn = tc.function as Record<string, unknown>;
+                  const argsRaw = fn?.arguments as string | undefined;
+                  let input: Record<string, unknown> = {};
+                  if (argsRaw) {
+                    try {
+                      input = JSON.parse(argsRaw);
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                  (out.content as unknown[]).push({
+                    type: "tool_use",
+                    id: sanitizeClaudeToolID((tc.id as string) ?? ""),
+                    name: fn?.name ?? "",
+                    input,
+                  });
                 }
-                (out.content as unknown[]).push({
-                  type: "tool_use",
-                  id: sanitizeClaudeToolID(tc.id as string ?? ""),
-                  name: fn?.name ?? "",
-                  input,
-                });
               }
+            } else if (itemType === "reasoning") {
+              const text = obj.text as string | undefined;
+              if (text) (out.content as unknown[]).push({ type: "thinking", thinking: text });
             }
-          } else if (itemType === "reasoning") {
-            const text = obj.text as string | undefined;
-            if (text) (out.content as unknown[]).push({ type: "thinking", thinking: text });
           }
         }
       }
-    }
 
-    // tool_calls (raw OpenAI format) → tool_use blocks
-    const rawToolCalls = message.tool_calls as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(rawToolCalls)) {
-      for (const tc of rawToolCalls) {
-        const fn = tc.function as Record<string, unknown>;
-        const argsRaw = fn?.arguments as string | undefined;
-        let input: Record<string, unknown> = {};
-        if (argsRaw) {
-          try { input = JSON.parse(argsRaw); } catch { /* ignore */ }
+      // tool_calls (raw OpenAI format) → tool_use blocks
+      const rawToolCalls = message.tool_calls as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(rawToolCalls)) {
+        for (const tc of rawToolCalls) {
+          const fn = tc.function as Record<string, unknown>;
+          const argsRaw = fn?.arguments as string | undefined;
+          let input: Record<string, unknown> = {};
+          if (argsRaw) {
+            try {
+              input = JSON.parse(argsRaw);
+            } catch {
+              /* ignore */
+            }
+          }
+          (out.content as unknown[]).push({
+            type: "tool_use",
+            id: sanitizeClaudeToolID((tc.id as string) ?? ""),
+            name: fn?.name ?? "",
+            input,
+          });
         }
-        (out.content as unknown[]).push({
-          type: "tool_use",
-          id: sanitizeClaudeToolID(tc.id as string ?? ""),
-          name: fn?.name ?? "",
-          input,
-        });
       }
     }
-  }
   }
 
   // usage
@@ -482,47 +506,52 @@ function collectReasoningTexts(node: unknown): string[] {
 
 function mapFinishReason(reason: string): string {
   switch (reason) {
-    case "stop":           return "end_turn";
-    case "length":         return "max_tokens";
-    case "tool_calls":      return "tool_use";
-    case "content_filter":  return "end_turn";
-    case "function_call":   return "tool_use";
-    default:               return "end_turn";
+    case "stop":
+      return "end_turn";
+    case "length":
+      return "max_tokens";
+    case "tool_calls":
+      return "tool_use";
+    case "content_filter":
+      return "end_turn";
+    case "function_call":
+      return "tool_use";
+    default:
+      return "end_turn";
   }
 }
 
 function stopThinkingBlock(state: StreamingState, results: Uint8Array[]): void {
   if (!state.thinkingBlockStarted) return;
-  results.push(appendSSEEventBytes(
-    new Uint8Array(),
-    "content_block_stop",
-    { type: "content_block_stop", index: state.thinkingBlockIndex },
-    2
-  ));
+  results.push(
+    appendSSEEventBytes(
+      new Uint8Array(),
+      "content_block_stop",
+      { type: "content_block_stop", index: state.thinkingBlockIndex },
+      2
+    )
+  );
   state.thinkingBlockStarted = false;
   state.thinkingBlockIndex = -1;
 }
 
 function stopTextBlock(state: StreamingState, results: Uint8Array[]): void {
   if (!state.textBlockStarted) return;
-  results.push(appendSSEEventBytes(
-    new Uint8Array(),
-    "content_block_stop",
-    { type: "content_block_stop", index: state.textBlockIndex },
-    2
-  ));
+  results.push(
+    appendSSEEventBytes(
+      new Uint8Array(),
+      "content_block_stop",
+      { type: "content_block_stop", index: state.textBlockIndex },
+      2
+    )
+  );
   state.textBlockStarted = false;
   state.textBlockIndex = -1;
 }
 
 function emitMessageStop(state: StreamingState, results: Uint8Array[]): void {
   if (state.messageStopSent) return;
-  results.push(appendSSEEventBytes(
-    new Uint8Array(),
-    "message_stop",
-    { type: "message_stop" },
-    2
-  ));
+  results.push(appendSSEEventBytes(new Uint8Array(), "message_stop", { type: "message_stop" }, 2));
   state.messageStopSent = true;
 }
 
@@ -531,22 +560,26 @@ function buildDoneEvents(state: StreamingState): Uint8Array[] {
 
   // Stop thinking
   if (state.thinkingBlockStarted) {
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "content_block_stop",
-      { type: "content_block_stop", index: state.thinkingBlockIndex },
-      2
-    ));
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "content_block_stop",
+        { type: "content_block_stop", index: state.thinkingBlockIndex },
+        2
+      )
+    );
   }
 
   // Stop text
   if (state.textBlockStarted) {
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "content_block_stop",
-      { type: "content_block_stop", index: state.textBlockIndex },
-      2
-    ));
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "content_block_stop",
+        { type: "content_block_stop", index: state.textBlockIndex },
+        2
+      )
+    );
   }
 
   // Stop all tool calls
@@ -555,23 +588,27 @@ function buildDoneEvents(state: StreamingState): Uint8Array[] {
       const blockIndex = state.toolBlockIndexes.get(index);
       if (blockIndex === undefined || state.toolBlockStopped.get(index)) continue;
       if (accum.arguments) {
-        results.push(appendSSEEventBytes(
-          new Uint8Array(),
-          "content_block_delta",
-          {
-            type: "content_block_delta",
-            index: blockIndex,
-            delta: { type: "input_json_delta", partial_json: fixPartialJSON(accum.arguments) },
-          },
-          2
-        ));
+        results.push(
+          appendSSEEventBytes(
+            new Uint8Array(),
+            "content_block_delta",
+            {
+              type: "content_block_delta",
+              index: blockIndex,
+              delta: { type: "input_json_delta", partial_json: fixPartialJSON(accum.arguments) },
+            },
+            2
+          )
+        );
       }
-      results.push(appendSSEEventBytes(
-        new Uint8Array(),
-        "content_block_stop",
-        { type: "content_block_stop", index: blockIndex },
-        2
-      ));
+      results.push(
+        appendSSEEventBytes(
+          new Uint8Array(),
+          "content_block_stop",
+          { type: "content_block_stop", index: blockIndex },
+          2
+        )
+      );
     }
   }
 
@@ -579,19 +616,19 @@ function buildDoneEvents(state: StreamingState): Uint8Array[] {
   // provider (stream may have cut off mid-way, e.g. connection drop). This ensures
   // the client always receives usage data and never crashes on missing input_tokens.
   if (!state.messageDeltaSent) {
-    const stopReason = state.finishReason
-      ? mapFinishReason(state.finishReason)
-      : "end_turn"; // fallback: stream died before provider sent stop_reason
-    results.push(appendSSEEventBytes(
-      new Uint8Array(),
-      "message_delta",
-      {
-        type: "message_delta",
-        delta: { stop_reason: stopReason, stop_sequence: null },
-        usage: { input_tokens: 0, output_tokens: 0 },
-      },
-      2
-    ));
+    const stopReason = state.finishReason ? mapFinishReason(state.finishReason) : "end_turn"; // fallback: stream died before provider sent stop_reason
+    results.push(
+      appendSSEEventBytes(
+        new Uint8Array(),
+        "message_delta",
+        {
+          type: "message_delta",
+          delta: { stop_reason: stopReason, stop_sequence: null },
+          usage: { input_tokens: 0, output_tokens: 0 },
+        },
+        2
+      )
+    );
     state.messageDeltaSent = true;
   }
 

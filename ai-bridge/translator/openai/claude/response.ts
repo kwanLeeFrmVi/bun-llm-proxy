@@ -98,19 +98,21 @@ export function convertClaudeResponseToOpenAI(
     if (type === "message_start") {
       const msg = event.message as Record<string, unknown> | undefined;
       if (msg) {
-        state.messageId = msg.id as string ?? "";
-        state.model = msg.model as string ?? "";
+        state.messageId = (msg.id as string) ?? "";
+        state.model = (msg.model as string) ?? "";
       }
       // Always emit OpenAI "data: {...}\n\n" format
-      results.push(new TextEncoder().encode(
-        `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] })}\n\n`
-      ));
+      results.push(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] })}\n\n`
+        )
+      );
       continue;
     }
 
     // content_block_start
     if (type === "content_block_start") {
-      const index = event.index as number | undefined ?? 0;
+      const index = (event.index as number | undefined) ?? 0;
       const contentBlock = event.content_block as Record<string, unknown> | undefined;
       if (!contentBlock) continue;
 
@@ -128,8 +130,8 @@ export function convertClaudeResponseToOpenAI(
         state.toolCallBlockIndex = index;
         state.toolCallsStarted = true;
         state.currentToolIndex = state.toolCallIndex++;
-        state.currentToolName = contentBlock.name as string ?? "";
-        state.currentToolId = contentBlock.id as string ?? "";
+        state.currentToolName = (contentBlock.name as string) ?? "";
+        state.currentToolId = (contentBlock.id as string) ?? "";
         state.toolArgumentsAccumulator = "";
       }
       continue;
@@ -137,7 +139,7 @@ export function convertClaudeResponseToOpenAI(
 
     // content_block_delta
     if (type === "content_block_delta") {
-      const index = event.index as number | undefined ?? 0;
+      const index = (event.index as number | undefined) ?? 0;
       const delta = event.delta as Record<string, unknown> | undefined;
       if (!delta) continue;
 
@@ -145,12 +147,14 @@ export function convertClaudeResponseToOpenAI(
 
       // text_delta → assistant message delta
       if (deltaType === "text_delta") {
-        const text = delta.text as string | undefined ?? "";
+        const text = (delta.text as string | undefined) ?? "";
         state.contentAccumulator += text;
 
-        results.push(new TextEncoder().encode(
-          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index, delta: { content: text }, finish_reason: null }] })}\n\n`
-        ));
+        results.push(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index, delta: { content: text }, finish_reason: null }] })}\n\n`
+          )
+        );
       }
 
       // thinking_delta → skip (OpenAI doesn't have thinking content)
@@ -160,12 +164,14 @@ export function convertClaudeResponseToOpenAI(
 
       // input_json_delta → accumulate tool call arguments
       if (deltaType === "input_json_delta") {
-        const partialJson = delta.partial_json as string | undefined ?? "";
+        const partialJson = (delta.partial_json as string | undefined) ?? "";
         state.toolArgumentsAccumulator += partialJson;
         // OpenAI tool call chunks use function.arguments
-        results.push(new TextEncoder().encode(
-          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index, delta: { tool_calls: [{ index: state.currentToolIndex, id: state.currentToolId, type: "function", function: { name: state.currentToolName, arguments: partialJson } }] }, finish_reason: null }] })}\n\n`
-        ));
+        results.push(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index, delta: { tool_calls: [{ index: state.currentToolIndex, id: state.currentToolId, type: "function", function: { name: state.currentToolName, arguments: partialJson } }] }, finish_reason: null }] })}\n\n`
+          )
+        );
       }
       continue;
     }
@@ -173,15 +179,21 @@ export function convertClaudeResponseToOpenAI(
     // content_block_stop
     if (type === "content_block_stop") {
       // Stop thinking block
-      if (state.thinkingStarted && state.thinkingIndex === (event.index as number | undefined ?? -1)) {
+      if (
+        state.thinkingStarted &&
+        state.thinkingIndex === ((event.index as number | undefined) ?? -1)
+      ) {
         state.thinkingStarted = false;
       }
       // Stop text block
-      if (state.textStarted && state.textIndex === (event.index as number | undefined ?? -1)) {
+      if (state.textStarted && state.textIndex === ((event.index as number | undefined) ?? -1)) {
         state.textStarted = false;
       }
       // Stop tool call block
-      if (state.toolCallsStarted && state.toolCallBlockIndex === (event.index as number | undefined ?? -1)) {
+      if (
+        state.toolCallsStarted &&
+        state.toolCallBlockIndex === ((event.index as number | undefined) ?? -1)
+      ) {
         state.toolCallsStarted = false;
       }
       continue;
@@ -201,11 +213,15 @@ export function convertClaudeResponseToOpenAI(
         // Extract usage with support for both Claude (input_tokens/output_tokens)
         // and OpenAI (prompt_tokens/completion_tokens) formats
         const usage = event.usage as Record<string, unknown> | undefined;
-        const inputTokens = (usage?.input_tokens as number) ?? (usage?.prompt_tokens as number) ?? 0;
-        const outputTokens = (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
-        results.push(new TextEncoder().encode(
-          `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens } })}\n\n`
-        ));
+        const inputTokens =
+          (usage?.input_tokens as number) ?? (usage?.prompt_tokens as number) ?? 0;
+        const outputTokens =
+          (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
+        results.push(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens } })}\n\n`
+          )
+        );
       }
       continue;
     }
@@ -236,8 +252,8 @@ export function convertClaudeResponseToOpenAINonStream(
     return raw;
   }
 
-  const id = parsed.id as string ?? "";
-  const model = parsed.model as string ?? "";
+  const id = (parsed.id as string) ?? "";
+  const model = (parsed.model as string) ?? "";
   const content = parsed.content as Array<Record<string, unknown>> | undefined;
 
   const message: Record<string, unknown> = { role: "assistant", content: "" };
@@ -248,19 +264,23 @@ export function convertClaudeResponseToOpenAINonStream(
     for (const block of content) {
       const blockType = block.type as string;
       if (blockType === "text") {
-        const text = block.text as string | undefined ?? "";
+        const text = (block.text as string | undefined) ?? "";
         parts.push(text);
       } else if (blockType === "tool_use") {
         const fn = block as Record<string, unknown>;
         const argsRaw = fn.input as string | undefined;
         let argsObj: Record<string, unknown> = {};
         if (typeof argsRaw === "string") {
-          try { argsObj = JSON.parse(argsRaw); } catch { /* ignore */ }
+          try {
+            argsObj = JSON.parse(argsRaw);
+          } catch {
+            /* ignore */
+          }
         } else if (typeof argsRaw === "object") {
           argsObj = argsRaw;
         }
         toolCalls.push({
-          id: sanitizeClaudeToolID(fn.id as string ?? ""),
+          id: sanitizeClaudeToolID((fn.id as string) ?? ""),
           type: "function",
           function: {
             name: fn.name ?? "",
@@ -273,7 +293,7 @@ export function convertClaudeResponseToOpenAINonStream(
     }
   }
 
-  const stopReason = mapClaudeStopReason(parsed.stop_reason as string ?? "");
+  const stopReason = mapClaudeStopReason((parsed.stop_reason as string) ?? "");
   const hasContent = parts.length > 0 || toolCalls.length > 0;
 
   if (hasContent) {
@@ -294,27 +314,35 @@ export function convertClaudeResponseToOpenAINonStream(
     total_tokens: ((usage?.input_tokens as number) ?? 0) + ((usage?.output_tokens as number) ?? 0),
   };
 
-  return new TextEncoder().encode(JSON.stringify({
-    id,
-    object: "chat.completion",
-    model,
-    choices: [{
-      index: 0,
-      message,
-      finish_reason: stopReason,
-    }],
-    usage: usageObj,
-  }));
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id,
+      object: "chat.completion",
+      model,
+      choices: [
+        {
+          index: 0,
+          message,
+          finish_reason: stopReason,
+        },
+      ],
+      usage: usageObj,
+    })
+  );
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function mapClaudeStopReason(reason: string): string {
   switch (reason) {
-    case "end_turn":   return "stop";
-    case "max_tokens": return "length";
-    case "tool_use":   return "tool_calls";
-    default:           return "stop";
+    case "end_turn":
+      return "stop";
+    case "max_tokens":
+      return "length";
+    case "tool_use":
+      return "tool_calls";
+    default:
+      return "stop";
   }
 }
 
@@ -352,7 +380,8 @@ export function convertOpenAIResponseToClaudeNonStream(
   // usage - always process and include usage field (supports both formats)
   const usage = parsed.usage as Record<string, unknown> | undefined;
   const inputTokens = (usage?.input_tokens as number) ?? (usage?.prompt_tokens as number) ?? 0;
-  const outputTokens = (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
+  const outputTokens =
+    (usage?.output_tokens as number) ?? (usage?.completion_tokens as number) ?? 0;
   (out.usage as Record<string, unknown>).input_tokens = inputTokens;
   (out.usage as Record<string, unknown>).output_tokens = outputTokens;
 
@@ -391,11 +420,15 @@ export function convertOpenAIResponseToClaudeNonStream(
               const argsRaw = fn?.arguments as string | undefined;
               let input: Record<string, unknown> = {};
               if (argsRaw) {
-                try { input = JSON.parse(argsRaw); } catch { /* ignore */ }
+                try {
+                  input = JSON.parse(argsRaw);
+                } catch {
+                  /* ignore */
+                }
               }
               (out.content as unknown[]).push({
                 type: "tool_use",
-                id: tc.id as string ?? "",
+                id: (tc.id as string) ?? "",
                 name: fn?.name ?? "",
                 input,
               });
@@ -413,11 +446,15 @@ export function convertOpenAIResponseToClaudeNonStream(
         const argsRaw = fn?.arguments as string | undefined;
         let input: Record<string, unknown> = {};
         if (argsRaw) {
-          try { input = JSON.parse(argsRaw); } catch { /* ignore */ }
+          try {
+            input = JSON.parse(argsRaw);
+          } catch {
+            /* ignore */
+          }
         }
         (out.content as unknown[]).push({
           type: "tool_use",
-          id: tc.id as string ?? "",
+          id: (tc.id as string) ?? "",
           name: fn?.name ?? "",
           input,
         });
@@ -453,11 +490,17 @@ function collectReasoningTexts(node: unknown): string[] {
 
 function mapFinishReason(reason: string): string {
   switch (reason) {
-    case "stop":          return "end_turn";
-    case "length":        return "max_tokens";
-    case "tool_calls":     return "tool_use";
-    case "content_filter": return "end_turn";
-    case "function_call":  return "tool_use";
-    default:               return "end_turn";
+    case "stop":
+      return "end_turn";
+    case "length":
+      return "max_tokens";
+    case "tool_calls":
+      return "tool_use";
+    case "content_filter":
+      return "end_turn";
+    case "function_call":
+      return "tool_use";
+    default:
+      return "end_turn";
   }
 }

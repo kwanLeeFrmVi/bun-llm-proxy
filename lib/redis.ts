@@ -65,7 +65,9 @@ export async function acquireLock(
           if (current === lockValue) {
             await client.del(lockKey);
           }
-        } catch { /* best effort */ }
+        } catch {
+          /* best effort */
+        }
       };
     }
     return null;
@@ -122,7 +124,11 @@ export async function getRedisCache(key: string): Promise<string | null> {
 /**
  * Set a cached string value with optional TTL (in seconds).
  */
-export async function setRedisCache(key: string, value: string, ttlSeconds?: number): Promise<void> {
+export async function setRedisCache(
+  key: string,
+  value: string,
+  ttlSeconds?: number
+): Promise<void> {
   const client = getRedis();
   if (!client) return;
   try {

@@ -53,31 +53,29 @@ export function EditConnectionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className='bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md'>
+      <DialogContent className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
-          <DialogTitle className='font-headline text-lg font-bold'>
-            Edit Connection
-          </DialogTitle>
+          <DialogTitle className="font-headline text-lg font-bold">Edit Connection</DialogTitle>
         </DialogHeader>
 
-        <div className='space-y-4 py-2'>
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               Name
             </Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder='Production Key'
-              className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
+              placeholder="Production Key"
+              className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               Priority
             </Label>
             <Input
-              type='number'
+              type="number"
               min={1}
               value={form.priority}
               onChange={(e) =>
@@ -86,40 +84,38 @@ export function EditConnectionModal({
                   priority: parseInt(e.target.value) || 1,
                 }))
               }
-              className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
+              className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
-          <div className='space-y-1.5'>
-            <Label className='text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]'>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
               {isOAuth ? "Refresh Token" : "API Key"}{" "}
-              <span className='font-normal normal-case tracking-normal text-[--on-surface-variant]'>
+              <span className="font-normal normal-case tracking-normal text-[--on-surface-variant]">
                 (leave blank to keep current)
               </span>
             </Label>
             <Input
-              type='password'
+              type="password"
               value={form.apiKey}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, apiKey: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
               placeholder={isOAuth ? "Enter refresh token..." : "sk-..."}
-              className='h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm'
+              className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
           </div>
         </div>
 
-        <DialogFooter className='gap-2'>
+        <DialogFooter className="gap-2">
           <Button
-            variant='outline'
+            variant="outline"
             onClick={onClose}
-            className='h-10 px-4 rounded font-medium text-sm'
+            className="h-10 px-4 rounded font-medium text-sm"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             disabled={!form.name}
-            className='h-10 px-5 rounded font-semibold text-sm bg-[#0F172A] text-white hover:bg-[#1e293b]'
+            className="h-10 px-5 rounded font-semibold text-sm bg-[#0F172A] text-white hover:bg-[#1e293b]"
           >
             Save
           </Button>

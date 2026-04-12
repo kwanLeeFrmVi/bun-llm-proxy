@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";
-import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "../../ai-bridge/handlers/provider.ts";
+import {
+  detectFormat,
+  getTargetFormat,
+  buildUpstreamUrl,
+  buildUpstreamHeaders,
+} from "../../ai-bridge/handlers/provider.ts";
 import { FORMATS } from "../../ai-bridge/translator/formats.ts";
 import { clearCachedClaudeHeaders } from "../../ai-bridge/utils/claudeHeaderCache.ts";
 
@@ -38,30 +43,38 @@ describe("detectFormat", () => {
 
   it("returns CLAUDE for body with tool_use content", () => {
     const result = detectFormat({
-      messages: [{
-        role: "assistant",
-        content: [{ type: "tool_use", id: "tool_1", name: "foo", input: {} }],
-      }],
+      messages: [
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "tool_1", name: "foo", input: {} }],
+        },
+      ],
     });
     expect(result).toBe(FORMATS.CLAUDE);
   });
 
   it("returns CLAUDE for body with tool_result content", () => {
     const result = detectFormat({
-      messages: [{
-        role: "user",
-        content: [{ type: "tool_result", tool_use_id: "tool_1", content: "result" }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "tool_1", content: "result" }],
+        },
+      ],
     });
     expect(result).toBe(FORMATS.CLAUDE);
   });
 
   it("returns CLAUDE for body with Claude image (source.type=base64)", () => {
     const result = detectFormat({
-      messages: [{
-        role: "user",
-        content: [{ type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } },
+          ],
+        },
+      ],
     });
     expect(result).toBe(FORMATS.CLAUDE);
   });
@@ -213,7 +226,9 @@ describe("buildUpstreamUrl", () => {
   });
 
   it("returns Gemini stream URL for gemini-cli with accessToken", () => {
-    const url = buildUpstreamUrl("gemini-cli", "gemini-2.0-flash", true, { accessToken: "token123" });
+    const url = buildUpstreamUrl("gemini-cli", "gemini-2.0-flash", true, {
+      accessToken: "token123",
+    });
     expect(url).toContain("streamGenerateContent");
   });
 

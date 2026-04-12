@@ -72,9 +72,7 @@ export function convertKiroResponseToOpenAI(
     if (alreadyPrefixed) {
       return [new TextEncoder().encode(`${rawText}\n`)];
     }
-    return [
-      new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`),
-    ];
+    return [new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`)];
   }
 
   const et = (data._eventType as string) || (data.event as string) || "";
@@ -121,12 +119,14 @@ export function convertKiroResponseToOpenAI(
     const toolInput = (toolUse.input as Record<string, unknown>) ?? {};
     const delta: Record<string, unknown> = {
       ...(state.chunkIndex === 0 ? { role: "assistant" } : {}),
-      tool_calls: [{
-        index: 0,
-        id: toolCallId,
-        type: "function",
-        function: { name: toolName, arguments: JSON.stringify(toolInput) },
-      }],
+      tool_calls: [
+        {
+          index: 0,
+          id: toolCallId,
+          type: "function",
+          function: { name: toolName, arguments: JSON.stringify(toolInput) },
+        },
+      ],
     };
     state.chunkIndex++;
     return [new TextEncoder().encode(`data: ${JSON.stringify(makeChunk(delta))}\n\n`)];
@@ -180,12 +180,14 @@ export function convertKiroResponseToOpenAINonStream(
   if (parsed.choices) return raw;
 
   const content = (parsed.content as string) ?? "";
-  return new TextEncoder().encode(JSON.stringify({
-    id: `chatcmpl-${Date.now()}`,
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model: "kiro",
-    choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
-    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-  }));
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id: `chatcmpl-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: "kiro",
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    })
+  );
 }

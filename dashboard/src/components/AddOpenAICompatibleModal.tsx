@@ -34,7 +34,11 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
   const [checkModel, setCheckModel] = useState("");
   const [validating, setValidating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; error?: string; method?: string } | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    error?: string;
+    method?: string;
+  } | null>(null);
 
   // Reset when modal opens
   useEffect(() => {
@@ -59,7 +63,10 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
       });
       setValidationResult(res as { valid: boolean; error?: string; method?: string });
     } catch (e) {
-      setValidationResult({ valid: false, error: e instanceof Error ? e.message : "Network error" });
+      setValidationResult({
+        valid: false,
+        error: e instanceof Error ? e.message : "Network error",
+      });
     } finally {
       setValidating(false);
     }
@@ -72,7 +79,10 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
       // Create node via direct fetch (not in api.ts yet)
       const res = await fetch("/api/provider-nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
         body: JSON.stringify({ ...form, type: "openai-compatible" }),
       });
       const data = await res.json();
@@ -91,58 +101,78 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline text-lg font-bold">Add OpenAI Compatible</DialogTitle>
+          <DialogTitle className="font-headline text-lg font-bold">
+            Add OpenAI Compatible
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Name</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Name
+            </Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="OpenAI Compatible (Prod)"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Required. A friendly label for this node.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Required. A friendly label for this node.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Prefix</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Prefix
+            </Label>
             <Input
               value={form.prefix}
               onChange={(e) => setForm((f) => ({ ...f, prefix: e.target.value }))}
               placeholder="oc-prod"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Required. Used as the provider prefix for model IDs.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Required. Used as the provider prefix for model IDs.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">API Type</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              API Type
+            </Label>
             <select
               value={form.apiType}
               onChange={(e) => setForm((f) => ({ ...f, apiType: e.target.value }))}
               className="h-11 w-full bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm px-3"
             >
               {API_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Base URL</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Base URL
+            </Label>
             <Input
               value={form.baseUrl}
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
               placeholder="https://api.openai.com/v1"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">Use the base URL (ending in /v1) for your OpenAI-compatible API.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              Use the base URL (ending in /v1) for your OpenAI-compatible API.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">API Key (for Check)</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              API Key (for Check)
+            </Label>
             <Input
               type="password"
               value={checkKey}
@@ -153,14 +183,18 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">Model ID (optional)</Label>
+            <Label className="text-xs uppercase tracking-widest font-semibold text-[--on-surface-variant]">
+              Model ID (optional)
+            </Label>
             <Input
               value={checkModel}
               onChange={(e) => setCheckModel(e.target.value)}
               placeholder="e.g. gpt-4, claude-3-opus"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm"
             />
-            <p className="text-xs text-[--on-surface-variant]">If provider lacks /models endpoint, validate via chat/completions instead.</p>
+            <p className="text-xs text-[--on-surface-variant]">
+              If provider lacks /models endpoint, validate via chat/completions instead.
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -172,15 +206,14 @@ export function AddOpenAICompatibleModal({ isOpen, onClose, onCreated }: Props) 
             >
               {validating ? "Checking..." : "Check"}
             </Button>
-            {validationResult && (
-              validationResult.valid ? (
+            {validationResult &&
+              (validationResult.valid ? (
                 <span className="text-xs text-green-600 font-medium">
                   ✓ Valid{validationResult.method === "chat" ? " (via chat)" : ""}
                 </span>
               ) : (
                 <span className="text-xs text-red-500">{validationResult.error}</span>
-              )
-            )}
+              ))}
           </div>
         </div>
 

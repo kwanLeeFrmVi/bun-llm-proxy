@@ -103,11 +103,7 @@ const MAVIS_PASS = process.env.MAVIS_PASSWORD ?? "";
 
 // ─── Core helpers ───────────────────────────────────────────────────────────────
 
-async function mavisFetch(
-  path: string,
-  init: RequestInit = {},
-  retry = true,
-): Promise<Response> {
+async function mavisFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "*/*",

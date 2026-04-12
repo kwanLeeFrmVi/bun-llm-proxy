@@ -10,14 +10,7 @@ import {
 } from "chart.js";
 import { fmt } from "./utils";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  Tooltip,
-  Legend,
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend);
 
 const CHART_COLORS = [
   "rgba(0,83,219,0.8)",
@@ -45,24 +38,14 @@ export type BreakdownRow = {
 
 type ViewOption = "model" | "provider" | "apikey";
 
-export function BreakdownChart({
-  rows,
-  view,
-}: {
-  rows: BreakdownRow[];
-  view: ViewOption;
-}) {
+export function BreakdownChart({ rows, view }: { rows: BreakdownRow[]; view: ViewOption }) {
   const top = rows.slice(0, 10).reverse();
   if (top.length === 0) return null;
 
   const isApiKey = view === "apikey";
   const metric = isApiKey ? "Requests" : "Tokens";
-  const values = isApiKey
-    ? top.map((r) => r.requests)
-    : top.map((r) => r.tokens);
-  const labels = top.map((r) =>
-    r.label.length > 28 ? r.label.slice(0, 28) + "\u2026" : r.label,
-  );
+  const values = isApiKey ? top.map((r) => r.requests) : top.map((r) => r.tokens);
+  const labels = top.map((r) => (r.label.length > 28 ? r.label.slice(0, 28) + "\u2026" : r.label));
 
   const data = {
     labels,
@@ -84,10 +67,7 @@ export function BreakdownChart({
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx: {
-            parsed: { x: number | null };
-            dataset: { label?: string };
-          }) =>
+          label: (ctx: { parsed: { x: number | null }; dataset: { label?: string } }) =>
             ` ${ctx.dataset.label}: ${(ctx.parsed.x ?? 0).toLocaleString()}`,
         },
       },
@@ -117,9 +97,9 @@ export function BreakdownChart({
 
   return (
     <div className={cardStyle}>
-      <div className='px-6 py-4 border-b border-[rgba(203,213,225,0.4)]'>
-        <p className='text-sm font-semibold text-[--on-surface]'>{title}</p>
-        <p className='text-xs text-[--on-surface-variant] mt-0.5'>
+      <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
+        <p className="text-sm font-semibold text-[--on-surface]">{title}</p>
+        <p className="text-xs text-[--on-surface-variant] mt-0.5">
           Top {top.length} — visual breakdown
         </p>
       </div>

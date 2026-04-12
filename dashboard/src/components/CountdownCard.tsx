@@ -42,9 +42,7 @@ export function CountdownCard({
 
   if (compact) {
     return (
-      <span className="text-[12px] text-[var(--on-surface-variant)]">
-        Resets in {timeLeft}
-      </span>
+      <span className="text-[12px] text-[var(--on-surface-variant)]">Resets in {timeLeft}</span>
     );
   }
 
@@ -53,9 +51,7 @@ export function CountdownCard({
       <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-600">
         Resets In
       </p>
-      <p className="mt-1 font-headline text-[28px] font-700 text-[var(--on-surface)]">
-        {timeLeft}
-      </p>
+      <p className="mt-1 font-headline text-[28px] font-700 text-[var(--on-surface)]">{timeLeft}</p>
       {sub && <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{sub}</p>}
     </div>
   );

@@ -72,17 +72,10 @@ export function ProxModelTable({ summary }: ProxModelTableProps) {
           <thead>
             <tr
               style={{
-                borderBottom:
-                  "1px solid rgba(203,213,225,0.4)",
+                borderBottom: "1px solid rgba(203,213,225,0.4)",
               }}
             >
-              {[
-                "Model",
-                "Requests",
-                "Input Tokens",
-                "Output Tokens",
-                "Total Cost",
-              ].map((h) => (
+              {["Model", "Requests", "Input Tokens", "Output Tokens", "Total Cost"].map((h) => (
                 <th
                   key={h}
                   style={{
@@ -105,8 +98,7 @@ export function ProxModelTable({ summary }: ProxModelTableProps) {
               <tr
                 key={item.model}
                 style={{
-                  borderBottom:
-                    "1px solid rgba(203,213,225,0.2)",
+                  borderBottom: "1px solid rgba(203,213,225,0.2)",
                 }}
               >
                 <td

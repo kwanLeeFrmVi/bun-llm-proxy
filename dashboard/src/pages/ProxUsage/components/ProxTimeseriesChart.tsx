@@ -26,10 +26,11 @@ ChartJS.register(
   LineController,
   Filler,
   Tooltip,
-  Legend,
+  Legend
 );
 
-const cardClass = "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
+const cardClass =
+  "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
 export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
   const points = chart?.chart ?? [];
@@ -37,10 +38,7 @@ export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
   if (points.length === 0) {
     return (
       <div className={cardClass}>
-        <SectionHeader
-          title='Token Usage Over Time'
-          sub='Daily tokens and request volume'
-        />
+        <SectionHeader title="Token Usage Over Time" sub="Daily tokens and request volume" />
         <div className="px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]">
           No timeseries data available.
         </div>
@@ -95,10 +93,7 @@ export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
       },
       tooltip: {
         callbacks: {
-          label: (ctx: {
-            dataset: { label?: string };
-            parsed: { y: number | null };
-          }) => {
+          label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
             const v = ctx.parsed.y ?? 0;
             return ctx.dataset.label === "Tokens"
               ? ` Tokens: ${v.toLocaleString()}`
@@ -131,12 +126,9 @@ export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
 
   return (
     <div className={cardClass}>
-      <SectionHeader
-        title='Token Usage Over Time'
-        sub='Daily tokens and request volume'
-      />
+      <SectionHeader title="Token Usage Over Time" sub="Daily tokens and request volume" />
       <div className="h-[260px] p-5 px-6">
-        <Chart type='bar' data={chartData} options={chartOptions} />
+        <Chart type="bar" data={chartData} options={chartOptions} />
       </div>
     </div>
   );

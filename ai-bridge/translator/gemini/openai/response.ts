@@ -41,9 +41,7 @@ export function convertGeminiResponseToOpenAI(
     return buildDoneEvents(param ?? newState());
   }
 
-  const stripped = rawText.startsWith("data: ")
-    ? rawText.slice(5).trim()
-    : rawText;
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(5).trim() : rawText;
 
   if (stripped === "[DONE]") {
     return buildDoneEvents(param ?? newState());
@@ -64,9 +62,11 @@ export function convertGeminiResponseToOpenAI(
   // message_start (only on first chunk)
   if (!state.messageStarted) {
     state.messageStarted = true;
-    results.push(new TextEncoder().encode(
-      `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] })}\n\n`
-    ));
+    results.push(
+      new TextEncoder().encode(
+        `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] })}\n\n`
+      )
+    );
   }
 
   // candidates[0].content.parts → delta
@@ -85,7 +85,14 @@ export function convertGeminiResponseToOpenAI(
             const text = part.text as string;
             state.contentAccumulator += text;
 
-            const deltaObj = { id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index: state.nextBlockIndex, delta: { content: text }, finish_reason: null }] };
+            const deltaObj = {
+              id: state.messageId,
+              object: "chat.completion.chunk",
+              model: state.model,
+              choices: [
+                { index: state.nextBlockIndex, delta: { content: text }, finish_reason: null },
+              ],
+            };
             results.push(new TextEncoder().encode(`data: ${JSON.stringify(deltaObj)}\n\n`));
           }
 
@@ -95,25 +102,35 @@ export function convertGeminiResponseToOpenAI(
             const args = fc.args;
             const toolCallIndex = state.nextBlockIndex++;
 
-            results.push(new TextEncoder().encode(
-              `data: ${JSON.stringify({
-                id: state.messageId,
-                object: "chat.completion.chunk",
-                model: state.model,
-                choices: [{
-                  index: toolCallIndex,
-                  delta: {
-                    tool_calls: [{
+            results.push(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({
+                  id: state.messageId,
+                  object: "chat.completion.chunk",
+                  model: state.model,
+                  choices: [
+                    {
                       index: toolCallIndex,
-                      id: `${fc.name ?? "tool"}_${Date.now()}`,
-                      type: "function",
-                      function: { name: fc.name ?? "", arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}) },
-                    }],
-                  },
-                  finish_reason: null,
-                }],
-              })}\n\n`
-            ));
+                      delta: {
+                        tool_calls: [
+                          {
+                            index: toolCallIndex,
+                            id: `${fc.name ?? "tool"}_${Date.now()}`,
+                            type: "function",
+                            function: {
+                              name: fc.name ?? "",
+                              arguments:
+                                typeof args === "string" ? args : JSON.stringify(args ?? {}),
+                            },
+                          },
+                        ],
+                      },
+                      finish_reason: null,
+                    },
+                  ],
+                })}\n\n`
+              )
+            );
           }
         }
       }
@@ -124,26 +141,30 @@ export function convertGeminiResponseToOpenAI(
   // Note: finishReason lives inside candidates[0] in the Gemini streaming SSE format
   // STOP and MAX_TOKENS are handled via the [DONE] sentinel in buildDoneEvents.
   // Other reasons (SAFETY, RECITATION, OTHER) are emitted inline here.
-  const finishReason = firstCandidate ? (firstCandidate as Record<string, unknown>).finishReason as string | undefined : undefined;
+  const finishReason = firstCandidate
+    ? ((firstCandidate as Record<string, unknown>).finishReason as string | undefined)
+    : undefined;
   if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
     const mapped = mapGeminiFinishReason(finishReason);
     const usage = parsed.usageMetadata as Record<string, unknown> | undefined;
     const promptTokens = (usage?.promptTokenCount as number) ?? 0;
     const completionTokens = (usage?.candidatesTokenCount as number) ?? 0;
 
-    results.push(new TextEncoder().encode(
-      `data: ${JSON.stringify({
-        id: state.messageId,
-        object: "chat.completion.chunk",
-        model: state.model,
-        choices: [{ index: 0, delta: {}, finish_reason: mapped }],
-        usage: {
-          prompt_tokens: promptTokens,
-          completion_tokens: completionTokens,
-          total_tokens: promptTokens + completionTokens,
-        },
-      })}\n\n`
-    ));
+    results.push(
+      new TextEncoder().encode(
+        `data: ${JSON.stringify({
+          id: state.messageId,
+          object: "chat.completion.chunk",
+          model: state.model,
+          choices: [{ index: 0, delta: {}, finish_reason: mapped }],
+          usage: {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: promptTokens + completionTokens,
+          },
+        })}\n\n`
+      )
+    );
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
     state.messageStopSent = true;
   }
@@ -165,8 +186,8 @@ export function convertGeminiResponseToOpenAINonStream(
     return raw;
   }
 
-  const id = parsed.id as string ?? `gemini-${Date.now()}`;
-  const model = parsed.modelVersion as string ?? "";
+  const id = (parsed.id as string) ?? `gemini-${Date.now()}`;
+  const model = (parsed.modelVersion as string) ?? "";
 
   const candidates = parsed.candidates as Array<Record<string, unknown>> | undefined;
   let content = "";
@@ -187,7 +208,10 @@ export function convertGeminiResponseToOpenAINonStream(
             toolCalls.push({
               id: `${fc.name ?? "tool"}_${Date.now()}`,
               type: "function",
-              function: { name: fc.name ?? "", arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}) },
+              function: {
+                name: fc.name ?? "",
+                arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}),
+              },
             });
           }
         }
@@ -198,50 +222,62 @@ export function convertGeminiResponseToOpenAINonStream(
   const finishReason = parsed.finishReason as string | undefined;
   const usage = parsed.usageMetadata as Record<string, unknown> | undefined;
 
-  return new TextEncoder().encode(JSON.stringify({
-    id,
-    object: "chat.completion",
-    model,
-    choices: [{
-      index: 0,
-      message: {
-        role: "assistant",
-        content: content || null,
-        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id,
+      object: "chat.completion",
+      model,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: content || null,
+            ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+          },
+          finish_reason: mapGeminiFinishReason(finishReason ?? "STOP"),
+        },
+      ],
+      usage: {
+        prompt_tokens: (usage?.promptTokenCount as number) ?? 0,
+        completion_tokens: (usage?.candidatesTokenCount as number) ?? 0,
+        total_tokens: (usage?.totalTokenCount as number) ?? 0,
       },
-      finish_reason: mapGeminiFinishReason(finishReason ?? "STOP"),
-    }],
-    usage: {
-      prompt_tokens: (usage?.promptTokenCount as number) ?? 0,
-      completion_tokens: (usage?.candidatesTokenCount as number) ?? 0,
-      total_tokens: (usage?.totalTokenCount as number) ?? 0,
-    },
-  }));
+    })
+  );
 }
 
 function mapGeminiFinishReason(reason: string): string {
   switch (reason) {
-    case "MAX_TOKENS":  return "length";
-    case "STOP":        return "stop";
-    case "SAFETY":      return "content_filter";
-    case "RECITATION":  return "content_filter";
-    case "OTHER":       return "stop";
-    default:            return "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case "STOP":
+      return "stop";
+    case "SAFETY":
+      return "content_filter";
+    case "RECITATION":
+      return "content_filter";
+    case "OTHER":
+      return "stop";
+    default:
+      return "stop";
   }
 }
 
 function buildDoneEvents(state: GeminiStreamingState): Uint8Array[] {
   const results: Uint8Array[] = [];
   if (!state.messageStopSent) {
-    results.push(new TextEncoder().encode(
-      `data: ${JSON.stringify({
-        id: state.messageId,
-        object: "chat.completion.chunk",
-        model: state.model,
-        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      })}\n\n`
-    ));
+    results.push(
+      new TextEncoder().encode(
+        `data: ${JSON.stringify({
+          id: state.messageId,
+          object: "chat.completion.chunk",
+          model: state.model,
+          choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        })}\n\n`
+      )
+    );
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
   }
   return results;

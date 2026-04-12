@@ -69,7 +69,7 @@ export async function refreshClaudeOAuthToken(refreshToken: string): Promise<Tok
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -99,7 +99,7 @@ export async function refreshCodexToken(refreshToken: string): Promise<TokenResu
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -129,7 +129,7 @@ export async function refreshOpenAIToken(refreshToken: string): Promise<TokenRes
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -163,7 +163,7 @@ export async function refreshGoogleToken(
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -193,7 +193,7 @@ export async function refreshQwenToken(refreshToken: string): Promise<TokenResul
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -224,7 +224,7 @@ export async function refreshKiroToken(
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: (data.accessToken ?? data.access_token) as string,
       refreshToken: (data.refreshToken ?? data.refresh_token) as string | undefined,
@@ -265,7 +265,7 @@ export async function refreshIflowToken(refreshToken: string): Promise<TokenResu
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -295,7 +295,7 @@ export async function refreshGitHubToken(refreshToken: string): Promise<TokenRes
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return {
       accessToken: data.access_token as string,
       refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
@@ -328,7 +328,7 @@ export async function refreshCopilotToken(
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     if (typeof data.token !== "string" || typeof data.expires_at !== "number") {
       log.error("TOKEN_REFRESH", "Copilot token response invalid");
       return null;
@@ -370,10 +370,8 @@ async function _refreshWithLock(
   refreshToken: string,
   creds: Record<string, unknown>
 ): Promise<TokenResult | null> {
-  const lockResult = await withLock(
-    `token-refresh:${connectionId}`,
-    REFRESH_LOCK_TTL,
-    () => _refreshByProvider(provider, refreshToken, creds)
+  const lockResult = await withLock(`token-refresh:${connectionId}`, REFRESH_LOCK_TTL, () =>
+    _refreshByProvider(provider, refreshToken, creds)
   );
 
   if (lockResult.executed) {
@@ -533,7 +531,7 @@ export async function refreshVertexToken(
       return null;
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     const accessToken = data.access_token as string;
     const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 3600;
 
@@ -565,11 +563,13 @@ export function refreshWithRetry(
 ): Promise<TokenResult | null> {
   return (async () => {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 1000));
+      if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 1000));
       try {
         const result = await refreshFn();
         if (result) return result;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     return null;
   })();
@@ -615,7 +615,7 @@ export async function updateProviderCredentials(
   try {
     const updates: Record<string, unknown> = {};
 
-    if (newCredentials.accessToken)  updates.accessToken  = newCredentials.accessToken;
+    if (newCredentials.accessToken) updates.accessToken = newCredentials.accessToken;
     if (newCredentials.refreshToken) updates.refreshToken = newCredentials.refreshToken;
     if (newCredentials.expiresIn) {
       updates.expiresAt = toExpiresAt(newCredentials.expiresIn as number);
@@ -661,7 +661,7 @@ export async function checkAndRefreshToken(
         expiresIn: Math.round(remaining / 1000),
       });
 
-      const newCreds = await getAccessToken(provider, creds) as Record<string, unknown> | null;
+      const newCreds = (await getAccessToken(provider, creds)) as Record<string, unknown> | null;
       if (newCreds?.accessToken) {
         const mergedCreds = {
           ...newCreds,
@@ -675,7 +675,10 @@ export async function checkAndRefreshToken(
           accessToken: newCreds.accessToken,
           refreshToken: (newCreds.refreshToken ?? creds.refreshToken) as string | undefined,
           providerSpecificData: newCreds.providerSpecificData
-            ? { ...(creds.providerSpecificData as object), ...(newCreds.providerSpecificData as object) }
+            ? {
+                ...(creds.providerSpecificData as object),
+                ...(newCreds.providerSpecificData as object),
+              }
             : creds.providerSpecificData,
           expiresAt: newCreds.expiresIn
             ? toExpiresAt(newCreds.expiresIn as number)
@@ -700,7 +703,10 @@ export async function checkAndRefreshToken(
         expiresIn: Math.round(remaining / 1000),
       });
 
-      const copilotToken = await refreshCopilotToken(creds.accessToken as string) as { token: string; expiresAt: number } | null;
+      const copilotToken = (await refreshCopilotToken(creds.accessToken as string)) as {
+        token: string;
+        expiresAt: number;
+      } | null;
       if (copilotToken) {
         const updatedSpecific: Record<string, unknown> = {
           ...psd,
@@ -728,7 +734,7 @@ export async function checkAndRefreshToken(
         const clientEmail = saJson.client_email as string;
         const cached = vertexTokenCache.get(clientEmail);
         const now = Date.now();
-        const needsRefresh = !cached || (cached.expiresAt - now) < TOKEN_EXPIRY_BUFFER_MS;
+        const needsRefresh = !cached || cached.expiresAt - now < TOKEN_EXPIRY_BUFFER_MS;
 
         if (needsRefresh) {
           log.info("TOKEN_REFRESH", "Vertex token expiring soon, refreshing proactively", {
@@ -739,7 +745,8 @@ export async function checkAndRefreshToken(
           const vertexResult = await refreshVertexToken(saJson);
           if (vertexResult?.accessToken) {
             // Update in-memory cache with expiresAt from refreshVertexToken
-            const newExpiresAt = vertexResult.expiresAt ?? now + (vertexResult.expiresIn ?? 3600) * 1000;
+            const newExpiresAt =
+              vertexResult.expiresAt ?? now + (vertexResult.expiresIn ?? 3600) * 1000;
             vertexTokenCache.set(clientEmail, {
               token: vertexResult.accessToken,
               expiresAt: typeof newExpiresAt === "number" ? newExpiresAt : now + 3600 * 1000,
@@ -768,10 +775,16 @@ export async function checkAndRefreshToken(
 export async function refreshGitHubAndCopilotTokens(
   credentials: Record<string, unknown>
 ): Promise<Record<string, unknown> | null> {
-  const newGitHubCreds = await refreshGitHubToken(credentials.refreshToken as string) as Record<string, unknown> | null;
+  const newGitHubCreds = (await refreshGitHubToken(credentials.refreshToken as string)) as Record<
+    string,
+    unknown
+  > | null;
   if (!newGitHubCreds?.accessToken) return newGitHubCreds;
 
-  const copilotToken = await refreshCopilotToken(newGitHubCreds.accessToken as string) as { token: string; expiresAt: number } | null;
+  const copilotToken = (await refreshCopilotToken(newGitHubCreds.accessToken as string)) as {
+    token: string;
+    expiresAt: number;
+  } | null;
   if (!copilotToken) return newGitHubCreds;
 
   return {
@@ -835,9 +848,13 @@ async function _doBackgroundRefresh(): Promise<void> {
       // Only refresh if expiring within the background buffer window
       if (remaining >= BACKGROUND_EXPIRY_BUFFER_MS) continue;
 
-      log.info("TOKEN_REFRESH", `Background: refreshing ${conn.provider} (${conn.name ?? conn.id})`, {
-        expiresIn: Math.round(remaining / 1000),
-      });
+      log.info(
+        "TOKEN_REFRESH",
+        `Background: refreshing ${conn.provider} (${conn.name ?? conn.id})`,
+        {
+          expiresIn: Math.round(remaining / 1000),
+        }
+      );
 
       try {
         const creds: Record<string, unknown> = {
@@ -847,28 +864,44 @@ async function _doBackgroundRefresh(): Promise<void> {
           providerSpecificData: conn.providerSpecificData,
         };
 
-        const newCreds = await getAccessToken(conn.provider, creds) as Record<string, unknown> | null;
+        const newCreds = (await getAccessToken(conn.provider, creds)) as Record<
+          string,
+          unknown
+        > | null;
         if (newCreds?.accessToken) {
           await updateProviderCredentials(conn.id, {
             ...newCreds,
             existingProviderSpecificData: conn.providerSpecificData,
           });
           refreshed++;
-          log.info("TOKEN_REFRESH", `Background: refreshed ${conn.provider} (${conn.name ?? conn.id})`);
+          log.info(
+            "TOKEN_REFRESH",
+            `Background: refreshed ${conn.provider} (${conn.name ?? conn.id})`
+          );
         } else {
           failed++;
-          log.warn("TOKEN_REFRESH", `Background: refresh returned null for ${conn.provider} (${conn.name ?? conn.id})`);
+          log.warn(
+            "TOKEN_REFRESH",
+            `Background: refresh returned null for ${conn.provider} (${conn.name ?? conn.id})`
+          );
         }
       } catch (err) {
         failed++;
-        log.error("TOKEN_REFRESH", `Background: refresh error for ${conn.provider} (${conn.name ?? conn.id})`, {
-          error: (err as Error).message,
-        });
+        log.error(
+          "TOKEN_REFRESH",
+          `Background: refresh error for ${conn.provider} (${conn.name ?? conn.id})`,
+          {
+            error: (err as Error).message,
+          }
+        );
       }
     }
 
     if (refreshed > 0 || failed > 0) {
-      log.info("TOKEN_REFRESH", `Background refresh cycle complete: ${refreshed} refreshed, ${failed} failed`);
+      log.info(
+        "TOKEN_REFRESH",
+        `Background refresh cycle complete: ${refreshed} refreshed, ${failed} failed`
+      );
     }
   } catch (err) {
     log.error("TOKEN_REFRESH", `Background refresh cycle error: ${(err as Error).message}`);

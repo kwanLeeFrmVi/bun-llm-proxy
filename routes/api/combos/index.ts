@@ -1,4 +1,10 @@
-import { getCombos, getComboByName, createCombo, setComboConfig, getComboConfig } from "@/lib/localDb";
+import {
+  getCombos,
+  getComboByName,
+  createCombo,
+  setComboConfig,
+  getComboConfig,
+} from "@/lib/localDb";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
@@ -19,11 +25,13 @@ function normalizeModels(raw: ComboModelsInput | undefined): string[] {
   });
 }
 
-function normalizeComboConfig(raw: ComboModelsInput | undefined): import("../../../db/index.ts").ComboConfig["models"] | null {
+function normalizeComboConfig(
+  raw: ComboModelsInput | undefined
+): import("../../../db/index.ts").ComboConfig["models"] | null {
   if (!raw || raw.length === 0) return null;
   // If all strings, no extended config needed
-  if (raw.every(item => typeof item === "string")) return null;
-  return raw.map(item => {
+  if (raw.every((item) => typeof item === "string")) return null;
+  return raw.map((item) => {
     if (typeof item === "string") return { model: item, weight: 1 };
     return { model: item.model, weight: Math.round(item.weight ?? 1) };
   });
@@ -41,13 +49,13 @@ export async function GET(req: Request): Promise<Response> {
       if (config && config.models.length > 0) {
         return {
           ...combo,
-          models: config.models,  // { model, weight }[]
+          models: config.models, // { model, weight }[]
         };
       }
       // Fall back to plain models array with weight=1
       return {
         ...combo,
-        models: combo.models.map(m => ({ model: m, weight: 1 })),
+        models: combo.models.map((m) => ({ model: m, weight: 1 })),
       };
     })
   );
@@ -60,7 +68,9 @@ export async function POST(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   let body: Record<string, unknown>;
-  try { body = await req.json() as Record<string, unknown>; } catch {
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -68,11 +78,17 @@ export async function POST(req: Request): Promise<Response> {
   const rawModels = body.models as ComboModelsInput | undefined;
 
   if (!name || !NAME_REGEX.test(name))
-    return Response.json({ error: "Invalid name — use letters, numbers, _ . -" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Invalid name — use letters, numbers, _ . -" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   if (await getComboByName(name))
     return Response.json({ error: "Name already exists" }, { status: 400, headers: CORS_HEADERS });
   if (!rawModels || rawModels.length === 0)
-    return Response.json({ error: "At least one model is required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "At least one model is required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
 
   const models = normalizeModels(rawModels);
   const combo = await createCombo({ name, models });
@@ -84,7 +100,10 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Return combo with models (including weights)
-  return Response.json({ ...combo, models: configModels ?? models.map(m => ({ model: m, weight: 1 })) }, { status: 201, headers: CORS_HEADERS });
+  return Response.json(
+    { ...combo, models: configModels ?? models.map((m) => ({ model: m, weight: 1 })) },
+    { status: 201, headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

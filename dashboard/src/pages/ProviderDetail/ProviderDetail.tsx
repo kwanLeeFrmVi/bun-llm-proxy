@@ -185,7 +185,10 @@ export default function ProviderDetail() {
   }, [fetchData]);
 
   useEffect(() => {
-    api.settings.get().then(s => setSettings(s as Record<string, unknown>)).catch(console.error);
+    api.settings
+      .get()
+      .then((s) => setSettings(s as Record<string, unknown>))
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -588,9 +591,16 @@ export default function ProviderDetail() {
   }
 
   // ─── Request Routing settings ─────────────────────────────────────────────────
-  const providerStrategies = (settings.providerStrategies as Record<string, Record<string, unknown>> | undefined) ?? {};
-  const currentStrategy = (providerStrategies[decodedId]?.fallbackStrategy as string) ?? (settings.fallbackStrategy as string) ?? "fill-first";
-  const currentStickyLimit = (providerStrategies[decodedId]?.stickyRoundRobinLimit as number) ?? (settings.stickyRoundRobinLimit as number) ?? 3;
+  const providerStrategies =
+    (settings.providerStrategies as Record<string, Record<string, unknown>> | undefined) ?? {};
+  const currentStrategy =
+    (providerStrategies[decodedId]?.fallbackStrategy as string) ??
+    (settings.fallbackStrategy as string) ??
+    "fill-first";
+  const currentStickyLimit =
+    (providerStrategies[decodedId]?.stickyRoundRobinLimit as number) ??
+    (settings.stickyRoundRobinLimit as number) ??
+    3;
 
   async function handleStrategyChange(value: string) {
     const updated = {
@@ -603,7 +613,7 @@ export default function ProviderDetail() {
       },
     };
     await api.settings.update(updated);
-    setSettings(prev => ({ ...prev, providerStrategies: updated.providerStrategies }));
+    setSettings((prev) => ({ ...prev, providerStrategies: updated.providerStrategies }));
     toast.success(`Strategy set to ${value}`);
   }
 
@@ -618,7 +628,7 @@ export default function ProviderDetail() {
       },
     };
     await api.settings.update(updated);
-    setSettings(prev => ({ ...prev, providerStrategies: updated.providerStrategies }));
+    setSettings((prev) => ({ ...prev, providerStrategies: updated.providerStrategies }));
   }
 
   async function handleUpdateProvider(updatedNode: ProviderNode) {
@@ -863,9 +873,11 @@ export default function ProviderDetail() {
           </div>
           <div className="p-4 space-y-4">
             <div>
-              <p className="text-xs font-medium text-[--on-surface-variant] mb-2">Fallback Strategy</p>
+              <p className="text-xs font-medium text-[--on-surface-variant] mb-2">
+                Fallback Strategy
+              </p>
               <div className="flex rounded-lg border border-[rgba(203,213,225,0.6)] overflow-hidden w-fit">
-                {(["fill-first", "round-robin"] as const).map(s => (
+                {(["fill-first", "round-robin"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => handleStrategyChange(s)}
@@ -888,7 +900,8 @@ export default function ProviderDetail() {
             {currentStrategy === "round-robin" && (
               <div>
                 <p className="text-xs font-medium text-[--on-surface-variant] mb-2">
-                  Sticky limit: <span className="text-[--on-surface] font-semibold">{currentStickyLimit}</span>
+                  Sticky limit:{" "}
+                  <span className="text-[--on-surface] font-semibold">{currentStickyLimit}</span>
                 </p>
                 <input
                   type="range"
@@ -896,11 +909,12 @@ export default function ProviderDetail() {
                   max={10}
                   step={1}
                   value={currentStickyLimit}
-                  onChange={e => handleStickyLimitChange(parseInt(e.target.value))}
+                  onChange={(e) => handleStickyLimitChange(parseInt(e.target.value))}
                   className="w-48 h-1.5 rounded-full appearance-none bg-[rgba(203,213,225,0.6)] accent-[#0F172A] cursor-pointer"
                 />
                 <p className="text-xs text-[--on-surface-variant] mt-1">
-                  Max consecutive requests on one account before switching. Set to 1 for maximum distribution.
+                  Max consecutive requests on one account before switching. Set to 1 for maximum
+                  distribution.
                 </p>
               </div>
             )}

@@ -239,7 +239,9 @@ describe("buildUpstreamHeaders() — claude provider cold start (no cache)", () 
 
     // Static fallback values from providers.js must still be present
     // They may be Title-Case since no cache to conflict with them
-    const hasVersion = headers["Anthropic-Version"] === "2023-06-01" || headers["anthropic-version"] === "2023-06-01";
+    const hasVersion =
+      headers["Anthropic-Version"] === "2023-06-01" ||
+      headers["anthropic-version"] === "2023-06-01";
     expect(hasVersion).toBe(true);
   });
 

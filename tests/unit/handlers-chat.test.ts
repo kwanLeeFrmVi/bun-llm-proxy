@@ -121,7 +121,9 @@ const mockGetSettings = mock(() => Promise.resolve({}));
 const mockGetModelInfo = mock(() => Promise.resolve({ provider: null, model: null }));
 const mockGetComboModelConfigs = mock(() => Promise.resolve(null));
 const mockGetProviderCredentials = mock(() => Promise.resolve(null));
-const mockCheckAndRefreshToken = mock((_p: string, c: Record<string, unknown>) => Promise.resolve(c));
+const mockCheckAndRefreshToken = mock((_p: string, c: Record<string, unknown>) =>
+  Promise.resolve(c)
+);
 const mockTrackPendingRequest = mock(() => {});
 const mockAppendRequestLog = mock(() => {});
 const mockMarkAccountUnavailable = mock(() => Promise.resolve({ shouldFallback: false }));
@@ -131,7 +133,6 @@ const mockGetProjectIdForConnection = mock(() => Promise.resolve(null));
 const mockIncrementCircuitBreaker = mock(() => Promise.resolve(0));
 const mockResetCircuitBreaker = mock(() => Promise.resolve());
 const mockGetProviderDisplayName = mock(() => Promise.resolve("test-provider"));
-
 
 mock.module("../../lib/authMiddleware.ts", () => ({ checkAuth: mockCheckAuth }));
 mock.module("../../db/index.ts", () => ({
@@ -198,10 +199,12 @@ describe("handleChat — streaming error responses", () => {
   // ── Missing model ────────────────────────────────────────────────────────────
 
   it("returns SSE error when stream=true and model is missing", async () => {
-    const res = await handleChat(makeRequest({
-      stream: true,
-      messages: [{ role: "user", content: "hi" }],
-    }));
+    const res = await handleChat(
+      makeRequest({
+        stream: true,
+        messages: [{ role: "user", content: "hi" }],
+      })
+    );
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     expect(res.status).toBe(HTTP_STATUS.BAD_REQUEST);
     const text = await res.text();
@@ -211,10 +214,12 @@ describe("handleChat — streaming error responses", () => {
   });
 
   it("returns JSON error when stream=false and model is missing", async () => {
-    const res = await handleChat(makeRequest({
-      stream: false,
-      messages: [{ role: "user", content: "hi" }],
-    }));
+    const res = await handleChat(
+      makeRequest({
+        stream: false,
+        messages: [{ role: "user", content: "hi" }],
+      })
+    );
     expect(res.headers.get("Content-Type")).toBe("application/json");
     const body = await res.json();
     expect(body.error).toBeDefined();
@@ -225,11 +230,13 @@ describe("handleChat — streaming error responses", () => {
   it("returns SSE error when stream=true and model has no provider", async () => {
     mockGetModelInfo.mockImplementation(() => Promise.resolve({ provider: null, model: null }));
 
-    const res = await handleChat(makeRequest({
-      model: "nonexistent-model",
-      stream: true,
-      messages: [{ role: "user", content: "hi" }],
-    }));
+    const res = await handleChat(
+      makeRequest({
+        model: "nonexistent-model",
+        stream: true,
+        messages: [{ role: "user", content: "hi" }],
+      })
+    );
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     const text = await res.text();
     expect(text).toContain("message_delta");
@@ -238,25 +245,31 @@ describe("handleChat — streaming error responses", () => {
   it("returns JSON error when stream=false and model has no provider", async () => {
     mockGetModelInfo.mockImplementation(() => Promise.resolve({ provider: null, model: null }));
 
-    const res = await handleChat(makeRequest({
-      model: "nonexistent-model",
-      stream: false,
-      messages: [{ role: "user", content: "hi" }],
-    }));
+    const res = await handleChat(
+      makeRequest({
+        model: "nonexistent-model",
+        stream: false,
+        messages: [{ role: "user", content: "hi" }],
+      })
+    );
     expect(res.headers.get("Content-Type")).toBe("application/json");
   });
 
   // ── No credentials ───────────────────────────────────────────────────────────
 
   it("returns SSE error when stream=true and no credentials available", async () => {
-    mockGetModelInfo.mockImplementation(() => Promise.resolve({ provider: "openai", model: "gpt-4o" }));
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "openai", model: "gpt-4o" })
+    );
     mockGetProviderCredentials.mockImplementation(() => Promise.resolve(null));
 
-    const res = await handleChat(makeRequest({
-      model: "openai/gpt-4o",
-      stream: true,
-      messages: [{ role: "user", content: "hi" }],
-    }));
+    const res = await handleChat(
+      makeRequest({
+        model: "openai/gpt-4o",
+        stream: true,
+        messages: [{ role: "user", content: "hi" }],
+      })
+    );
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     const text = await res.text();
     expect(text).toContain("message_delta");
@@ -266,7 +279,9 @@ describe("handleChat — streaming error responses", () => {
   // ── Upstream error (503) ─────────────────────────────────────────────────────
 
   it("returns SSE error when stream=true and upstream returns 503", async () => {
-    mockGetModelInfo.mockImplementation(() => Promise.resolve({ provider: "openai", model: "gpt-4o" }));
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "openai", model: "gpt-4o" })
+    );
     mockGetProviderCredentials.mockImplementation(() =>
       Promise.resolve({
         connectionId: "conn-1",
@@ -276,22 +291,23 @@ describe("handleChat — streaming error responses", () => {
         accessToken: "test-access",
       })
     );
-    mockMarkAccountUnavailable.mockImplementation(() =>
-      Promise.resolve({ shouldFallback: false })
-    );
+    mockMarkAccountUnavailable.mockImplementation(() => Promise.resolve({ shouldFallback: false }));
 
     // Mock fetch so the real handleChatCore gets a 503 response
     const origFetch = globalThis.fetch;
     globalThis.fetch = (() =>
-      Promise.resolve(new Response("Service Unavailable", { status: 503 }))
-    ) as unknown as typeof globalThis.fetch;
+      Promise.resolve(
+        new Response("Service Unavailable", { status: 503 })
+      )) as unknown as typeof globalThis.fetch;
 
     try {
-      const res = await handleChat(makeRequest({
-        model: "openai/gpt-4o",
-        stream: true,
-        messages: [{ role: "user", content: "hi" }],
-      }));
+      const res = await handleChat(
+        makeRequest({
+          model: "openai/gpt-4o",
+          stream: true,
+          messages: [{ role: "user", content: "hi" }],
+        })
+      );
       expect(res.headers.get("Content-Type")).toBe("text/event-stream");
       const text = await res.text();
       // Verify the full SSE lifecycle that Claude Code expects
@@ -313,7 +329,9 @@ describe("handleChat — streaming error responses", () => {
   });
 
   it("returns JSON error when stream=false and upstream returns 503", async () => {
-    mockGetModelInfo.mockImplementation(() => Promise.resolve({ provider: "openai", model: "gpt-4o" }));
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "openai", model: "gpt-4o" })
+    );
     mockGetProviderCredentials.mockImplementation(() =>
       Promise.resolve({
         connectionId: "conn-1",
@@ -321,21 +339,22 @@ describe("handleChat — streaming error responses", () => {
         apiKey: "test-key",
       })
     );
-    mockMarkAccountUnavailable.mockImplementation(() =>
-      Promise.resolve({ shouldFallback: false })
-    );
+    mockMarkAccountUnavailable.mockImplementation(() => Promise.resolve({ shouldFallback: false }));
 
     const origFetch = globalThis.fetch;
     globalThis.fetch = (() =>
-      Promise.resolve(new Response("Service Unavailable", { status: 503 }))
-    ) as unknown as typeof globalThis.fetch;
+      Promise.resolve(
+        new Response("Service Unavailable", { status: 503 })
+      )) as unknown as typeof globalThis.fetch;
 
     try {
-      const res = await handleChat(makeRequest({
-        model: "openai/gpt-4o",
-        stream: false,
-        messages: [{ role: "user", content: "hi" }],
-      }));
+      const res = await handleChat(
+        makeRequest({
+          model: "openai/gpt-4o",
+          stream: false,
+          messages: [{ role: "user", content: "hi" }],
+        })
+      );
       expect(res.headers.get("Content-Type")).toBe("application/json");
     } finally {
       globalThis.fetch = origFetch;

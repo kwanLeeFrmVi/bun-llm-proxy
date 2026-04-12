@@ -49,24 +49,24 @@ export function PaginationControls({
   }
 
   return (
-    <div className='px-6 py-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3'>
-      <p className='text-xs text-muted-foreground font-medium tracking-wide'>
+    <div className="px-6 py-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p className="text-xs text-muted-foreground font-medium tracking-wide">
         SHOWING {start}–{end} OF {total.toLocaleString()} {label}
       </p>
-      <div className='flex items-center gap-1'>
+      <div className="flex items-center gap-1">
         <button
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
-          className='h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+          className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeft className='w-4 h-4 text-muted-foreground' />
+          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
         </button>
 
         {getPageNumbers().map((p, idx) =>
           p === "ellipsis" ? (
             <span
               key={`ellipsis-${idx}`}
-              className='h-7 w-7 flex items-center justify-center text-xs text-muted-foreground'
+              className="h-7 w-7 flex items-center justify-center text-xs text-muted-foreground"
             >
               …
             </span>
@@ -82,15 +82,15 @@ export function PaginationControls({
             >
               {p + 1}
             </button>
-          ),
+          )
         )}
 
         <button
           disabled={page + 1 >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className='h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+          className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronRight className='w-4 h-4 text-muted-foreground' />
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
     </div>

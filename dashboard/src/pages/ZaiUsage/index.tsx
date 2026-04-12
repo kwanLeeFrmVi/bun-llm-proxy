@@ -3,7 +3,12 @@ import { api } from "@/lib/api.ts";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import type { ZaiQuotaResponse, ZaiPerformanceResponse, ZaiUsageResponse, DateRange } from "@/lib/zaiTypes.ts";
+import type {
+  ZaiQuotaResponse,
+  ZaiPerformanceResponse,
+  ZaiUsageResponse,
+  DateRange,
+} from "@/lib/zaiTypes.ts";
 import { RANGES, getDateRange } from "./utils.ts";
 import { QuotaTab } from "./QuotaTab.tsx";
 import { PerformanceTab } from "./PerformanceTab.tsx";
@@ -81,11 +86,7 @@ export default function ZaiUsage() {
           <Tabs value={range} onValueChange={(v) => setRange(v as DateRange)}>
             <TabsList className="h-9 bg-[var(--surface-container-low)] rounded-lg p-1">
               {RANGES.map((r) => (
-                <TabsTrigger
-                  key={r}
-                  value={r}
-                  className="h-7 px-3 rounded-md text-[12px] font-500"
-                >
+                <TabsTrigger key={r} value={r} className="h-7 px-3 rounded-md text-[12px] font-500">
                   {r}
                 </TabsTrigger>
               ))}
@@ -98,9 +99,7 @@ export default function ZaiUsage() {
             disabled={refreshing}
             className="h-9"
           >
-            <RefreshCw
-              className={`w-[14px] h-[14px] mr-1.5 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`w-[14px] h-[14px] mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing" : "Refresh"}
           </Button>
         </div>
@@ -116,12 +115,8 @@ export default function ZaiUsage() {
         <div className="flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(203,213,225,0.6)]">
           <AlertCircle className="shrink-0 w-5 h-5 text-[#ef4444]" />
           <div>
-            <p className="text-[13px] font-600 text-[#ef4444]">
-              Failed to load ZAI data
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
-              {error}
-            </p>
+            <p className="text-[13px] font-600 text-[#ef4444]">Failed to load ZAI data</p>
+            <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{error}</p>
             <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
               Make sure{" "}
               <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
@@ -140,9 +135,7 @@ export default function ZaiUsage() {
       {!quota || !performance || !usage || isLoading ? (
         <div className="px-12 py-12 text-center">
           <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
-          <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">
-            Loading from api.z.ai
-          </p>
+          <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">Loading from api.z.ai</p>
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>

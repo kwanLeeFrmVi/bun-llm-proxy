@@ -3,15 +3,9 @@
 import { PROVIDER_ID_TO_ALIAS } from "../ai-bridge/config/providerModels.ts";
 
 // Re-export from centralized constants and utils
-export {
-  OPENAI_COMPATIBLE_PREFIX,
-  ANTHROPIC_COMPATIBLE_PREFIX,
-} from "./constants.ts";
+export { OPENAI_COMPATIBLE_PREFIX, ANTHROPIC_COMPATIBLE_PREFIX } from "./constants.ts";
 
-export {
-  isOpenAICompatibleProvider,
-  isAnthropicCompatibleProvider,
-} from "./utils.ts";
+export { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "./utils.ts";
 
 // Invert ID→alias to get alias→ID
 const ALIAS_TO_ID: Record<string, string> = Object.fromEntries(
@@ -43,7 +37,8 @@ export async function getProviderDisplayName(providerId: string): Promise<string
     return providerDisplayNameCache.get(providerId)!;
   }
 
-  const isCustom = providerId.startsWith("anthropic-compatible-") || providerId.startsWith("openai-compatible-");
+  const isCustom =
+    providerId.startsWith("anthropic-compatible-") || providerId.startsWith("openai-compatible-");
 
   if (isCustom) {
     try {

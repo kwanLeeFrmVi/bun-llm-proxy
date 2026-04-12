@@ -8,9 +8,7 @@ export function StatusBadge({ status }: { status: string }) {
           : "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
       }`}
     >
-      <span
-        className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`}
-      />
+      <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`} />
       {status}
     </span>
   );

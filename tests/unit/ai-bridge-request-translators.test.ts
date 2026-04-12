@@ -36,7 +36,9 @@ describe("NeedsTranslation", () => {
 describe("openai → claude (Request)", () => {
   it("converts string content to text block", () => {
     const body = { model: "claude-sonnet-4", messages: [{ role: "user", content: "hello" }] };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
 
     expect(result.model).toBe("claude-sonnet-4-20250514");
     expect(result.messages).toBeDefined();
@@ -51,15 +53,21 @@ describe("openai → claude (Request)", () => {
   it("maps image_url to base64 data URL", () => {
     const body = {
       model: "claude-sonnet-4",
-      messages: [{
-        role: "user",
-        content: [{
-          type: "image_url",
-          image_url: { url: "data:image/png;base64,abc123" },
-        }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: "data:image/png;base64,abc123" },
+            },
+          ],
+        },
+      ],
     };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     const msgs = result.messages as Array<Record<string, unknown>>;
     const content = msgs[0].content as Array<Record<string, unknown>>;
     expect(content[0].type).toBe("image");
@@ -72,12 +80,20 @@ describe("openai → claude (Request)", () => {
     const body = {
       model: "claude-sonnet-4",
       messages: [{ role: "user", content: "use the weather tool" }],
-      tools: [{
-        type: "function",
-        function: { name: "get_weather", description: "Get weather", parameters: { type: "object" } },
-      }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "get_weather",
+            description: "Get weather",
+            parameters: { type: "object" },
+          },
+        },
+      ],
     };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.tools).toBeDefined();
     const tools = result.tools as Array<Record<string, unknown>>;
     expect(tools[0].name).toBe("get_weather");
@@ -90,7 +106,9 @@ describe("openai → claude (Request)", () => {
       messages: [{ role: "user", content: "explain physics" }],
       reasoning_effort: "high",
     };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.thinking).toBeDefined();
     const thinking = result.thinking as Record<string, unknown>;
     expect(thinking.type).toBe("enabled");
@@ -105,7 +123,9 @@ describe("openai → claude (Request)", () => {
       temperature: 0.7,
       stop: ["END"],
     };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.max_tokens).toBe(1024);
     expect(result.temperature).toBe(0.7);
     expect(result.stop_sequences).toEqual(["END"]);
@@ -119,12 +139,14 @@ describe("openai → claude (Request)", () => {
         { role: "user", content: "hello" },
       ],
     };
-    const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.system).toBeDefined();
     expect(result.messages).toBeDefined();
     const msgs = result.messages as Array<Record<string, unknown>>;
     // System should be removed from messages
-    expect(msgs.find(m => (m.role as string) === "system")).toBeUndefined();
+    expect(msgs.find((m) => (m.role as string) === "system")).toBeUndefined();
   });
 });
 
@@ -132,12 +154,17 @@ describe("claude → openai (Request)", () => {
   it("maps text block array to openai content array", () => {
     const body = {
       model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [{ type: "text", text: "hi" }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
     };
-    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<string, unknown>;
+    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
 
     expect(result.model).toBe("gpt-4o");
     const msgs = result.messages as Array<Record<string, unknown>>;
@@ -152,15 +179,23 @@ describe("claude → openai (Request)", () => {
   it("preserves multimodal arrays (text + image)", () => {
     const body = {
       model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: "describe" },
-          { type: "image", source: { type: "base64", media_type: "image/png", data: "ZmFrZQ==" } },
-        ],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "describe" },
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/png", data: "ZmFrZQ==" },
+            },
+          ],
+        },
+      ],
     };
-    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<string, unknown>;
+    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
     const msgs = result.messages as Array<Record<string, unknown>>;
     expect(Array.isArray(msgs[0].content)).toBe(true);
     const content = msgs[0].content as Array<Record<string, unknown>>;
@@ -172,13 +207,18 @@ describe("claude → openai (Request)", () => {
     const body = {
       model: "gpt-4o",
       messages: [{ role: "user", content: "hi" }],
-      tools: [{
-        name: "search",
-        description: "Search the web",
-        input_schema: { type: "object", properties: { query: { type: "string" } } },
-      }],
+      tools: [
+        {
+          name: "search",
+          description: "Search the web",
+          input_schema: { type: "object", properties: { query: { type: "string" } } },
+        },
+      ],
     };
-    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<string, unknown>;
+    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
     expect(result.tools).toBeDefined();
     const tools = result.tools as Array<Record<string, unknown>>;
     expect(tools[0].type).toBe("function");
@@ -193,7 +233,10 @@ describe("claude → openai (Request)", () => {
       messages: [{ role: "user", content: "hi" }],
       thinking: { type: "enabled", budget_tokens: 10000 },
     };
-    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<string, unknown>;
+    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
     expect(result.reasoning_effort).toBeDefined();
     expect(typeof result.reasoning_effort).toBe("string");
   });
@@ -204,7 +247,9 @@ describe("gemini → openai (Request)", () => {
     const body = {
       contents: [{ role: "user", parts: [{ text: "hello gemini" }] }],
     };
-    const result = decode(Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.model).toBe("gemini-2.0-flash");
     const msgs = result.messages as Array<Record<string, unknown>>;
     expect(msgs[0].role).toBe("user");
@@ -213,19 +258,27 @@ describe("gemini → openai (Request)", () => {
 
   it("maps inlineData to image_url", () => {
     const body = {
-      contents: [{
-        role: "user",
-        parts: [{
-          inlineData: { mimeType: "image/jpeg", data: "SGVsbG8=" },
-        }],
-      }],
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: { mimeType: "image/jpeg", data: "SGVsbG8=" },
+            },
+          ],
+        },
+      ],
     };
-    const result = decode(Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     const msgs = result.messages as Array<Record<string, unknown>>;
     expect(Array.isArray(msgs[0].content)).toBe(true);
     const content = msgs[0].content as Array<Record<string, unknown>>;
     expect(content[0].type).toBe("image_url");
-    expect((content[0].image_url as Record<string, unknown>).url).toContain("data:image/jpeg;base64,SGVsbG8=");
+    expect((content[0].image_url as Record<string, unknown>).url).toContain(
+      "data:image/jpeg;base64,SGVsbG8="
+    );
   });
 
   it("maps generationConfig → max_tokens, temperature", () => {
@@ -233,7 +286,9 @@ describe("gemini → openai (Request)", () => {
       contents: [{ role: "user", parts: [{ text: "hi" }] }],
       generationConfig: { maxOutputTokens: 2048, temperature: 0.5 },
     };
-    const result = decode(Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.max_tokens).toBe(2048);
     expect(result.temperature).toBe(0.5);
   });
@@ -243,22 +298,34 @@ describe("gemini → openai (Request)", () => {
       contents: [{ role: "user", parts: [{ text: "hi" }] }],
       systemInstruction: { parts: [{ text: "You are an assistant." }] },
     };
-    const result = decode(Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     const msgs = result.messages as Array<Record<string, unknown>>;
     expect(msgs[0].role).toBe("system");
-    expect((msgs[0].content as Array<Record<string, unknown>>)[0].text).toBe("You are an assistant.");
+    expect((msgs[0].content as Array<Record<string, unknown>>)[0].text).toBe(
+      "You are an assistant."
+    );
   });
 
   it("maps tools.functionDeclarations → tools.functions", () => {
     const body = {
       contents: [{ role: "user", parts: [{ text: "hi" }] }],
-      tools: [{ functionDeclarations: [{
-        name: "calc",
-        description: "Calculator",
-        parameters: { type: "object" },
-      }] }],
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: "calc",
+              description: "Calculator",
+              parameters: { type: "object" },
+            },
+          ],
+        },
+      ],
     };
-    const result = decode(Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "openai", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.tools).toBeDefined();
     const tools = result.tools as Array<Record<string, unknown>>;
     expect((tools[0] as Record<string, unknown>).function).toBeDefined();
@@ -271,7 +338,9 @@ describe("openai → gemini (Request)", () => {
       model: "gemini-2.0-flash",
       messages: [{ role: "user", content: "hello gemini" }],
     };
-    const result = decode(Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.contents).toBeDefined();
     const contents = result.contents as Array<Record<string, unknown>>;
     expect(contents[0].role).toBe("user");
@@ -287,7 +356,9 @@ describe("openai → gemini (Request)", () => {
         { role: "user", content: "hello" },
       ],
     };
-    const result = decode(Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.systemInstruction).toBeDefined();
     expect((result.systemInstruction as Record<string, unknown>).parts).toBeDefined();
   });
@@ -298,7 +369,9 @@ describe("openai → gemini (Request)", () => {
       messages: [{ role: "user", content: "hi" }],
       max_tokens: 1024,
     };
-    const result = decode(Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.generationConfig).toBeDefined();
     const gc = result.generationConfig as Record<string, unknown>;
     expect(gc.maxOutputTokens).toBe(1024);
@@ -308,12 +381,16 @@ describe("openai → gemini (Request)", () => {
     const body = {
       model: "gemini-2.0-flash",
       messages: [{ role: "user", content: "hi" }],
-      tools: [{
-        type: "function",
-        function: { name: "search", description: "Web search", parameters: { type: "object" } },
-      }],
+      tools: [
+        {
+          type: "function",
+          function: { name: "search", description: "Web search", parameters: { type: "object" } },
+        },
+      ],
     };
-    const result = decode(Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("openai", "gemini", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.tools).toBeDefined();
   });
 });
@@ -321,20 +398,27 @@ describe("openai → gemini (Request)", () => {
 describe("passthrough identity", () => {
   it("openai → openai returns body unchanged", () => {
     const body = { model: "gpt-4o", messages: [{ role: "user", content: "hi" }] };
-    const result = decode(Request("openai", "openai", "gpt-4o", encode(body), false)) as Record<string, unknown>;
+    const result = decode(Request("openai", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
     expect(result.model).toBe("gpt-4o");
     expect(result.messages).toEqual(body.messages);
   });
 
   it("claude → claude returns body unchanged", () => {
     const body = { model: "claude-sonnet-4", messages: [{ role: "user", content: "hi" }] };
-    const result = decode(Request("claude", "claude", "claude-sonnet-4-20250514", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("claude", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.model).toBe("claude-sonnet-4");
   });
 
   it("gemini → gemini returns body unchanged", () => {
     const body = { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
-    const result = decode(Request("gemini", "gemini", "gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      Request("gemini", "gemini", "gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     expect(result.contents).toEqual(body.contents);
   });
 });
@@ -344,7 +428,9 @@ describe("passthrough identity", () => {
 describe("openai → antigravity (Request)", () => {
   it("wraps Gemini payload in Antigravity outer structure", () => {
     const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "hi" }] };
-    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const result = decode(
+      convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
 
     expect(result.request).toBeDefined();
     expect(result.requestId).toBeDefined();
@@ -357,7 +443,11 @@ describe("openai → antigravity (Request)", () => {
 
   it("maps sessionId from credentials", () => {
     const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "hi" }] };
-    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false, { sessionId: "custom-session-123" })) as Record<string, unknown>;
+    const result = decode(
+      convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false, {
+        sessionId: "custom-session-123",
+      })
+    ) as Record<string, unknown>;
 
     expect(result.sessionId).toBe("custom-session-123");
     const inner = result.request as Record<string, unknown>;
@@ -365,8 +455,14 @@ describe("openai → antigravity (Request)", () => {
   });
 
   it("maps reasoning_effort to thinking (via Gemini translator)", () => {
-    const body = { model: "gemini-2.0-flash", messages: [{ role: "user", content: "explain" }], reasoning_effort: "high" };
-    const result = decode(convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)) as Record<string, unknown>;
+    const body = {
+      model: "gemini-2.0-flash",
+      messages: [{ role: "user", content: "explain" }],
+      reasoning_effort: "high",
+    };
+    const result = decode(
+      convertOpenAIRequestToAntigravity("gemini-2.0-flash", encode(body), false)
+    ) as Record<string, unknown>;
     const inner = result.request as Record<string, unknown>;
     // Gemini translator maps reasoning_effort to generationConfig or passes through
     expect(inner.contents).toBeDefined();

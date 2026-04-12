@@ -19,7 +19,7 @@ export function ProviderCard({
 
   const allDisabled = useMemo(
     () => total > 0 && connected === 0 && error === 0,
-    [total, connected, error],
+    [total, connected, error]
   );
 
   const connections = stats.connections ?? [];

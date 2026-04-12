@@ -93,18 +93,20 @@ function db() {
  */
 export async function getProxKeys(): Promise<ProxKeyInfo[]> {
   const rows = db()
-    .query<{ id: string; name: string }, []>(
-      `SELECT id, name FROM provider_nodes WHERE prefix LIKE 'prox%' ORDER BY id LIMIT 300 OFFSET 0`
-    )
+    .query<
+      { id: string; name: string },
+      []
+    >(`SELECT id, name FROM provider_nodes WHERE prefix LIKE 'prox%' ORDER BY id LIMIT 300 OFFSET 0`)
     .all();
 
   const keys: ProxKeyInfo[] = [];
   for (const row of rows) {
     // provider_connections.provider = provider_nodes.id (the node UUID)
     const connRows = db()
-      .query<{ id: string; data: string }, string>(
-        `SELECT id, data FROM provider_connections WHERE provider = ?`
-      )
+      .query<
+        { id: string; data: string },
+        string
+      >(`SELECT id, data FROM provider_connections WHERE provider = ?`)
       .all(row.id);
 
     for (const conn of connRows) {
@@ -150,14 +152,8 @@ export async function getStatus(apiKey: string): Promise<ProxStatus> {
   return res.json() as Promise<ProxStatus>;
 }
 
-export async function getSummary(
-  days = 0,
-  apiKey: string,
-): Promise<ProxSummary> {
-  const res = await proxFetch(
-    apiKey,
-    `/api/user/usage/summary?days=${days}`,
-  );
+export async function getSummary(days = 0, apiKey: string): Promise<ProxSummary> {
+  const res = await proxFetch(apiKey, `/api/user/usage/summary?days=${days}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Pro-X /summary failed (${res.status}): ${text}`);
@@ -165,14 +161,8 @@ export async function getSummary(
   return res.json() as Promise<ProxSummary>;
 }
 
-export async function getChart(
-  days = 30,
-  apiKey: string,
-): Promise<ProxChart> {
-  const res = await proxFetch(
-    apiKey,
-    `/api/user/usage/chart?days=${days}`,
-  );
+export async function getChart(days = 30, apiKey: string): Promise<ProxChart> {
+  const res = await proxFetch(apiKey, `/api/user/usage/chart?days=${days}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Pro-X /chart failed (${res.status}): ${text}`);
@@ -180,15 +170,8 @@ export async function getChart(
   return res.json() as Promise<ProxChart>;
 }
 
-export async function getRecent(
-  page = 1,
-  limit = 15,
-  apiKey: string,
-): Promise<ProxRecent> {
-  const res = await proxFetch(
-    apiKey,
-    `/api/user/usage/recent?page=${page}&limit=${limit}`,
-  );
+export async function getRecent(page = 1, limit = 15, apiKey: string): Promise<ProxRecent> {
+  const res = await proxFetch(apiKey, `/api/user/usage/recent?page=${page}&limit=${limit}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Pro-X /recent failed (${res.status}): ${text}`);
@@ -308,7 +291,7 @@ function aggregateChart(charts: ProxChart[]): ProxChart {
 async function aggregateRecent(
   page: number,
   limit: number,
-  keys: ProxKeyInfo[],
+  keys: ProxKeyInfo[]
 ): Promise<ProxRecent> {
   if (keys.length === 0) {
     return { logs: [], pagination: { page: 1, limit, total: 0, total_pages: 0 } };
@@ -324,14 +307,11 @@ async function aggregateRecent(
       } catch {
         // skip failing keys
       }
-    }),
+    })
   );
 
   // Sort all logs by created_at desc, then paginate
-  allLogs.sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const total = allLogs.length;
   const totalPages = Math.ceil(total / limit);
@@ -350,9 +330,7 @@ export async function proxGetKeys(): Promise<ProxKeyInfo[]> {
   return getProxKeys();
 }
 
-export async function proxGetStatus(
-  keyId?: string,
-): Promise<ProxStatus> {
+export async function proxGetStatus(keyId?: string): Promise<ProxStatus> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);
@@ -366,10 +344,7 @@ export async function proxGetStatus(
   return aggregateStatus(statuses);
 }
 
-export async function proxGetSummary(
-  days = 0,
-  keyId?: string,
-): Promise<ProxSummary> {
+export async function proxGetSummary(days = 0, keyId?: string): Promise<ProxSummary> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);
@@ -383,10 +358,7 @@ export async function proxGetSummary(
   return aggregateSummary(summaries);
 }
 
-export async function proxGetChart(
-  days = 30,
-  keyId?: string,
-): Promise<ProxChart> {
+export async function proxGetChart(days = 30, keyId?: string): Promise<ProxChart> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);
@@ -400,11 +372,7 @@ export async function proxGetChart(
   return aggregateChart(charts);
 }
 
-export async function proxGetRecent(
-  page = 1,
-  limit = 15,
-  keyId?: string,
-): Promise<ProxRecent> {
+export async function proxGetRecent(page = 1, limit = 15, keyId?: string): Promise<ProxRecent> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);

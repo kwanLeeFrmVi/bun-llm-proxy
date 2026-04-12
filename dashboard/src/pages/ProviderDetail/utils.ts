@@ -1,14 +1,10 @@
 import type { ProviderConnection, ProviderNode } from "@/lib/api";
-import {
-  isOpenAICompatibleProvider,
-  isAnthropicCompatibleProvider,
-} from "@/constants/providers";
+import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/constants/providers";
 import type { StatusVariant } from "./types";
 
 export function statusVariant(conn: ProviderConnection): StatusVariant {
   if (conn.isActive === false) return "default";
-  if (conn.testStatus === "active" || conn.testStatus === "success")
-    return "success";
+  if (conn.testStatus === "active" || conn.testStatus === "success") return "success";
   if (
     conn.testStatus === "error" ||
     conn.testStatus === "expired" ||
@@ -35,9 +31,7 @@ export function getLogoPath(providerId: string, node?: ProviderNode): string {
       return "/providers/anthropic-m.webp";
     }
     if (isOpenAICompatibleProvider(node.type ?? "")) {
-      return node.apiType === "responses"
-        ? "/providers/oai-r.webp"
-        : "/providers/oai-cc.webp";
+      return node.apiType === "responses" ? "/providers/oai-r.webp" : "/providers/oai-cc.webp";
     }
   }
   return `/providers/${providerId}.webp`;

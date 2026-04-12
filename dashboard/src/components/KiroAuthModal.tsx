@@ -55,9 +55,7 @@ export default function KiroAuthModal({ isOpen, onConnect, onClose }: KiroAuthMo
     <Dialog open={isOpen} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline text-lg font-bold">
-            Connect Kiro AI
-          </DialogTitle>
+          <DialogTitle className="font-headline text-lg font-bold">Connect Kiro AI</DialogTitle>
         </DialogHeader>
 
         <div className="py-2 space-y-3">
@@ -138,7 +136,12 @@ export default function KiroAuthModal({ isOpen, onConnect, onClose }: KiroAuthMo
           {/* IDC Config */}
           {method === "idc" && (
             <>
-              <Button variant="ghost" size="sm" onClick={() => setMethod("select")} className="mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMethod("select")}
+                className="mb-2"
+              >
                 ← Back
               </Button>
               <p className="text-sm text-[--on-surface-variant] mb-3">
@@ -176,7 +179,10 @@ export default function KiroAuthModal({ isOpen, onConnect, onClose }: KiroAuthMo
               <Button
                 className="w-full bg-[#0F172A] text-white hover:bg-[#1e293b]"
                 onClick={() => {
-                  if (!idcStartUrl.trim()) { setError("Start URL is required"); return; }
+                  if (!idcStartUrl.trim()) {
+                    setError("Start URL is required");
+                    return;
+                  }
                   onConnect("idc", { startUrl: idcStartUrl.trim(), region: idcRegion });
                   handleClose();
                 }}
@@ -189,14 +195,20 @@ export default function KiroAuthModal({ isOpen, onConnect, onClose }: KiroAuthMo
           {/* Import Token */}
           {method === "import" && (
             <>
-              <Button variant="ghost" size="sm" onClick={() => setMethod("select")} className="mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMethod("select")}
+                className="mb-2"
+              >
                 ← Back
               </Button>
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 mb-4">
                 <div className="flex gap-2">
                   <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   <p className="text-xs text-blue-800 dark:text-blue-200">
-                    Paste your refresh token from Kiro IDE. The token should start with <code className="font-mono">aorAAAAAG</code>.
+                    Paste your refresh token from Kiro IDE. The token should start with{" "}
+                    <code className="font-mono">aorAAAAAG</code>.
                   </p>
                 </div>
               </div>

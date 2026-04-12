@@ -34,9 +34,7 @@ export function convertOpenAIResponseToGemini(
     return buildDoneEvents(param ?? newState());
   }
 
-  const stripped = rawText.startsWith("data: ")
-    ? rawText.slice(5).trim()
-    : rawText;
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(5).trim() : rawText;
 
   if (stripped === "[DONE]") {
     return buildDoneEvents(param ?? newState());
@@ -73,17 +71,21 @@ export function convertOpenAIResponseToGemini(
     const content = delta.content as string | undefined;
     if (content) {
       state.contentAccumulator += content;
-      results.push(new TextEncoder().encode(
-        `data: ${JSON.stringify({
-          candidates: [{
-            content: {
-              parts: [{ text: content }],
-              role: "model",
-            },
-            finishReason: null,
-          }],
-        })}\n\n`
-      ));
+      results.push(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: content }],
+                  role: "model",
+                },
+                finishReason: null,
+              },
+            ],
+          })}\n\n`
+        )
+      );
     }
 
     // tool_calls → functionCall
@@ -92,26 +94,39 @@ export function convertOpenAIResponseToGemini(
       for (const tc of toolCalls) {
         const fn = tc.function as Record<string, unknown>;
         const args = fn?.arguments;
-        const argsObj = typeof args === "string"
-          ? (() => { try { return JSON.parse(args); } catch { return {}; } })()
-          : (args ?? {});
+        const argsObj =
+          typeof args === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(args);
+                } catch {
+                  return {};
+                }
+              })()
+            : (args ?? {});
 
-        results.push(new TextEncoder().encode(
-          `data: ${JSON.stringify({
-            candidates: [{
-              content: {
-                parts: [{
-                  functionCall: {
-                    name: fn?.name ?? "",
-                    args: argsObj,
+        results.push(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        functionCall: {
+                          name: fn?.name ?? "",
+                          args: argsObj,
+                        },
+                      },
+                    ],
+                    role: "model",
                   },
-                }],
-                role: "model",
-              },
-              finishReason: null,
-            }],
-          })}\n\n`
-        ));
+                  finishReason: null,
+                },
+              ],
+            })}\n\n`
+          )
+        );
       }
     }
   }
@@ -119,19 +134,21 @@ export function convertOpenAIResponseToGemini(
   // finish_reason → done
   if (finishReason && finishReason !== null) {
     const mapped = mapOpenAIFinishReason(finishReason);
-    results.push(new TextEncoder().encode(
-      `data: ${JSON.stringify({
-        candidates: [{
-          content: {
-            parts: state.contentAccumulator
-              ? [{ text: state.contentAccumulator }]
-              : [],
-            role: "model",
-          },
-          finishReason: mapped,
-        }],
-      })}\n\n`
-    ));
+    results.push(
+      new TextEncoder().encode(
+        `data: ${JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: state.contentAccumulator ? [{ text: state.contentAccumulator }] : [],
+                role: "model",
+              },
+              finishReason: mapped,
+            },
+          ],
+        })}\n\n`
+      )
+    );
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
     state.messageStopSent = true;
   }
@@ -153,8 +170,8 @@ export function convertOpenAIResponseToGeminiNonStream(
     return raw;
   }
 
-  const id = parsed.id as string ?? `openai-${Date.now()}`;
-  const model = parsed.model as string ?? "";
+  const id = (parsed.id as string) ?? `openai-${Date.now()}`;
+  const model = (parsed.model as string) ?? "";
 
   const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
   const choice = choices?.[0] as Record<string, unknown> | undefined;
@@ -188,9 +205,16 @@ export function convertOpenAIResponseToGeminiNonStream(
             for (const tc of calls) {
               const fn = tc.function as Record<string, unknown>;
               const args = fn?.arguments;
-              const argsObj = typeof args === "string"
-                ? (() => { try { return JSON.parse(args); } catch { return {}; } })()
-                : (args ?? {});
+              const argsObj =
+                typeof args === "string"
+                  ? (() => {
+                      try {
+                        return JSON.parse(args);
+                      } catch {
+                        return {};
+                      }
+                    })()
+                  : (args ?? {});
               parts.push({
                 functionCall: { name: fn?.name ?? "", args: argsObj },
               });
@@ -205,9 +229,16 @@ export function convertOpenAIResponseToGeminiNonStream(
       for (const tc of toolCalls) {
         const fn = tc.function as Record<string, unknown>;
         const args = fn?.arguments;
-        const argsObj = typeof args === "string"
-          ? (() => { try { return JSON.parse(args); } catch { return {}; } })()
-          : (args ?? {});
+        const argsObj =
+          typeof args === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(args);
+                } catch {
+                  return {};
+                }
+              })()
+            : (args ?? {});
         parts.push({
           functionCall: { name: fn?.name ?? "", args: argsObj },
         });
@@ -217,28 +248,37 @@ export function convertOpenAIResponseToGeminiNonStream(
 
   const usage = parsed.usage as Record<string, unknown> | undefined;
 
-  return new TextEncoder().encode(JSON.stringify({
-    id,
-    modelVersion: model,
-    candidates: [{
-      content: { parts, role: "model" },
-      finishReason: mapOpenAIFinishReason(finishReason ?? "stop"),
-    }],
-    usageMetadata: {
-      promptTokenCount: (usage?.prompt_tokens as number) ?? 0,
-      candidatesTokenCount: (usage?.completion_tokens as number) ?? 0,
-      totalTokenCount: (usage?.total_tokens as number) ?? 0,
-    },
-  }));
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id,
+      modelVersion: model,
+      candidates: [
+        {
+          content: { parts, role: "model" },
+          finishReason: mapOpenAIFinishReason(finishReason ?? "stop"),
+        },
+      ],
+      usageMetadata: {
+        promptTokenCount: (usage?.prompt_tokens as number) ?? 0,
+        candidatesTokenCount: (usage?.completion_tokens as number) ?? 0,
+        totalTokenCount: (usage?.total_tokens as number) ?? 0,
+      },
+    })
+  );
 }
 
 function mapOpenAIFinishReason(reason: string): string {
   switch (reason) {
-    case "stop":        return "STOP";
-    case "length":      return "MAX_TOKENS";
-    case "tool_calls":  return "STOP";
-    case "content_filter": return "SAFETY";
-    default:            return "STOP";
+    case "stop":
+      return "STOP";
+    case "length":
+      return "MAX_TOKENS";
+    case "tool_calls":
+      return "STOP";
+    case "content_filter":
+      return "SAFETY";
+    default:
+      return "STOP";
   }
 }
 
@@ -246,14 +286,18 @@ function buildDoneEvents(state: OpenAIGeminiState): Uint8Array[] {
   const results: Uint8Array[] = [];
   if (!state.messageStopSent) {
     if (state.contentAccumulator) {
-      results.push(new TextEncoder().encode(
-        `data: ${JSON.stringify({
-          candidates: [{
-            content: { parts: [{ text: state.contentAccumulator }], role: "model" },
-            finishReason: "STOP",
-          }],
-        })}\n\n`
-      ));
+      results.push(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({
+            candidates: [
+              {
+                content: { parts: [{ text: state.contentAccumulator }], role: "model" },
+                finishReason: "STOP",
+              },
+            ],
+          })}\n\n`
+        )
+      );
     }
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
   }

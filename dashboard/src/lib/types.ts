@@ -20,8 +20,8 @@ export interface UsageStats {
   totalCompletionTokens: number;
   totalCost: number;
   byProvider: { provider: string; requests: number; cost: number; tokens: number }[];
-  byModel:    { model: string;    requests: number; cost: number; tokens: number }[];
-  byApiKey:   { apiKeyId: string; requests: number; cost: number }[];
+  byModel: { model: string; requests: number; cost: number; tokens: number }[];
+  byApiKey: { apiKeyId: string; requests: number; cost: number }[];
 }
 
 export interface UsageRecord {

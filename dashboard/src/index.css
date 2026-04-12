@@ -213,8 +213,7 @@
 
   /* Ghost border for focus states */
   .ghost-border {
-    outline: 1px solid
-      color-mix(in srgb, var(--outline-variant) 15%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--outline-variant) 15%, transparent);
   }
 
   .ghost-border-focus:focus {
@@ -229,16 +228,11 @@
 
   /* Primary gradient button */
   .btn-gradient {
-    background: linear-gradient(
-      135deg,
-      var(--primary) 0%,
-      var(--primary-dim) 100%
-    );
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dim) 100%);
   }
 
   /* Inner glow for active states */
   .inner-glow {
-    box-shadow: inset 0 0 0 2px
-      color-mix(in srgb, var(--primary-container) 50%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-container) 50%, transparent);
   }
 }

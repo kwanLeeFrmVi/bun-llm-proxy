@@ -40,9 +40,7 @@ export function convertOllamaResponseToClaude(
     return buildDoneEvents(param ?? newState());
   }
 
-  const stripped = rawText.startsWith("data: ")
-    ? rawText.slice(5).trim()
-    : rawText;
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(5).trim() : rawText;
 
   if (stripped === "[DONE]") {
     return buildDoneEvents(param ?? newState());
@@ -63,19 +61,21 @@ export function convertOllamaResponseToClaude(
   // message_start
   if (!state.messageStarted) {
     state.messageStarted = true;
-    results.push(buildSSEEvent("message_start", {
-      type: "message_start",
-      message: {
-        id: state.messageId,
-        type: "message",
-        role: "assistant",
-        model: state.model,
-        content: [],
-        stop_reason: null,
-        stop_sequence: null,
-        usage: { input_tokens: 0, output_tokens: 0 },
-      },
-    }));
+    results.push(
+      buildSSEEvent("message_start", {
+        type: "message_start",
+        message: {
+          id: state.messageId,
+          type: "message",
+          role: "assistant",
+          model: state.model,
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        },
+      })
+    );
   }
 
   const message = parsed.message as Record<string, unknown> | undefined;
@@ -86,18 +86,22 @@ export function convertOllamaResponseToClaude(
       if (!state.textBlockStarted) {
         state.textBlockIndex = state.nextBlockIndex++;
         state.textBlockStarted = true;
-        results.push(buildSSEEvent("content_block_start", {
-          type: "content_block_start",
-          index: state.textBlockIndex,
-          content_block: { type: "text", text: "" },
-        }));
+        results.push(
+          buildSSEEvent("content_block_start", {
+            type: "content_block_start",
+            index: state.textBlockIndex,
+            content_block: { type: "text", text: "" },
+          })
+        );
       }
 
-      results.push(buildSSEEvent("content_block_delta", {
-        type: "content_block_delta",
-        index: state.textBlockIndex,
-        delta: { type: "text_delta", text: content },
-      }));
+      results.push(
+        buildSSEEvent("content_block_delta", {
+          type: "content_block_delta",
+          index: state.textBlockIndex,
+          delta: { type: "text_delta", text: content },
+        })
+      );
       state.contentAccumulator += content;
     }
   }
@@ -109,18 +113,22 @@ export function convertOllamaResponseToClaude(
 
     // Stop text block
     if (state.textBlockStarted) {
-      results.push(buildSSEEvent("content_block_stop", {
-        type: "content_block_stop",
-        index: state.textBlockIndex,
-      }));
+      results.push(
+        buildSSEEvent("content_block_stop", {
+          type: "content_block_stop",
+          index: state.textBlockIndex,
+        })
+      );
       state.textBlockStarted = false;
     }
 
-    results.push(buildSSEEvent("message_delta", {
-      type: "message_delta",
-      delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { input_tokens: 0, output_tokens: 0 },
-    }));
+    results.push(
+      buildSSEEvent("message_delta", {
+        type: "message_delta",
+        delta: { stop_reason: stopReason, stop_sequence: null },
+        usage: { input_tokens: 0, output_tokens: 0 },
+      })
+    );
 
     results.push(buildSSEEvent("message_stop", { type: "message_stop" }));
     state.messageStopSent = true;
@@ -147,16 +155,18 @@ export function convertOllamaResponseToClaudeNonStream(
   const content = (message?.content as string | undefined) ?? "";
   const model = (parsed.model as string | undefined) ?? "";
 
-  return new TextEncoder().encode(JSON.stringify({
-    id: `ollama-${Date.now()}`,
-    type: "message",
-    role: "assistant",
-    model,
-    content: [{ type: "text", text: content }],
-    stop_reason: parsed.done_reason === "length" ? "max_tokens" : "end_turn",
-    stop_sequence: null,
-    usage: { input_tokens: 0, output_tokens: 0 },
-  }));
+  return new TextEncoder().encode(
+    JSON.stringify({
+      id: `ollama-${Date.now()}`,
+      type: "message",
+      role: "assistant",
+      model,
+      content: [{ type: "text", text: content }],
+      stop_reason: parsed.done_reason === "length" ? "max_tokens" : "end_turn",
+      stop_sequence: null,
+      usage: { input_tokens: 0, output_tokens: 0 },
+    })
+  );
 }
 
 function buildSSEEvent(event: string, payload: object): Uint8Array {
@@ -167,17 +177,21 @@ function buildSSEEvent(event: string, payload: object): Uint8Array {
 function buildDoneEvents(state: OllamaStreamingState): Uint8Array[] {
   const results: Uint8Array[] = [];
   if (state.textBlockStarted) {
-    results.push(buildSSEEvent("content_block_stop", {
-      type: "content_block_stop",
-      index: state.textBlockIndex,
-    }));
+    results.push(
+      buildSSEEvent("content_block_stop", {
+        type: "content_block_stop",
+        index: state.textBlockIndex,
+      })
+    );
   }
   if (!state.messageStopSent) {
-    results.push(buildSSEEvent("message_delta", {
-      type: "message_delta",
-      delta: { stop_reason: "end_turn", stop_sequence: null },
-      usage: { input_tokens: 0, output_tokens: 0 },
-    }));
+    results.push(
+      buildSSEEvent("message_delta", {
+        type: "message_delta",
+        delta: { stop_reason: "end_turn", stop_sequence: null },
+        usage: { input_tokens: 0, output_tokens: 0 },
+      })
+    );
     results.push(buildSSEEvent("message_stop", { type: "message_stop" }));
   }
   return results;

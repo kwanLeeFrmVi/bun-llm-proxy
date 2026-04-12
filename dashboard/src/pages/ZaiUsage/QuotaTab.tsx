@@ -20,11 +20,25 @@ interface QuotaLimitCardProps {
 }
 
 function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
-  const { type, unit, number, usage, currentValue, remaining, percentage, nextResetTime, usageDetails } = limit;
+  const {
+    type,
+    unit,
+    number,
+    usage,
+    currentValue,
+    remaining,
+    percentage,
+    nextResetTime,
+    usageDetails,
+  } = limit;
 
   const getTypeLabel = () => {
     if (type === "TIME_LIMIT") {
-      return unit === 5 ? "Rate Limit (5-min window)" : unit === 1 ? "Requests/Second" : "Time Limit";
+      return unit === 5
+        ? "Rate Limit (5-min window)"
+        : unit === 1
+          ? "Requests/Second"
+          : "Time Limit";
     }
     if (type === "TOKENS_LIMIT") {
       const unitLabels: Record<number, string> = {
@@ -65,16 +79,20 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
     <div className="overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="border-b border-[rgba(203,213,225,0.4)] px-6 py-4 flex items-center justify-between">
         <div>
-          <p className="text-[13px] font-600 text-[var(--on-surface)]">
-            {getTypeLabel()}
-          </p>
+          <p className="text-[13px] font-600 text-[var(--on-surface)]">{getTypeLabel()}</p>
           <p className="mt-0.5 text-[11px] text-[var(--on-surface-variant)]">
             Limit: {getLimitValue()}
           </p>
         </div>
         <Badge
           variant="outline"
-          className={percentage >= 80 ? "text-red-600 border-red-200" : percentage >= 50 ? "text-amber-600 border-amber-200" : "text-green-600 border-green-200"}
+          className={
+            percentage >= 80
+              ? "text-red-600 border-red-200"
+              : percentage >= 50
+                ? "text-amber-600 border-amber-200"
+                : "text-green-600 border-green-200"
+          }
         >
           {percentage}%
         </Badge>
@@ -103,13 +121,8 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
         <ProgressBar value={percentage} />
 
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-[12px] text-[var(--on-surface-variant)]">
-            Resets in
-          </span>
-          <CountdownCard
-            target={String(nextResetTime)}
-            compact
-          />
+          <span className="text-[12px] text-[var(--on-surface-variant)]">Resets in</span>
+          <CountdownCard target={String(nextResetTime)} compact />
         </div>
 
         {usageDetails && usageDetails.length > 0 && (

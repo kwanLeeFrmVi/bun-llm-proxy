@@ -11,8 +11,17 @@ const CACHE_TTL = 6 * 60 * 60; // 6 hours in seconds
 
 // Common suffixes to strip when normalizing model names
 const STRIP_SUFFIXES = [
-  "-turbo", "-maas", "-fast", "-ultra", "-large", "-mini", "-hd",
-  "-code", "-instruct", "-preview", "-latest",
+  "-turbo",
+  "-maas",
+  "-fast",
+  "-ultra",
+  "-large",
+  "-mini",
+  "-hd",
+  "-code",
+  "-instruct",
+  "-preview",
+  "-latest",
 ];
 
 // In-memory cache of normalized model name → { id, input, output }
@@ -133,7 +142,7 @@ async function fetchOpenRouterModels(apiKey?: string): Promise<OpenRouterModel[]
     throw new Error(`OpenRouter returned ${response.status}: ${text.slice(0, 200)}`);
   }
 
-  const data = await response.json() as { data: OpenRouterModel[] };
+  const data = (await response.json()) as { data: OpenRouterModel[] };
   const models = data.data ?? [];
 
   // Cache in Redis
@@ -170,7 +179,9 @@ function buildPricingMap(models: OpenRouterModel[]): Record<string, PricingEntry
  * Build a lookup map for fuzzy matching (normalized name → full model ID → pricing).
  * Loaded lazily into memory on first cost calculation.
  */
-function buildFuzzyLookup(models: OpenRouterModel[]): Record<string, { id: string; input: number; output: number }> {
+function buildFuzzyLookup(
+  models: OpenRouterModel[]
+): Record<string, { id: string; input: number; output: number }> {
   const lookup: Record<string, { id: string; input: number; output: number }> = {};
 
   for (const model of models) {
@@ -217,7 +228,7 @@ export async function syncOpenRouterPricing(apiKey?: string): Promise<SyncResult
     // Load fuzzy lookup into memory
     orModelCache = buildFuzzyLookup(models);
 
-    const providers = new Set(models.map(m => m.id.split("/")[0])).size;
+    const providers = new Set(models.map((m) => m.id.split("/")[0])).size;
     const cached = !!(await getRedisCache(CACHE_KEY));
 
     log.info("PRICING", `Synced ${models.length} models from ${providers} providers`);
@@ -244,7 +255,10 @@ export async function syncOpenRouterPricing(apiKey?: string): Promise<SyncResult
 /**
  * Get the in-memory OpenRouter model cache, loading from Redis if needed.
  */
-export async function getORModelCache(): Promise<Record<string, { id: string; input: number; output: number }> | null> {
+export async function getORModelCache(): Promise<Record<
+  string,
+  { id: string; input: number; output: number }
+> | null> {
   if (orModelCache) return orModelCache;
 
   const cached = await getRedisCache(CACHE_KEY);

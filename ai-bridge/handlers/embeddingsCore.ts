@@ -10,10 +10,7 @@ export interface EmbeddingsCoreOptions {
   credentials: Record<string, unknown>;
   onCredentialsRefreshed?: (creds: Record<string, unknown>) => Promise<void>;
   onRequestSuccess?: () => Promise<void>;
-  onUsage?: (usage: {
-    prompt_tokens?: number;
-    cached_tokens?: number;
-  }) => Promise<void>;
+  onUsage?: (usage: { prompt_tokens?: number; cached_tokens?: number }) => Promise<void>;
 }
 
 export interface EmbeddingsCoreResult {
@@ -23,25 +20,35 @@ export interface EmbeddingsCoreResult {
   error?: string;
 }
 
-export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise<EmbeddingsCoreResult> {
+export async function handleEmbeddingsCore(
+  opts: EmbeddingsCoreOptions
+): Promise<EmbeddingsCoreResult> {
   const { body, modelInfo, credentials, ctx } = opts;
   const { provider, model } = modelInfo;
 
   // ── Input validation ─────────────────────────────────────────────────────────
   const input = body.input;
-  if (!input || typeof input !== "string" && !Array.isArray(input)) {
-    return { success: false, status: HTTP_STATUS.BAD_REQUEST, error: "Missing required field: input (must be string or array)" };
+  if (!input || (typeof input !== "string" && !Array.isArray(input))) {
+    return {
+      success: false,
+      status: HTTP_STATUS.BAD_REQUEST,
+      error: "Missing required field: input (must be string or array)",
+    };
   }
 
   // Build upstream URL
   const upstreamUrl = buildEmbeddingsUrl(provider, model);
   if (!upstreamUrl) {
-    return { success: false, status: HTTP_STATUS.BAD_REQUEST, error: `Unknown embeddings provider: ${provider}` };
+    return {
+      success: false,
+      status: HTTP_STATUS.BAD_REQUEST,
+      error: `Unknown embeddings provider: ${provider}`,
+    };
   }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${credentials.apiKey ?? credentials.accessToken ?? ""}`,
+    Authorization: `Bearer ${credentials.apiKey ?? credentials.accessToken ?? ""}`,
   };
 
   // Import logger dynamically to avoid circular dependency
@@ -74,7 +81,11 @@ export async function handleEmbeddingsCore(opts: EmbeddingsCoreOptions): Promise
       }
     } catch {
       log.error(ctx ?? null, "EMBED", "Provider response is not valid JSON");
-      return { success: false, status: HTTP_STATUS.BAD_GATEWAY, error: "Provider response is not valid JSON" };
+      return {
+        success: false,
+        status: HTTP_STATUS.BAD_GATEWAY,
+        error: "Provider response is not valid JSON",
+      };
     }
     const response = new globalThis.Response(responseBody, {
       status: upstream.status || 200,

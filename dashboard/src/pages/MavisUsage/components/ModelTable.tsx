@@ -23,7 +23,7 @@ export function ModelTable({
 
   if (models.length === 0) {
     return (
-      <div className='px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]'>
+      <div className="px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]">
         No model data available.
       </div>
     );
@@ -32,65 +32,58 @@ export function ModelTable({
   const rows = models.map((m) => {
     const pr = pricing[m.model];
     const cost = estimateCost(m.input_tokens, m.output_tokens, pr);
-    const share =
-      totalTokens > 0 ? Math.round((m.total_tokens / totalTokens) * 100) : 0;
+    const share = totalTokens > 0 ? Math.round((m.total_tokens / totalTokens) * 100) : 0;
     return { m, cost, share };
   });
 
   return (
-    <div className='overflow-hidden rounded-xl bg-(--surface-container-lowest) border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]'>
-      <SectionHeader
-        title='Usage by Model'
-        sub='Token breakdown and estimated cost per model'
-      />
-      <div className='overflow-x-auto'>
+    <div className="overflow-hidden rounded-xl bg-(--surface-container-lowest) border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <SectionHeader title="Usage by Model" sub="Token breakdown and estimated cost per model" />
+      <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className='border-b border-[rgba(203,213,225,0.4)]'>
-              <TableHead className='px-6 py-3 text-[11px] uppercase tracking-widest text-[var(--on-surface-variant)]'>
+            <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
+              <TableHead className="px-6 py-3 text-[11px] uppercase tracking-widest text-[var(--on-surface-variant)]">
                 Model
               </TableHead>
-              <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Requests
               </TableHead>
-              <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Input Tokens
               </TableHead>
-              <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Output Tokens
               </TableHead>
-              <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Failures
               </TableHead>
-              <TableHead className='px-6 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableHead className="px-6 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                 Est. Cost
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map(({ m, cost, share }) => (
-              <TableRow
-                key={m.model}
-                className='border-b border-[rgba(203,213,225,0.25)]'
-              >
-                <TableCell className='px-6 py-3'>
-                  <Badge variant='endpoint'>{m.model}</Badge>
+              <TableRow key={m.model} className="border-b border-[rgba(203,213,225,0.25)]">
+                <TableCell className="px-6 py-3">
+                  <Badge variant="endpoint">{m.model}</Badge>
                   {share > 1 && (
-                    <div className='mt-1.5 h-[3px] w-full rounded-full bg-[rgba(34,197,94,0.25)]'>
+                    <div className="mt-1.5 h-[3px] w-full rounded-full bg-[rgba(34,197,94,0.25)]">
                       <div
-                        className='h-full rounded-full bg-[#22c55e]'
+                        className="h-full rounded-full bg-[#22c55e]"
                         style={{ width: `${share}%` }}
                       />
                     </div>
                   )}
                 </TableCell>
-                <TableCell className='px-3 py-3 text-right tabular-nums'>
+                <TableCell className="px-3 py-3 text-right tabular-nums">
                   {m.requests.toLocaleString()}
                 </TableCell>
-                <TableCell className='px-3 py-3 text-right tabular-nums text-[var(--primary)]'>
+                <TableCell className="px-3 py-3 text-right tabular-nums text-[var(--primary)]">
                   {m.input_tokens.toLocaleString()}
                 </TableCell>
-                <TableCell className='px-3 py-3 text-right tabular-nums'>
+                <TableCell className="px-3 py-3 text-right tabular-nums">
                   {m.output_tokens.toLocaleString()}
                 </TableCell>
                 <TableCell
@@ -98,7 +91,7 @@ export function ModelTable({
                 >
                   {m.failures}
                 </TableCell>
-                <TableCell className='px-6 py-3 text-right tabular-nums'>
+                <TableCell className="px-6 py-3 text-right tabular-nums">
                   ${cost.toFixed(4)}
                 </TableCell>
               </TableRow>

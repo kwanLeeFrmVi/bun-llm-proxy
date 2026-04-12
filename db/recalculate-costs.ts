@@ -17,14 +17,17 @@ async function main() {
 
   // Fetch all pricing data
   const pricingRows = db
-    .query<{ provider: string; model: string; input: number; output: number }, []>(
-      "SELECT provider, model, input, output FROM pricing"
-    )
+    .query<
+      { provider: string; model: string; input: number; output: number },
+      []
+    >("SELECT provider, model, input, output FROM pricing")
     .all();
 
   if (pricingRows.length === 0) {
     console.log("[RECALCULATE] No pricing data found. Run pricing sync first:");
-    console.log("  curl -X POST http://localhost:20129/api/pricing/sync -H 'Authorization: Bearer TOKEN'");
+    console.log(
+      "  curl -X POST http://localhost:20129/api/pricing/sync -H 'Authorization: Bearer TOKEN'"
+    );
     process.exit(1);
   }
 
@@ -39,13 +42,16 @@ async function main() {
 
   // Get entries with zero cost but with tokens
   const entries = db
-    .query<{
-      id: string;
-      provider: string;
-      model: string;
-      prompt_tokens: number;
-      completion_tokens: number;
-    }, []>(
+    .query<
+      {
+        id: string;
+        provider: string;
+        model: string;
+        prompt_tokens: number;
+        completion_tokens: number;
+      },
+      []
+    >(
       `SELECT id, provider, model, prompt_tokens, completion_tokens
        FROM usage_log
        WHERE cost = 0 AND (prompt_tokens > 0 OR completion_tokens > 0)
@@ -67,22 +73,22 @@ async function main() {
     // 1. Exact match
     if (pricing[provider]?.[model]) {
       const p = pricing[provider]![model]!;
-      cost = (prompt_tokens * p.input / 1_000_000) + (completion_tokens * p.output / 1_000_000);
+      cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
     }
     // 2. Normalized match
     else if (pricing[provider]?.[normalizeModelName(model)]) {
       const p = pricing[provider]![normalizeModelName(model)]!;
-      cost = (prompt_tokens * p.input / 1_000_000) + (completion_tokens * p.output / 1_000_000);
+      cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
     }
     // 3. Stripped match
     else if (pricing[provider]?.[stripSuffixes(model)]) {
       const p = pricing[provider]![stripSuffixes(model)]!;
-      cost = (prompt_tokens * p.input / 1_000_000) + (completion_tokens * p.output / 1_000_000);
+      cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
     }
     // 4. Base model match
     else if (pricing[provider]?.[baseModelName(model)]) {
       const p = pricing[provider]![baseModelName(model)]!;
-      cost = (prompt_tokens * p.input / 1_000_000) + (completion_tokens * p.output / 1_000_000);
+      cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
     }
     // 5. Try openrouter provider with any model match
     else if (pricing.openrouter) {
@@ -94,7 +100,9 @@ async function main() {
           key === baseModelName(model) ||
           normalizeModelName(key) === normalizeModelName(model)
         ) {
-          cost = (prompt_tokens * value.input / 1_000_000) + (completion_tokens * value.output / 1_000_000);
+          cost =
+            (prompt_tokens * value.input) / 1_000_000 +
+            (completion_tokens * value.output) / 1_000_000;
           break;
         }
       }

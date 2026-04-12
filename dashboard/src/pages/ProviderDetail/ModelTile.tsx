@@ -53,31 +53,31 @@ export function ModelTile({
       className={`group flex items-center gap-2 px-3 py-2 rounded-lg border ${borderColor} hover:bg-[--surface-container-low]/50 transition-colors`}
     >
       <svg
-        xmlns='http://www.w3.org/2000/svg'
-        width='16'
-        height='16'
-        viewBox='0 0 24 24'
-        fill='none'
-        stroke='currentColor'
-        strokeWidth='2'
-        strokeLinecap='round'
-        strokeLinejoin='round'
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         className={`shrink-0 ${iconColor}`}
       >
-        <path d='M12 8V4H8' />
-        <rect width='16' height='12' x='4' y='8' rx='2' />
-        <path d='M2 14h2' />
-        <path d='M20 14h2' />
-        <path d='M15 13v2' />
-        <path d='M9 13v2' />
+        <path d="M12 8V4H8" />
+        <rect width="16" height="12" x="4" y="8" rx="2" />
+        <path d="M2 14h2" />
+        <path d="M20 14h2" />
+        <path d="M15 13v2" />
+        <path d="M9 13v2" />
       </svg>
-      <div className='flex-1 min-w-0'>
+      <div className="flex-1 min-w-0">
         {/* First line: Formatted model name */}
-        <div className='text-sm font-medium text-[--on-surface] truncate'>
+        <div className="text-sm font-medium text-[--on-surface] truncate">
           {formatModelName(modelNameOnly)}
         </div>
         {/* Second line: Full model ID with prefix (smaller, 80% opacity) */}
-        <div className='text-xs font-mono text-[--on-surface-variant]/80 truncate'>
+        <div className="text-xs font-mono text-[--on-surface-variant]/80 truncate">
           {fullModelId}
         </div>
       </div>
@@ -85,38 +85,38 @@ export function ModelTile({
         <button
           onClick={onTest}
           disabled={isTesting}
-          className='shrink-0 text-[--on-surface-variant] hover:text-[--on-surface] disabled:opacity-50'
+          className="shrink-0 text-[--on-surface-variant] hover:text-[--on-surface] disabled:opacity-50"
           title={isTesting ? "Testing..." : "Test model"}
         >
           {isTesting ? (
-            <Loader2 className='w-3.5 h-3.5 animate-spin' />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : testStatus === "ok" ? (
-            <span className='text-xs text-green-600'>ok</span>
+            <span className="text-xs text-green-600">ok</span>
           ) : testStatus === "error" ? (
-            <span className='text-xs text-red-500'>err</span>
+            <span className="text-xs text-red-500">err</span>
           ) : (
-            <Play className='w-3.5 h-3.5' />
+            <Play className="w-3.5 h-3.5" />
           )}
         </button>
       )}
       {onDelete && (
         <button
           onClick={onDelete}
-          className='shrink-0 text-[--on-surface-variant] hover:text-red-500'
-          title='Delete model'
+          className="shrink-0 text-[--on-surface-variant] hover:text-red-500"
+          title="Delete model"
         >
-          <Trash2 className='w-3.5 h-3.5' />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
       <button
         onClick={() => onCopy(fullModelId)}
-        className='shrink-0 text-[--on-surface-variant] hover:text-[--on-surface]'
-        title='Copy'
+        className="shrink-0 text-[--on-surface-variant] hover:text-[--on-surface]"
+        title="Copy"
       >
         {copied === fullModelId ? (
-          <span className='text-xs text-green-600'>ok</span>
+          <span className="text-xs text-green-600">ok</span>
         ) : (
-          <Copy className='w-3.5 h-3.5' />
+          <Copy className="w-3.5 h-3.5" />
         )}
       </button>
     </div>

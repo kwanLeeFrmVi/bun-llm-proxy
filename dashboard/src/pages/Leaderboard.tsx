@@ -62,10 +62,12 @@ function RankBadge({ rank }: { rank: number }) {
 
   if (rank <= 3) {
     return (
-      <div className={cn(
-        "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-sm",
-        colors[rank - 1]
-      )}>
+      <div
+        className={cn(
+          "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-sm",
+          colors[rank - 1]
+        )}
+      >
         {rank}
       </div>
     );

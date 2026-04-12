@@ -43,13 +43,7 @@ interface BudgetCardProps {
 
 export function BudgetCard({ source }: BudgetCardProps) {
   if (source.type === "mavis") {
-    const {
-      planAllowance,
-      periodUsedQuota,
-      planPeriod,
-      planName,
-      periodResetAt,
-    } = source;
+    const { planAllowance, periodUsedQuota, planPeriod, planName, periodResetAt } = source;
     const budget = planAllowance / MAVIS_QUOTA_DIVISOR;
     const used = periodUsedQuota / MAVIS_QUOTA_DIVISOR;
     const remaining = budget - used;
@@ -98,11 +92,8 @@ export function BudgetCard({ source }: BudgetCardProps) {
               {planName}
             </span>
           </div>
-          <span
-            style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}
-          >
-            ${remaining.toFixed(2)} remaining of ${budget.toFixed(2)} every{" "}
-            {planPeriod}
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+            ${remaining.toFixed(2)} remaining of ${budget.toFixed(2)} every {planPeriod}
           </span>
         </div>
 
@@ -115,9 +106,7 @@ export function BudgetCard({ source }: BudgetCardProps) {
             marginTop: "8px",
           }}
         >
-          <span
-            style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}
-          >
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
             ${used.toFixed(2)} used
           </span>
           <CountdownCard target={periodResetAt} compact={true} />
@@ -174,9 +163,7 @@ export function BudgetCard({ source }: BudgetCardProps) {
               padding: "2px 8px",
               borderRadius: "9999px",
               background:
-                planType === "rate"
-                  ? "rgba(249, 115, 22, 0.15)"
-                  : "rgba(34, 197, 94, 0.15)",
+                planType === "rate" ? "rgba(249, 115, 22, 0.15)" : "rgba(34, 197, 94, 0.15)",
               color: planType === "rate" ? "#f97316" : "#22c55e",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -200,11 +187,8 @@ export function BudgetCard({ source }: BudgetCardProps) {
               marginTop: "8px",
             }}
           >
-            <span
-              style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}
-            >
-              {rateLimitSpent.toFixed(2)} / {rateLimitAmount} in window (
-              {rateLimitHours}h)
+            <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+              {rateLimitSpent.toFixed(2)} / {rateLimitAmount} in window ({rateLimitHours}h)
             </span>
             <CountdownCard target={rateLimitResetsAt} compact={true} />
           </div>
@@ -219,11 +203,8 @@ export function BudgetCard({ source }: BudgetCardProps) {
             marginTop: "4px",
           }}
         >
-          <span
-            style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}
-          >
-            Expires: {new Date(expiry).toLocaleDateString()} ({daysRemaining}d
-            remaining)
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+            Expires: {new Date(expiry).toLocaleDateString()} ({daysRemaining}d remaining)
           </span>
         </div>
       )}

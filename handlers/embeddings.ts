@@ -11,7 +11,11 @@ import { checkAuth } from "../lib/authMiddleware.ts";
 import { getModelInfo } from "../services/model.ts";
 import { handleEmbeddingsCore } from "../ai-bridge/handlers/embeddingsCore.ts";
 import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts";
-import { HTTP_STATUS, TRANSIENT_RETRY, TRANSIENT_ERROR_STATUSES } from "../ai-bridge/config/runtimeConfig.ts";
+import {
+  HTTP_STATUS,
+  TRANSIENT_RETRY,
+  TRANSIENT_ERROR_STATUSES,
+} from "../ai-bridge/config/runtimeConfig.ts";
 import * as log from "../lib/logger.ts";
 import { RequestContext } from "../lib/requestContext.ts";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.ts";
@@ -29,7 +33,7 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await request.json() as Record<string, unknown>;
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     log.warn(ctx, "EMBEDDINGS", "Invalid JSON body");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body") as Response;
@@ -87,19 +91,35 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       const creds = credentials as Record<string, unknown> | null;
       if (creds?.allRateLimited) {
         const errorMsg = lastError ?? (creds.lastError as string | undefined) ?? "Unavailable";
-        const status = lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
-        log.warn(ctx, "EMBEDDINGS", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
+        const status =
+          lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
+        log.warn(
+          ctx,
+          "EMBEDDINGS",
+          `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`
+        );
         appendRequestLog(requestId, "rate_limited");
-        return unavailableResponse(status, `[${provider}/${model}] ${errorMsg}`, creds.retryAfter as string, creds.retryAfterHuman as string) as Response;
+        return unavailableResponse(
+          status,
+          `[${provider}/${model}] ${errorMsg}`,
+          creds.retryAfter as string,
+          creds.retryAfterHuman as string
+        ) as Response;
       }
       if (excludeConnectionIds.size === 0) {
         log.warn(ctx, "AUTH", `No credentials for provider: ${provider}`);
         appendRequestLog(requestId, "no_credentials");
-        return errorResponse(HTTP_STATUS.BAD_REQUEST, `No credentials for provider: ${provider}`) as Response;
+        return errorResponse(
+          HTTP_STATUS.BAD_REQUEST,
+          `No credentials for provider: ${provider}`
+        ) as Response;
       }
       log.warn(ctx, "EMBEDDINGS", "No more accounts available", { provider });
       appendRequestLog(requestId, "unavailable");
-      return errorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable") as Response;
+      return errorResponse(
+        lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE,
+        lastError ?? "All accounts unavailable"
+      ) as Response;
     }
 
     const creds = credentials as Record<string, unknown>;
@@ -125,13 +145,23 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model, ctx);
       },
-      onUsage: async (usage: { prompt_tokens?: number; completion_tokens?: number; reasoning_tokens?: number; cached_tokens?: number }) => {
+      onUsage: async (usage: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        reasoning_tokens?: number;
+        cached_tokens?: number;
+      }) => {
         await saveRequestUsage(requestId, { ...usage, provider, model }, Date.now() - startTime);
       },
     };
 
     // ── Retry transient errors on the same account before locking ─────────────────
-    type EmbeddingsCoreResult = { success: boolean; response?: Response; status: number; error: string };
+    type EmbeddingsCoreResult = {
+      success: boolean;
+      response?: Response;
+      status: number;
+      error: string;
+    };
     let result: EmbeddingsCoreResult | null = null;
     for (let attempt = 0; attempt <= TRANSIENT_RETRY.maxAttempts; attempt++) {
       result = (await handleEmbeddingsCore(embeddingsCoreOpts)) as EmbeddingsCoreResult;
@@ -150,7 +180,11 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       if (attempt === 0) {
         const totalFailures = await incrementCircuitBreaker(creds.connectionId as string, model);
         if (totalFailures >= TRANSIENT_RETRY.maxAttempts) {
-          log.warn(ctx, "EMBEDDINGS", `Circuit open for ${creds.connectionName} on ${model} — skipping retries, locking now`);
+          log.warn(
+            ctx,
+            "EMBEDDINGS",
+            `Circuit open for ${creds.connectionName} on ${model} — skipping retries, locking now`
+          );
           break;
         }
       }
@@ -158,7 +192,11 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
       // Transient error with retries remaining — back off and retry
       if (attempt < TRANSIENT_RETRY.maxAttempts) {
         const delayMs = TRANSIENT_RETRY.baseDelayMs * (attempt + 1);
-        log.warn(ctx, "EMBEDDINGS", `Transient error ${result.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms...`);
+        log.warn(
+          ctx,
+          "EMBEDDINGS",
+          `Transient error ${result.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms...`
+        );
         await Bun.sleep(delayMs);
       }
     }
@@ -175,7 +213,11 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
     );
 
     if (shouldFallback) {
-      log.warn(ctx, "AUTH", `Account ${creds.connectionName} unavailable (${finalResult.status}), trying fallback`);
+      log.warn(
+        ctx,
+        "AUTH",
+        `Account ${creds.connectionName} unavailable (${finalResult.status}), trying fallback`
+      );
       excludeConnectionIds.add(creds.connectionId as string);
       lastError = finalResult.error;
       lastStatus = finalResult.status;
@@ -184,6 +226,12 @@ export async function handleEmbeddings(request: Request): Promise<Response> {
 
     appendRequestLog(requestId, `error_${finalResult.status}`);
     RequestContext.delete(ctx.id);
-    return finalResult.response ?? errorResponse(finalResult.status ?? HTTP_STATUS.BAD_GATEWAY, finalResult.error ?? "Unknown error");
+    return (
+      finalResult.response ??
+      errorResponse(
+        finalResult.status ?? HTTP_STATUS.BAD_GATEWAY,
+        finalResult.error ?? "Unknown error"
+      )
+    );
   }
 }

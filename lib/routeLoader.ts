@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { corsResponse } from "./cors.ts";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"] as const;
-type HttpMethod = typeof HTTP_METHODS[number];
+type HttpMethod = (typeof HTTP_METHODS)[number];
 
 type Handler = (req: Request) => Response | Promise<Response>;
 type RouteConfig = Record<string, Partial<Record<HttpMethod, Handler>>>;
@@ -46,10 +46,7 @@ function pathToRoute(filePath: string, routesDir: string): string {
   const withoutExt = rel.replace(/\.ts$/, "").replace(/\.tsx$/, "");
   const segments = withoutExt.split(/[/\\]/);
   // Drop the "index" suffix — e.g. routes/v1/chat/completions/index.ts → v1/chat/completions
-  const routeParts = segments
-    .slice(0, -1)
-    .map(normalizeSegment)
-    .filter(Boolean);
+  const routeParts = segments.slice(0, -1).map(normalizeSegment).filter(Boolean);
   const route = "/" + routeParts.join("/");
   return route === "/index" ? "/" : route;
 }
@@ -75,10 +72,7 @@ function collectRouteFiles(dir: string, base = ""): string[] {
       const stat = statSync(full);
       if (stat.isDirectory()) {
         results.push(...collectRouteFiles(full, join(base, entry)));
-      } else if (
-        (entry === "index.ts" || entry === "index.tsx") &&
-        dir !== base
-      ) {
+      } else if ((entry === "index.ts" || entry === "index.tsx") && dir !== base) {
         results.push(full);
       }
     }

@@ -7,7 +7,10 @@ export function convertClaudeRequestToOllama(
   stream: boolean
 ): Uint8Array {
   // Parse raw
-  const raw = typeof inputRaw === "string" ? JSON.parse(inputRaw) : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
   const out: Record<string, unknown> = { model: modelName, stream };
 
   // max_tokens → keep_alive (or just omit)
@@ -64,7 +67,8 @@ export function convertClaudeRequestToOllama(
             }
           } else if (partType === "tool_result") {
             const toolContent = part.content;
-            const text = typeof toolContent === "string" ? toolContent : JSON.stringify(toolContent);
+            const text =
+              typeof toolContent === "string" ? toolContent : JSON.stringify(toolContent);
             parts.push(`[TOOL_RESULT: ${text}]`);
           } else if (partType === "tool_use") {
             const toolInput = part.input;
@@ -85,7 +89,7 @@ export function convertClaudeRequestToOllama(
   const tools = raw.tools as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(tools) && tools.length > 0) {
     // Convert tools to a text description appended to system
-    const toolDescs = tools.map(t => `- ${t.name}: ${t.description ?? ""}`).join("\n");
+    const toolDescs = tools.map((t) => `- ${t.name}: ${t.description ?? ""}`).join("\n");
     const toolsBlock = `\n\nYou have access to these tools:\n${toolDescs}\nIf you want to use a tool, output the tool name and arguments in your response.`;
     if (out.messages && Array.isArray(out.messages) && out.messages[0]?.role === "system") {
       (out.messages[0] as Record<string, unknown>).content += toolsBlock;

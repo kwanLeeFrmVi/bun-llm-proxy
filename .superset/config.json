@@ -1,11 +1,5 @@
 {
-  "setup": [
-    "bun install"
-  ],
-  "teardown": [
-    "pm2 delete pm2.config.cjs"
-  ],
-  "run": [
-    "bun run dev"
-  ]
+  "setup": ["bun install"],
+  "teardown": ["pm2 delete pm2.config.cjs"],
+  "run": ["bun run dev"]
 }

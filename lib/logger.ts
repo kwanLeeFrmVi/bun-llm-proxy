@@ -43,12 +43,7 @@ function formatLog(ctx: LogContext, tag: string, message: string, data?: unknown
 /**
  * Format log with timing delta for milestone tags
  */
-function formatLogWithDelta(
-  ctx: LogContext,
-  tag: string,
-  message: string,
-  data?: unknown
-): string {
+function formatLogWithDelta(ctx: LogContext, tag: string, message: string, data?: unknown): string {
   const reqPrefix = formatLogPrefix(ctx);
   const dataStr = data ? ` ${formatData(data)}` : "";
 
@@ -67,7 +62,12 @@ function formatLogWithDelta(
 // Backward-compatible signatures (old: tag, message, data)
 export function debug(tag: string, message: string, data?: unknown): void;
 export function debug(ctx: LogContext, tag: string, message: string, data?: unknown): void;
-export function debug(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+export function debug(
+  ctxOrTag: LogContext | string,
+  tagOrMsg: string,
+  msgOrData?: string | unknown,
+  data?: unknown
+): void {
   if (typeof ctxOrTag === "string") {
     // Old signature: debug(tag, message, data)
     if (LEVEL <= LOG_LEVELS.DEBUG) {
@@ -83,48 +83,75 @@ export function debug(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData
 
 export function info(tag: string, message: string, data?: unknown): void;
 export function info(ctx: LogContext, tag: string, message: string, data?: unknown): void;
-export function info(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+export function info(
+  ctxOrTag: LogContext | string,
+  tagOrMsg: string,
+  msgOrData?: string | unknown,
+  data?: unknown
+): void {
   if (typeof ctxOrTag === "string") {
     // Old signature: info(tag, message, data)
     if (LEVEL <= LOG_LEVELS.INFO) {
-      console.log(`\x1b[36m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`);
+      console.log(
+        `\x1b[36m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`
+      );
     }
   } else {
     // New signature: info(ctx, tag, message, data)
     if (LEVEL <= LOG_LEVELS.INFO) {
-      console.log(`\x1b[36m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`);
+      console.log(
+        `\x1b[36m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`
+      );
     }
   }
 }
 
 export function warn(tag: string, message: string, data?: unknown): void;
 export function warn(ctx: LogContext, tag: string, message: string, data?: unknown): void;
-export function warn(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+export function warn(
+  ctxOrTag: LogContext | string,
+  tagOrMsg: string,
+  msgOrData?: string | unknown,
+  data?: unknown
+): void {
   if (typeof ctxOrTag === "string") {
     // Old signature: warn(tag, message, data)
     if (LEVEL <= LOG_LEVELS.WARN) {
-      console.warn(`\x1b[33m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`);
+      console.warn(
+        `\x1b[33m${formatLogWithDelta(null, ctxOrTag, tagOrMsg as string, msgOrData as unknown)}\x1b[0m`
+      );
     }
   } else {
     // New signature: warn(ctx, tag, message, data)
     if (LEVEL <= LOG_LEVELS.WARN) {
-      console.warn(`\x1b[33m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`);
+      console.warn(
+        `\x1b[33m${formatLogWithDelta(ctxOrTag, tagOrMsg, msgOrData as string, data)}\x1b[0m`
+      );
     }
   }
 }
 
 export function error(tag: string, message: string, data?: unknown): void;
 export function error(ctx: LogContext, tag: string, message: string, data?: unknown): void;
-export function error(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData?: string | unknown, data?: unknown): void {
+export function error(
+  ctxOrTag: LogContext | string,
+  tagOrMsg: string,
+  msgOrData?: string | unknown,
+  data?: unknown
+): void {
   if (typeof ctxOrTag === "string") {
     // Old signature: error(tag, message, data)
     if (LEVEL <= LOG_LEVELS.ERROR) {
-      console.log(`\x1b[31m[${formatTime()}] ❌ [${ctxOrTag}] ${tagOrMsg}${msgOrData !== undefined ? ` ${formatData(msgOrData)}` : ""}\x1b[0m`);
+      console.log(
+        `\x1b[31m[${formatTime()}] ❌ [${ctxOrTag}] ${tagOrMsg}${msgOrData !== undefined ? ` ${formatData(msgOrData)}` : ""}\x1b[0m`
+      );
     }
   } else {
     // New signature: error(ctx, tag, message, data)
     if (LEVEL <= LOG_LEVELS.ERROR) {
-      console.log(`\x1b[31m[${formatTime()}] ${formatLogPrefix(ctxOrTag)} ❌ [${tagOrMsg}] ${msgOrData as string}${data !== undefined ? ` ${formatData(data)}` : ""}\x1b[0m`);
+      console.log(
+        `\x1b[31m[${formatTime()}] ${formatLogPrefix(ctxOrTag)} ❌ [${tagOrMsg}] ${msgOrData as string}${data !== undefined ? ` ${formatData(data)}` : ""}\x1b[0m`
+      );
     }
   }
 }
@@ -136,7 +163,12 @@ export function error(ctxOrTag: LogContext | string, tagOrMsg: string, msgOrData
  */
 export function requestStart(method: string, path: string, extra?: unknown): void;
 export function requestStart(ctx: LogContext, method: string, path: string, extra?: unknown): void;
-export function requestStart(ctxOrMethod: LogContext | string, methodOrPath: string, pathOrExtra?: string | unknown, extra?: unknown): void {
+export function requestStart(
+  ctxOrMethod: LogContext | string,
+  methodOrPath: string,
+  pathOrExtra?: string | unknown,
+  extra?: unknown
+): void {
   let ctx: LogContext = null;
   let method: string;
   let path: string;
@@ -165,7 +197,12 @@ export function requestStart(ctxOrMethod: LogContext | string, methodOrPath: str
  */
 export function response(status: number, duration: number, extra?: unknown): void;
 export function response(ctx: LogContext, status: number, duration: number, extra?: unknown): void;
-export function response(ctxOrStatus: LogContext | number, statusOrDuration: number, durationOrExtra?: number | unknown, extra?: unknown): void {
+export function response(
+  ctxOrStatus: LogContext | number,
+  statusOrDuration: number,
+  durationOrExtra?: number | unknown,
+  extra?: unknown
+): void {
   let ctx: LogContext = null;
   let status: number;
   let duration: number;
@@ -197,7 +234,11 @@ export function response(ctxOrStatus: LogContext | number, statusOrDuration: num
  */
 export function stream(event: string, data?: unknown): void;
 export function stream(ctx: LogContext, event: string, data?: unknown): void;
-export function stream(ctxOrEvent: LogContext | string, eventOrData?: string | unknown, data?: unknown): void {
+export function stream(
+  ctxOrEvent: LogContext | string,
+  eventOrData?: string | unknown,
+  data?: unknown
+): void {
   let ctx: LogContext = null;
   let event: string;
   let eventData: unknown = undefined;
@@ -220,7 +261,7 @@ export function stream(ctxOrEvent: LogContext | string, eventOrData?: string | u
   let durationStr = "";
   if (event === "COMPLETE" && ctx && typeof ctx !== "string") {
     const elapsed = ctx.elapsed;
-    durationStr = ` | ${(elapsed >= 1000 ? (elapsed / 1000).toFixed(1) + "s" : elapsed + "ms")}`;
+    durationStr = ` | ${elapsed >= 1000 ? (elapsed / 1000).toFixed(1) + "s" : elapsed + "ms"}`;
   }
 
   const icon = event === "COMPLETE" ? "✅" : "🌊";
@@ -232,7 +273,11 @@ export function stream(ctxOrEvent: LogContext | string, eventOrData?: string | u
  */
 export function pending(provider: string, model: string): void;
 export function pending(ctx: LogContext, provider: string, model: string): void;
-export function pending(ctxOrProvider: LogContext | string, providerOrModel: string, model?: string): void {
+export function pending(
+  ctxOrProvider: LogContext | string,
+  providerOrModel: string,
+  model?: string
+): void {
   let ctx: LogContext = null;
   let provider: string;
   let mod: string;
@@ -251,8 +296,10 @@ export function pending(ctxOrProvider: LogContext | string, providerOrModel: str
   const reqPrefix = formatLogPrefix(ctx);
   // Import dynamically to avoid circular dependency
   import("./providers.ts").then(({ getProviderDisplayName }) => {
-    getProviderDisplayName(provider).then(providerName => {
-      console.log(`[${formatTime()}] ${reqPrefix} ⏳ [PENDING] provider=${providerName} | model=${mod}`);
+    getProviderDisplayName(provider).then((providerName) => {
+      console.log(
+        `[${formatTime()}] ${reqPrefix} ⏳ [PENDING] provider=${providerName} | model=${mod}`
+      );
     });
   });
 }
@@ -262,7 +309,12 @@ export function pending(ctxOrProvider: LogContext | string, providerOrModel: str
  */
 export function formatDetect(from: string, to: string, stream: boolean): void;
 export function formatDetect(ctx: LogContext, from: string, to: string, stream: boolean): void;
-export function formatDetect(ctxOrFrom: LogContext | string, fromOrTo: string, toOrStream?: string | boolean, stream?: boolean): void {
+export function formatDetect(
+  ctxOrFrom: LogContext | string,
+  fromOrTo: string,
+  toOrStream?: string | boolean,
+  stream?: boolean
+): void {
   let ctx: LogContext = null;
   let from: string;
   let to: string;
@@ -290,7 +342,12 @@ export function formatDetect(ctxOrFrom: LogContext | string, fromOrTo: string, t
  */
 export function passthrough(from: string, to: string, mode: string): void;
 export function passthrough(ctx: LogContext, from: string, to: string, mode: string): void;
-export function passthrough(ctxOrFrom: LogContext | string, fromOrTo: string, toOrMode?: string, mode?: string): void {
+export function passthrough(
+  ctxOrFrom: LogContext | string,
+  fromOrTo: string,
+  toOrMode?: string,
+  mode?: string
+): void {
   let ctx: LogContext = null;
   let from: string;
   let to: string;
@@ -318,7 +375,12 @@ export function passthrough(ctxOrFrom: LogContext | string, fromOrTo: string, to
  */
 export function upstream(method: string, url: string, extra?: string): void;
 export function upstream(ctx: LogContext, method: string, url: string, extra?: string): void;
-export function upstream(ctxOrMethod: LogContext | string, methodOrUrl: string, urlOrExtra?: string | undefined, extra?: string): void {
+export function upstream(
+  ctxOrMethod: LogContext | string,
+  methodOrUrl: string,
+  urlOrExtra?: string | undefined,
+  extra?: string
+): void {
   let ctx: LogContext = null;
   let method: string;
   let url: string;

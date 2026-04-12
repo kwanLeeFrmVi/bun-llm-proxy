@@ -3,11 +3,11 @@ import { ERROR_TYPES, DEFAULT_ERROR_MESSAGES } from "../config/runtimeConfig.ts"
 // ─── Core builders ─────────────────────────────────────────────────────────────
 
 export function buildErrorBody(statusCode: number, message?: string): object {
-  const info = ERROR_TYPES[statusCode] ?? (
-    statusCode >= 500
+  const info =
+    ERROR_TYPES[statusCode] ??
+    (statusCode >= 500
       ? { type: "server_error", code: "internal_server_error" }
-      : { type: "invalid_request_error", code: "" }
-  );
+      : { type: "invalid_request_error", code: "" });
   return {
     error: {
       message: message ?? DEFAULT_ERROR_MESSAGES[statusCode] ?? "An error occurred",
@@ -34,13 +34,10 @@ export function unavailableResponse(
     Math.ceil((new Date(retryAfter).getTime() - Date.now()) / 1000),
     1
   );
-  return new Response(
-    JSON.stringify({ error: { message: `${message} (${retryAfterHuman})` } }),
-    {
-      status: statusCode,
-      headers: { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) },
-    }
-  );
+  return new Response(JSON.stringify({ error: { message: `${message} (${retryAfterHuman})` } }), {
+    status: statusCode,
+    headers: { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) },
+  });
 }
 
 // ─── Error result object for chatCore ─────────────────────────────────────────
@@ -77,29 +74,34 @@ export function createErrorResult(
  */
 export function sseErrorResponse(status: number, message: string): Response {
   const msgId = `msg_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
-  const events = [
-    `event: message_start\ndata: ${JSON.stringify({
-      type: "message_start",
-      message: {
-        id: msgId, type: "message", role: "assistant", content: [],
-        stop_reason: null, stop_sequence: null,
+  const events =
+    [
+      `event: message_start\ndata: ${JSON.stringify({
+        type: "message_start",
+        message: {
+          id: msgId,
+          type: "message",
+          role: "assistant",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        },
+      })}`,
+      `event: message_delta\ndata: ${JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn", stop_sequence: null },
         usage: { input_tokens: 0, output_tokens: 0 },
-      },
-    })}`,
-    `event: message_delta\ndata: ${JSON.stringify({
-      type: "message_delta",
-      delta: { stop_reason: "end_turn", stop_sequence: null },
-      usage: { input_tokens: 0, output_tokens: 0 },
-    })}`,
-    `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}`,
-  ].join("\n\n") + "\n\ndata: [DONE]\n\n";
+      })}`,
+      `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}`,
+    ].join("\n\n") + "\n\ndata: [DONE]\n\n";
 
   return new Response(events, {
     status,
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
       "Access-Control-Allow-Origin": "*",
     },
@@ -143,9 +145,7 @@ export async function parseUpstreamError(
 
   const messageStr = typeof message === "string" ? message : JSON.stringify(message);
   const finalMessage =
-    messageStr ||
-    DEFAULT_ERROR_MESSAGES[response.status] ||
-    `Upstream error: ${response.status}`;
+    messageStr || DEFAULT_ERROR_MESSAGES[response.status] || `Upstream error: ${response.status}`;
 
   if (provider === "antigravity" && response.status === 429) {
     retryAfterMs = parseAntigravityRetryTime(finalMessage);

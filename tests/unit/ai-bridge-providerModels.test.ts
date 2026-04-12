@@ -22,13 +22,13 @@ describe("getProviderModels", () => {
   it("returns models for a known provider alias (openai)", () => {
     const models = getProviderModels("openai");
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === "gpt-4o")).toBe(true);
+    expect(models.some((m) => m.id === "gpt-4o")).toBe(true);
   });
 
   it("returns models for OAuth alias (cc)", () => {
     const models = getProviderModels("cc");
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === "claude-opus-4-6")).toBe(true);
+    expect(models.some((m) => m.id === "claude-opus-4-6")).toBe(true);
   });
 
   it("returns empty array for unknown provider", () => {

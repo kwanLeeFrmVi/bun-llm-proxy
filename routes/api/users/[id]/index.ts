@@ -21,34 +21,37 @@ export async function GET(req: Request): Promise<Response> {
 
   // Get all API keys to show both assigned and unassigned keys
   const allKeys = await getApiKeys();
-  const assignedKeys = allKeys.filter(k => k.userId === id);
-  const unassignedKeys = allKeys.filter(k => !k.userId);
+  const assignedKeys = allKeys.filter((k) => k.userId === id);
+  const unassignedKeys = allKeys.filter((k) => !k.userId);
 
   // Get all users for enrichment
   const allUsers = await getUsers();
-  const userMap = new Map(allUsers.map(u => [u.id, u.username]));
+  const userMap = new Map(allUsers.map((u) => [u.id, u.username]));
 
   // Enrich keys with owner username
-  const enrichedAssignedKeys = assignedKeys.map(k => ({
+  const enrichedAssignedKeys = assignedKeys.map((k) => ({
     ...k,
     ownerUsername: k.userId ? (userMap.get(k.userId) ?? null) : null,
   }));
 
-  const enrichedUnassignedKeys = unassignedKeys.map(k => ({
+  const enrichedUnassignedKeys = unassignedKeys.map((k) => ({
     ...k,
     ownerUsername: null,
   }));
 
-  return Response.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      createdAt: user.createdAt,
+  return Response.json(
+    {
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+      assignedKeys: enrichedAssignedKeys,
+      unassignedKeys: enrichedUnassignedKeys,
     },
-    assignedKeys: enrichedAssignedKeys,
-    unassignedKeys: enrichedUnassignedKeys,
-  }, { headers: CORS_HEADERS });
+    { headers: CORS_HEADERS }
+  );
 }
 
 export async function DELETE(req: Request): Promise<Response> {

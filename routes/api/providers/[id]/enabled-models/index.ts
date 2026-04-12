@@ -1,7 +1,11 @@
 // Provider-level enabled models CRUD
 // This endpoint manages custom models at the provider level, independent of connections.
 
-import { getProviderEnabledModels, updateProviderEnabledModels, getProviderNodeById } from "db/index.ts";
+import {
+  getProviderEnabledModels,
+  updateProviderEnabledModels,
+  getProviderNodeById,
+} from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
@@ -42,13 +46,16 @@ export async function PUT(req: Request): Promise<Response> {
 
   let body: { models?: unknown };
   try {
-    body = await req.json() as { models?: unknown };
+    body = (await req.json()) as { models?: unknown };
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   if (!body.models || !Array.isArray(body.models)) {
-    return Response.json({ error: "models array is required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "models array is required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const models = await updateProviderEnabledModels(providerName, body.models);
@@ -67,13 +74,16 @@ export async function POST(req: Request): Promise<Response> {
 
   let body: { model?: unknown };
   try {
-    body = await req.json() as { model?: unknown };
+    body = (await req.json()) as { model?: unknown };
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   if (!body.model || typeof body.model !== "string" || !body.model.trim()) {
-    return Response.json({ error: "model string is required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "model string is required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const modelId = body.model.trim();
@@ -102,18 +112,21 @@ export async function DELETE(req: Request): Promise<Response> {
 
   let body: { model?: unknown };
   try {
-    body = await req.json() as { model?: unknown };
+    body = (await req.json()) as { model?: unknown };
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   if (!body.model || typeof body.model !== "string" || !body.model.trim()) {
-    return Response.json({ error: "model string is required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "model string is required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const modelId = body.model.trim();
   const currentModels = await getProviderEnabledModels(providerName);
-  const models = currentModels.filter(m => m !== modelId);
+  const models = currentModels.filter((m) => m !== modelId);
 
   await updateProviderEnabledModels(providerName, models);
 

@@ -103,7 +103,12 @@ export function parseVertexSaJson(apiKey: string): Record<string, unknown> | nul
   if (typeof apiKey !== "string") return null;
   try {
     const parsed = JSON.parse(apiKey);
-    if (parsed.type === "service_account" && parsed.client_email && parsed.private_key && parsed.project_id) {
+    if (
+      parsed.type === "service_account" &&
+      parsed.client_email &&
+      parsed.private_key &&
+      parsed.project_id
+    ) {
       return parsed as Record<string, unknown>;
     }
     return null;
@@ -125,11 +130,13 @@ export async function refreshWithRetry(
   _log: Log | null = null
 ): Promise<TokenResult | null> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 1000));
+    if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 1000));
     try {
       const result = await refreshFn();
       if (result) return result;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   return null;
 }

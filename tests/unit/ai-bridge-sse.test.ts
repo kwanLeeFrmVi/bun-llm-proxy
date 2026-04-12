@@ -17,13 +17,16 @@ describe("buildSSEEvent", () => {
   it("produces event: + data: lines with double-newline terminator", () => {
     const result = buildSSEEvent("message_start", { id: "msg_1" });
     expect(result).toContain("event: message_start\n");
-    expect(result).toContain("data: {\"id\":\"msg_1\"}");
+    expect(result).toContain('data: {"id":"msg_1"}');
     expect(result.endsWith("\n\n")).toBe(true);
     expect(result).not.toContain("event: message_start\n\n");
   });
 
   it("JSON-stringifies object payloads", () => {
-    const result = buildSSEEvent("content_block_delta", { type: "content_block_delta", delta: { text: "hi" } });
+    const result = buildSSEEvent("content_block_delta", {
+      type: "content_block_delta",
+      delta: { text: "hi" },
+    });
     expect(result).toContain('"type":"content_block_delta"');
     expect(result).toContain('"text":"hi"');
   });
@@ -48,7 +51,7 @@ describe("buildSSEData", () => {
   it("produces data-only lines (no event: prefix)", () => {
     const result = buildSSEData({ content: "hello" });
     expect(result).not.toContain("event:");
-    expect(result).toContain("data: {\"content\":\"hello\"}");
+    expect(result).toContain('data: {"content":"hello"}');
     expect(result.endsWith("\n\n")).toBe(true);
   });
 

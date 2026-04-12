@@ -60,7 +60,7 @@ describe("Combo System E2E", () => {
   afterAll(() => {
     db.close();
     // Cleanup
-    import("node:fs").then(fs => {
+    import("node:fs").then((fs) => {
       fs.unlinkSync(TEST_DB_PATH);
     });
   });
@@ -136,16 +136,24 @@ describe("Combo System E2E", () => {
         [randomUUID(), comboName, JSON.stringify(["a", "b"]), now, now]
       );
 
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "model-a", 3]);
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "model-b", 1]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "model-a",
+        3,
+      ]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "model-b",
+        1,
+      ]);
 
-      const configs = db.query<ComboConfig, string>(
-        "SELECT * FROM combo_configs WHERE combo_name = ?"
-      ).all(comboName);
+      const configs = db
+        .query<ComboConfig, string>("SELECT * FROM combo_configs WHERE combo_name = ?")
+        .all(comboName);
 
       expect(configs.length).toBe(2);
-      expect(configs.find(c => c.model === "model-a")!.weight).toBe(3);
-      expect(configs.find(c => c.model === "model-b")!.weight).toBe(1);
+      expect(configs.find((c) => c.model === "model-a")!.weight).toBe(3);
+      expect(configs.find((c) => c.model === "model-b")!.weight).toBe(1);
     });
 
     it("should replace configs on update", () => {
@@ -158,15 +166,23 @@ describe("Combo System E2E", () => {
       );
 
       // Initial config
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "old-model", 1]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "old-model",
+        1,
+      ]);
 
       // Replace config
       db.run("DELETE FROM combo_configs WHERE combo_name = ?", [comboName]);
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "new-model", 5]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "new-model",
+        5,
+      ]);
 
-      const configs = db.query<ComboConfig, string>(
-        "SELECT * FROM combo_configs WHERE combo_name = ?"
-      ).all(comboName);
+      const configs = db
+        .query<ComboConfig, string>("SELECT * FROM combo_configs WHERE combo_name = ?")
+        .all(comboName);
 
       expect(configs.length).toBe(1);
       expect(configs[0].model).toBe("new-model");
@@ -230,8 +246,16 @@ describe("Combo System E2E", () => {
         "INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
         [randomUUID(), "inner-weighted", JSON.stringify(["fast", "slow"]), now, now]
       );
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", ["inner-weighted", "fast", 3]);
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", ["inner-weighted", "slow", 1]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        "inner-weighted",
+        "fast",
+        3,
+      ]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        "inner-weighted",
+        "slow",
+        1,
+      ]);
 
       // Create outer combo
       db.run(
@@ -240,12 +264,12 @@ describe("Combo System E2E", () => {
       );
 
       // Verify weights are independent
-      const innerConfigs = db.query<ComboConfig, string>(
-        "SELECT * FROM combo_configs WHERE combo_name = ?"
-      ).all("inner-weighted");
+      const innerConfigs = db
+        .query<ComboConfig, string>("SELECT * FROM combo_configs WHERE combo_name = ?")
+        .all("inner-weighted");
 
-      expect(innerConfigs.find(c => c.model === "fast")!.weight).toBe(3);
-      expect(innerConfigs.find(c => c.model === "slow")!.weight).toBe(1);
+      expect(innerConfigs.find((c) => c.model === "fast")!.weight).toBe(3);
+      expect(innerConfigs.find((c) => c.model === "slow")!.weight).toBe(1);
     });
   });
 
@@ -260,21 +284,30 @@ describe("Combo System E2E", () => {
         "INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
         [randomUUID(), comboName, JSON.stringify(["model-a", "model-b"]), now, now]
       );
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "model-a", 2]);
-      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [comboName, "model-b", 1]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "model-a",
+        2,
+      ]);
+      db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+        comboName,
+        "model-b",
+        1,
+      ]);
 
       // Simulate API response transformation
       const combo = db.query<Combo, string>("SELECT * FROM combos WHERE name = ?").get(comboName);
-      const configs = db.query<ComboConfig, string>(
-        "SELECT * FROM combo_configs WHERE combo_name = ?"
-      ).all(comboName);
+      const configs = db
+        .query<ComboConfig, string>("SELECT * FROM combo_configs WHERE combo_name = ?")
+        .all(comboName);
 
       const response = {
         id: combo!.id,
         name: combo!.name,
-        models: configs.length > 0
-          ? configs.map(c => ({ model: c.model, weight: c.weight }))
-          : JSON.parse(combo!.models).map((m: string) => ({ model: m, weight: 1 })),
+        models:
+          configs.length > 0
+            ? configs.map((c) => ({ model: c.model, weight: c.weight }))
+            : JSON.parse(combo!.models).map((m: string) => ({ model: m, weight: 1 })),
         createdAt: combo!.created_at,
         updatedAt: combo!.updated_at,
       };
@@ -295,14 +328,15 @@ describe("Combo System E2E", () => {
       );
 
       const combo = db.query<Combo, string>("SELECT * FROM combos WHERE name = ?").get(comboName);
-      const configs = db.query<ComboConfig, string>(
-        "SELECT * FROM combo_configs WHERE combo_name = ?"
-      ).all(comboName);
+      const configs = db
+        .query<ComboConfig, string>("SELECT * FROM combo_configs WHERE combo_name = ?")
+        .all(comboName);
 
       // When no configs, default to weight=1 for all models
-      const models = configs.length > 0
-        ? configs.map(c => ({ model: c.model, weight: c.weight }))
-        : JSON.parse(combo!.models).map((m: string) => ({ model: m, weight: 1 }));
+      const models =
+        configs.length > 0
+          ? configs.map((c) => ({ model: c.model, weight: c.weight }))
+          : JSON.parse(combo!.models).map((m: string) => ({ model: m, weight: 1 }));
 
       expect(models).toEqual([
         { model: "model-x", weight: 1 },
@@ -317,7 +351,14 @@ describe("Combo System E2E", () => {
     const NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
 
     it("should accept valid names", () => {
-      const validNames = ["simple", "with-dash", "with_underscore", "with.dot", "MixedCase123", "a"];
+      const validNames = [
+        "simple",
+        "with-dash",
+        "with_underscore",
+        "with.dot",
+        "MixedCase123",
+        "a",
+      ];
       for (const name of validNames) {
         expect(NAME_REGEX.test(name)).toBe(true);
       }
@@ -341,8 +382,8 @@ describe("Combo System E2E", () => {
         { model: "model-c" }, // object without weight (should default to 1)
       ];
 
-      const models = input.map(item => typeof item === "string" ? item : item.model);
-      const configs = input.map(item => {
+      const models = input.map((item) => (typeof item === "string" ? item : item.model));
+      const configs = input.map((item) => {
         if (typeof item === "string") return { model: item, weight: 1 };
         return { model: item.model, weight: Math.round(item.weight ?? 1) };
       });

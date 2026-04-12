@@ -1,14 +1,7 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { api, type LoginResponse } from "./api.ts";
 
-export type UserRole = 'admin' | 'user';
+export type UserRole = "admin" | "user";
 
 interface AuthContextValue {
   token: string | null;
@@ -23,29 +16,28 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem("auth_token"),
-  );
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem("auth_token"));
   const [username, setUsername] = useState<string | null>(() =>
-    localStorage.getItem("auth_username"),
+    localStorage.getItem("auth_username")
   );
-  const [userId, setUserId] = useState<string | null>(() =>
-    localStorage.getItem("auth_user_id"),
-  );
-  const [role, setRole] = useState<UserRole | null>(() =>
-    (localStorage.getItem("auth_role") as UserRole | null),
+  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem("auth_user_id"));
+  const [role, setRole] = useState<UserRole | null>(
+    () => localStorage.getItem("auth_role") as UserRole | null
   );
   const [loading, setLoading] = useState(false);
 
   // On mount, refresh role from /me if we have a token but role is missing
   useEffect(() => {
     if (token && !role) {
-      api.auth.me().then(res => {
-        localStorage.setItem("auth_role", res.role);
-        localStorage.setItem("auth_user_id", res.id);
-        setRole(res.role);
-        setUserId(res.id);
-      }).catch(() => {});
+      api.auth
+        .me()
+        .then((res) => {
+          localStorage.setItem("auth_role", res.role);
+          localStorage.setItem("auth_user_id", res.id);
+          setRole(res.role);
+          setUserId(res.id);
+        })
+        .catch(() => {});
     }
   }, [token, role]);
 

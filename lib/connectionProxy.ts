@@ -19,7 +19,9 @@ function normalizeLegacyProxy(providerSpecificData: Record<string, unknown> = {}
   return { connectionProxyEnabled, connectionProxyUrl, connectionNoProxy };
 }
 
-export async function resolveConnectionProxyConfig(providerSpecificData: Record<string, unknown> = {}): Promise<{
+export async function resolveConnectionProxyConfig(
+  providerSpecificData: Record<string, unknown> = {}
+): Promise<{
   source: string;
   proxyPoolId: string | null;
   proxyPool: unknown;

@@ -104,9 +104,12 @@ export default function OAuthModal({
         startPolling(data.device_code, data.codeVerifier, data.interval || 5, data);
       } else {
         // Authorization code flow
-        const res = await fetch(`/api/oauth/${provider}/authorize?redirect_uri=${encodeURIComponent(`${window.location.origin}/oauth/callback`)}`, {
-          headers: getAuthHeaders(),
-        });
+        const res = await fetch(
+          `/api/oauth/${provider}/authorize?redirect_uri=${encodeURIComponent(`${window.location.origin}/oauth/callback`)}`,
+          {
+            headers: getAuthHeaders(),
+          }
+        );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to get auth URL");
 
@@ -135,7 +138,12 @@ export default function OAuthModal({
 
   // ─── Polling ──────────────────────────────────────────────────────────────────
   const startPolling = useCallback(
-    (deviceCode: string, codeVerifier: string, interval: number, extraData: Record<string, unknown>) => {
+    (
+      deviceCode: string,
+      codeVerifier: string,
+      interval: number,
+      extraData: Record<string, unknown>
+    ) => {
       pollingRef.current = false;
       setPolling(true);
 
@@ -231,7 +239,12 @@ export default function OAuthModal({
     if (!authData) return;
     callbackProcessedRef.current = false;
 
-    const handleCallback = async (data: { code?: string; state?: string; error?: string; errorDescription?: string }) => {
+    const handleCallback = async (data: {
+      code?: string;
+      state?: string;
+      error?: string;
+      errorDescription?: string;
+    }) => {
       if (callbackProcessedRef.current) return;
       if (data.error) {
         callbackProcessedRef.current = true;
@@ -360,8 +373,15 @@ export default function OAuthModal({
                 <code className="text-xs font-mono text-[--primary] flex-1 break-all">
                   {deviceData.verification_uri}
                 </code>
-                <button onClick={() => handleCopy(deviceData.verification_uri)} className="shrink-0 text-[--on-surface-variant] hover:text-[--on-surface]">
-                  {copied === deviceData.verification_uri ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                <button
+                  onClick={() => handleCopy(deviceData.verification_uri)}
+                  className="shrink-0 text-[--on-surface-variant] hover:text-[--on-surface]"
+                >
+                  {copied === deviceData.verification_uri ? (
+                    <Check className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
                 </button>
               </div>
 
@@ -402,7 +422,13 @@ export default function OAuthModal({
               <p className="text-sm text-[--on-surface-variant]">
                 Waiting for authorization in popup...
               </p>
-              <Button variant="outline" size="sm" onClick={() => { setStep("input"); }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setStep("input");
+                }}
+              >
                 Paste callback URL manually
               </Button>
             </div>
@@ -421,11 +447,19 @@ export default function OAuthModal({
                   {authData.authUrl}
                 </code>
                 <button onClick={() => handleCopy(authData.authUrl)} className="shrink-0">
-                  {copied === authData.authUrl ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-[--on-surface-variant]" />}
+                  {copied === authData.authUrl ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-[--on-surface-variant]" />
+                  )}
                 </button>
               </div>
 
-              <Button variant="outline" className="w-full text-xs" onClick={() => window.open(authData.authUrl, "_blank")}>
+              <Button
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => window.open(authData.authUrl, "_blank")}
+              >
                 <ExternalLink className="w-4 h-4 mr-2" /> Open Authorization URL
               </Button>
 
@@ -436,7 +470,11 @@ export default function OAuthModal({
                 className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm font-mono"
               />
 
-              <Button className="w-full bg-[#0F172A] text-white hover:bg-[#1e293b]" onClick={handleManualSubmit} disabled={!callbackUrl.trim()}>
+              <Button
+                className="w-full bg-[#0F172A] text-white hover:bg-[#1e293b]"
+                onClick={handleManualSubmit}
+                disabled={!callbackUrl.trim()}
+              >
                 Submit
               </Button>
             </div>

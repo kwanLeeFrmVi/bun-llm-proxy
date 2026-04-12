@@ -9,7 +9,7 @@ export default defineConfig({
     port: 20130,
     proxy: {
       "/api": "http://localhost:20129",
-      "/v1":  "http://localhost:20129",
+      "/v1": "http://localhost:20129",
     },
   },
   preview: {

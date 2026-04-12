@@ -12,12 +12,16 @@ import { openDb } from "./index.ts";
 // Allow overriding the db.json path via CLI argument
 const args = process.argv.slice(2);
 const forceFlag = args.includes("--force");
-const dbJsonPath = args.find(a => a !== "--force") ?? join(process.env.DATA_DIR ?? join(homedir(), ".bunLLM"), "db.json");
+const dbJsonPath =
+  args.find((a) => a !== "--force") ??
+  join(process.env.DATA_DIR ?? join(homedir(), ".bunLLM"), "db.json");
 
 const db = openDb();
 
 // Check if already migrated (unless --force)
-const count = db.query<{ count: number }, []>("SELECT COUNT(*) as count FROM provider_connections").get();
+const count = db
+  .query<{ count: number }, []>("SELECT COUNT(*) as count FROM provider_connections")
+  .get();
 if ((count?.count ?? 0) > 0 && !forceFlag) {
   console.log("[migrate] SQLite already populated, skipping.");
   console.log("[migrate] Use --force to re-run migration.");
@@ -45,7 +49,7 @@ if (!(await file.exists())) {
   process.exit(0);
 }
 
-const data = await file.json() as Record<string, unknown>;
+const data = (await file.json()) as Record<string, unknown>;
 console.log(`[migrate] Reading ${dbJsonPath}`);
 console.log(`[migrate] Top-level keys found: ${Object.keys(data).join(", ")}`);
 
@@ -203,9 +207,13 @@ for (const node of nodes) {
     const inferred = baseUrlByProviderId.get(node.id as string);
     if (inferred) {
       baseUrl = inferred;
-      console.log(`[migrate] Provider node "${name || node.id}" — inferred baseUrl from connection: ${baseUrl}`);
+      console.log(
+        `[migrate] Provider node "${name || node.id}" — inferred baseUrl from connection: ${baseUrl}`
+      );
     } else {
-      console.warn(`[migrate] Provider node "${name || node.id}" has no baseUrl and no connection to infer from — it will need to be updated manually.`);
+      console.warn(
+        `[migrate] Provider node "${name || node.id}" has no baseUrl and no connection to infer from — it will need to be updated manually.`
+      );
     }
   }
 
@@ -260,75 +268,93 @@ console.log(`[migrate] Migrated ${pools.length} proxy pools`);
 const combos = (pickArray(data, "combos") as Array<{ name: string; models: string[] }>) ?? [];
 for (const combo of combos) {
   const id = crypto.randomUUID();
-  db.run(
-    "INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-    [id, combo.name, JSON.stringify(combo.models ?? []), new Date().toISOString(), new Date().toISOString()]
-  );
+  db.run("INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [
+    id,
+    combo.name,
+    JSON.stringify(combo.models ?? []),
+    new Date().toISOString(),
+    new Date().toISOString(),
+  ]);
 }
 console.log(`[migrate] Migrated ${combos.length} combos`);
 
 // Migrate API keys
-const apiKeys = (pickArray(data, "apiKeys") as Array<{ id: string; name: string; key: string; machineId?: string; isActive?: boolean; createdAt?: string }>) ?? [];
+const apiKeys =
+  (pickArray(data, "apiKeys") as Array<{
+    id: string;
+    name: string;
+    key: string;
+    machineId?: string;
+    isActive?: boolean;
+    createdAt?: string;
+  }>) ?? [];
 for (const k of apiKeys) {
   db.run(
     "INSERT INTO api_keys (id, name, key, machine_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [k.id, k.name, k.key, k.machineId ?? null, k.isActive !== false ? 1 : 0, k.createdAt ?? new Date().toISOString()]
+    [
+      k.id,
+      k.name,
+      k.key,
+      k.machineId ?? null,
+      k.isActive !== false ? 1 : 0,
+      k.createdAt ?? new Date().toISOString(),
+    ]
   );
 }
 console.log(`[migrate] Migrated ${apiKeys.length} API keys`);
 
 // Migrate settings
-const settings = data.settings as Record<string, unknown> ?? {};
+const settings = (data.settings as Record<string, unknown>) ?? {};
 for (const [key, value] of Object.entries(settings)) {
-  db.run(
-    "INSERT INTO settings (key, value) VALUES (?, ?)",
-    [key, JSON.stringify(value)]
-  );
+  db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [key, JSON.stringify(value)]);
 }
 console.log(`[migrate] Migrated ${Object.keys(settings).length} settings`);
 
 // Migrate model aliases
-const modelAliases = data.modelAliases as Record<string, string> ?? {};
+const modelAliases = (data.modelAliases as Record<string, string>) ?? {};
 for (const [alias, model] of Object.entries(modelAliases)) {
-  db.run(
-    "INSERT INTO model_aliases (alias, model) VALUES (?, ?)",
-    [alias, model]
-  );
+  db.run("INSERT INTO model_aliases (alias, model) VALUES (?, ?)", [alias, model]);
 }
 console.log(`[migrate] Migrated ${Object.keys(modelAliases).length} model aliases`);
 
 // Migrate MITM aliases
-const mitmAlias = data.mitmAlias as Record<string, Record<string, string>> ?? {};
+const mitmAlias = (data.mitmAlias as Record<string, Record<string, string>>) ?? {};
 for (const [toolName, aliases] of Object.entries(mitmAlias)) {
   for (const [alias, model] of Object.entries(aliases)) {
-    db.run(
-      "INSERT INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)",
-      [toolName, alias, model]
-    );
+    db.run("INSERT INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)", [
+      toolName,
+      alias,
+      model,
+    ]);
   }
 }
 console.log(`[migrate] Migrated MITM aliases`);
 
 // Migrate pricing
-const pricing = data.pricing as Record<string, Record<string, { input: number; output: number }>> ?? {};
+const pricing =
+  (data.pricing as Record<string, Record<string, { input: number; output: number }>>) ?? {};
 for (const [provider, models] of Object.entries(pricing)) {
   for (const [model, prices] of Object.entries(models)) {
-    db.run(
-      "INSERT INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?)",
-      [provider, model, prices.input ?? 0, prices.output ?? 0]
-    );
+    db.run("INSERT INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?)", [
+      provider,
+      model,
+      prices.input ?? 0,
+      prices.output ?? 0,
+    ]);
   }
 }
 console.log(`[migrate] Migrated pricing data`);
 
 // Migrate combo configs
-const comboConfigs = data.comboConfigs as Record<string, { models: Array<{ model: string; weight: number }> }> ?? {};
+const comboConfigs =
+  (data.comboConfigs as Record<string, { models: Array<{ model: string; weight: number }> }>) ?? {};
 for (const [comboName, config] of Object.entries(comboConfigs)) {
   for (const item of config.models ?? []) {
-    db.run(
-      "INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)",
-      [comboName, item.model, item.weight ?? 1]
-    );
+    db.run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+      comboName,
+      item.model,
+      item.weight ?? 1,
+    ]);
   }
 }
 console.log(`[migrate] Migrated combo configs`);

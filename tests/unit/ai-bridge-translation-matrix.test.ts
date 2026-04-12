@@ -10,7 +10,12 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { Request, Response, ResponseNonStream, NeedsTranslation } from "../../ai-bridge/translator/index.ts";
+import {
+  Request,
+  Response,
+  ResponseNonStream,
+  NeedsTranslation,
+} from "../../ai-bridge/translator/index.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -26,7 +31,7 @@ function decode(bytes: Uint8Array): Record<string, unknown> {
 }
 
 function decodeSSE(chunks: Uint8Array[]): string[] {
-  return chunks.map(c => dec.decode(c));
+  return chunks.map((c) => dec.decode(c));
 }
 
 const NO_RAW = new Uint8Array(0);
@@ -54,31 +59,37 @@ const FIXTURES = {
     requestWithTools: {
       model: "gpt-4o",
       messages: [{ role: "user", content: "use the weather tool" }],
-      tools: [{
-        type: "function",
-        function: {
-          name: "get_weather",
-          description: "Get weather for a city",
-          parameters: {
-            type: "object",
-            properties: { city: { type: "string" } },
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "get_weather",
+            description: "Get weather for a city",
+            parameters: {
+              type: "object",
+              properties: { city: { type: "string" } },
+            },
           },
         },
-      }],
+      ],
     },
-    streamingChunk: 'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","created":1234567890,"choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}\n\n',
-    streamingChunkDone: 'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","created":1234567890,"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n',
+    streamingChunk:
+      'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","created":1234567890,"choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}\n\n',
+    streamingChunkDone:
+      'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","created":1234567890,"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n',
     streamingDone: "data: [DONE]\n\n",
     nonStreamingResponse: {
       id: "chatcmpl_123",
       object: "chat.completion",
       created: 1234567890,
       model: "gpt-4o",
-      choices: [{
-        index: 0,
-        message: { role: "assistant", content: "hello world" },
-        finish_reason: "stop",
-      }],
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "hello world" },
+          finish_reason: "stop",
+        },
+      ],
       usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
     },
   },
@@ -87,38 +98,49 @@ const FIXTURES = {
   claude: {
     basicRequest: {
       model: "claude-sonnet-4-20250514",
-      messages: [{
-        role: "user",
-        content: [{ type: "text", text: "hello" }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "hello" }],
+        },
+      ],
       max_tokens: 1024,
     },
     requestWithSystem: {
       model: "claude-sonnet-4-20250514",
       system: "You are helpful.",
-      messages: [{
-        role: "user",
-        content: [{ type: "text", text: "hello" }],
-      }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "hello" }],
+        },
+      ],
     },
     requestWithTools: {
       model: "claude-sonnet-4-20250514",
-      messages: [{
-        role: "user",
-        content: [{ type: "text", text: "use the weather tool" }],
-      }],
-      tools: [{
-        name: "get_weather",
-        description: "Get weather for a city",
-        input_schema: {
-          type: "object",
-          properties: { city: { type: "string" } },
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "use the weather tool" }],
         },
-      }],
+      ],
+      tools: [
+        {
+          name: "get_weather",
+          description: "Get weather for a city",
+          input_schema: {
+            type: "object",
+            properties: { city: { type: "string" } },
+          },
+        },
+      ],
     },
-    streamingStart: 'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_123","type":"message","role":"assistant","model":"claude-sonnet-4","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n',
-    streamingDelta: 'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}\n\n',
-    streamingStop: 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n',
+    streamingStart:
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_123","type":"message","role":"assistant","model":"claude-sonnet-4","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n',
+    streamingDelta:
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}\n\n',
+    streamingStop:
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n',
     streamingStopEvent: 'event: message_stop\ndata: {"type":"message_stop"}\n\n',
     nonStreamingResponse: {
       id: "msg_123",
@@ -134,10 +156,12 @@ const FIXTURES = {
   // === GEMINI FORMAT ===
   gemini: {
     basicRequest: {
-      contents: [{
-        role: "user",
-        parts: [{ text: "hello" }],
-      }],
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: "hello" }],
+        },
+      ],
     },
     requestWithSystem: {
       contents: [{ role: "user", parts: [{ text: "hello" }] }],
@@ -150,13 +174,17 @@ const FIXTURES = {
         temperature: 0.7,
       },
     },
-    streamingChunk: '{"candidates":[{"content":{"parts":[{"text":"hello"}]}}],"modelVersion":"gemini-2.0-flash"}\n',
-    streamingChunkDone: '{"candidates":[{"content":{"parts":[{"text":"world"}]}}],"finishReason":"STOP","usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}\n',
+    streamingChunk:
+      '{"candidates":[{"content":{"parts":[{"text":"hello"}]}}],"modelVersion":"gemini-2.0-flash"}\n',
+    streamingChunkDone:
+      '{"candidates":[{"content":{"parts":[{"text":"world"}]}}],"finishReason":"STOP","usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}\n',
     nonStreamingResponse: {
-      candidates: [{
-        content: { parts: [{ text: "hello world" }] },
-        finishReason: "STOP",
-      }],
+      candidates: [
+        {
+          content: { parts: [{ text: "hello world" }] },
+          finishReason: "STOP",
+        },
+      ],
       usageMetadata: {
         promptTokenCount: 10,
         candidatesTokenCount: 5,
@@ -188,8 +216,10 @@ const FIXTURES = {
       },
       stream: true,
     },
-    streamingChunk: '{"model":"llama3","message":{"role":"assistant","content":"hello"},"done":false}',
-    streamingChunkDone: '{"model":"llama3","message":{"role":"assistant","content":"world"},"done":true,"done_reason":"stop","prompt_eval_count":10,"eval_count":5}',
+    streamingChunk:
+      '{"model":"llama3","message":{"role":"assistant","content":"hello"},"done":false}',
+    streamingChunkDone:
+      '{"model":"llama3","message":{"role":"assistant","content":"world"},"done":true,"done_reason":"stop","prompt_eval_count":10,"eval_count":5}',
     nonStreamingResponse: {
       model: "llama3",
       message: { role: "assistant", content: "hello world" },
@@ -220,7 +250,7 @@ const FIXTURES = {
       },
     },
     streamingChunk: 'event: assistantResponseEvent\ndata: {"content":"hello"}\n\n',
-    streamingChunkDone: 'event: messageStopEvent\ndata: {}\n\n',
+    streamingChunkDone: "event: messageStopEvent\ndata: {}\n\n",
     streamingDone: "data: [DONE]\n\n",
     nonStreamingResponse: {
       content: "hello world",
@@ -232,44 +262,54 @@ const FIXTURES = {
     basicRequest: {
       request: {
         sessionId: "session-123",
-        contents: [{
-          role: "user",
-          parts: [{ text: "hello" }],
-        }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: "hello" }],
+          },
+        ],
       },
       requestId: "req-123",
       sessionId: "session-123",
     },
-    streamingChunk: JSON.stringify({
-      response: {
-        responseId: "resp-123",
-        modelVersion: "gemini-2.0",
-        candidates: [{
-          content: { parts: [{ text: "hello" }] },
-        }],
-      },
-    }) + "\n",
-    streamingChunkDone: JSON.stringify({
-      response: {
-        candidates: [{
-          content: { parts: [{ text: "world" }] },
-          finishReason: "STOP",
-        }],
-        usageMetadata: {
-          promptTokenCount: 10,
-          candidatesTokenCount: 5,
-          totalTokenCount: 15,
+    streamingChunk:
+      JSON.stringify({
+        response: {
+          responseId: "resp-123",
+          modelVersion: "gemini-2.0",
+          candidates: [
+            {
+              content: { parts: [{ text: "hello" }] },
+            },
+          ],
         },
-      },
-    }) + "\n",
+      }) + "\n",
+    streamingChunkDone:
+      JSON.stringify({
+        response: {
+          candidates: [
+            {
+              content: { parts: [{ text: "world" }] },
+              finishReason: "STOP",
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: 5,
+            totalTokenCount: 15,
+          },
+        },
+      }) + "\n",
     nonStreamingResponse: {
       response: {
         responseId: "resp-123",
         modelVersion: "gemini-2.0",
-        candidates: [{
-          content: { parts: [{ text: "hello world" }] },
-          finishReason: "STOP",
-        }],
+        candidates: [
+          {
+            content: { parts: [{ text: "hello world" }] },
+            finishReason: "STOP",
+          },
+        ],
         usageMetadata: {
           promptTokenCount: 10,
           candidatesTokenCount: 5,
@@ -284,18 +324,23 @@ const FIXTURES = {
   // and Gemini format for responses
   vertex: {
     basicRequest: {
-      contents: [{
-        role: "user",
-        parts: [{ text: "hello" }],
-      }],
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: "hello" }],
+        },
+      ],
     },
     // Vertex responses are identical to Gemini
-    streamingChunk: '{"candidates":[{"content":{"parts":[{"text":"hello"}]}}],"modelVersion":"gemini-2.0-flash"}\n',
+    streamingChunk:
+      '{"candidates":[{"content":{"parts":[{"text":"hello"}]}}],"modelVersion":"gemini-2.0-flash"}\n',
     nonStreamingResponse: {
-      candidates: [{
-        content: { parts: [{ text: "hello world" }] },
-        finishReason: "STOP",
-      }],
+      candidates: [
+        {
+          content: { parts: [{ text: "hello world" }] },
+          finishReason: "STOP",
+        },
+      ],
     },
   },
 } as const;
@@ -354,21 +399,27 @@ describe("Translation Matrix: Request Translators", () => {
   for (const [from, to] of REQUEST_MATRIX) {
     describe(`${from} → ${to}`, () => {
       it("should translate without crashing", () => {
-        const fixture = FIXTURES[from as keyof typeof FIXTURES] as { basicRequest: Record<string, unknown> };
+        const fixture = FIXTURES[from as keyof typeof FIXTURES] as {
+          basicRequest: Record<string, unknown>;
+        };
         const input = encode(fixture.basicRequest);
         const result = Request(from, to, "test-model", input, false);
         expect(result).toBeInstanceOf(Uint8Array);
       });
 
       it("should produce valid JSON output", () => {
-        const fixture = FIXTURES[from as keyof typeof FIXTURES] as { basicRequest: Record<string, unknown> };
+        const fixture = FIXTURES[from as keyof typeof FIXTURES] as {
+          basicRequest: Record<string, unknown>;
+        };
         const input = encode(fixture.basicRequest);
         const result = Request(from, to, "test-model", input, false);
         expect(() => decode(result)).not.toThrow();
       });
 
       it("should preserve model information", () => {
-        const fixture = FIXTURES[from as keyof typeof FIXTURES] as { basicRequest: Record<string, unknown> };
+        const fixture = FIXTURES[from as keyof typeof FIXTURES] as {
+          basicRequest: Record<string, unknown>;
+        };
         const input = encode(fixture.basicRequest);
         const result = Request(from, to, "test-model", input, false);
         const output = decode(result);
@@ -384,7 +435,9 @@ describe("Translation Matrix: Request Translators", () => {
 
     for (const format of formats) {
       it(`${format} → ${format} returns input unchanged`, () => {
-        const fixture = FIXTURES[format as keyof typeof FIXTURES] as { basicRequest: Record<string, unknown> };
+        const fixture = FIXTURES[format as keyof typeof FIXTURES] as {
+          basicRequest: Record<string, unknown>;
+        };
         const input = encode(fixture.basicRequest);
         const result = Request(format, format, "test-model", input, false);
         expect(dec.decode(result)).toBe(dec.decode(input));
@@ -452,14 +505,18 @@ describe("Translation Matrix: Response Non-Streaming Translators", () => {
   for (const [from, to] of RESPONSE_NONSTREAM_MATRIX) {
     describe(`${from} → ${to} (non-streaming)`, () => {
       it("should translate response", () => {
-        const fixture = FIXTURES[from as keyof typeof FIXTURES] as { nonStreamingResponse: Record<string, unknown> };
+        const fixture = FIXTURES[from as keyof typeof FIXTURES] as {
+          nonStreamingResponse: Record<string, unknown>;
+        };
         const input = encode(fixture.nonStreamingResponse);
         const result = ResponseNonStream(from, to, null, "test-model", NO_RAW, NO_RAW, input);
         expect(result).toBeInstanceOf(Uint8Array);
       });
 
       it("should produce valid JSON", () => {
-        const fixture = FIXTURES[from as keyof typeof FIXTURES] as { nonStreamingResponse: Record<string, unknown> };
+        const fixture = FIXTURES[from as keyof typeof FIXTURES] as {
+          nonStreamingResponse: Record<string, unknown>;
+        };
         const input = encode(fixture.nonStreamingResponse);
         const result = ResponseNonStream(from, to, null, "test-model", NO_RAW, NO_RAW, input);
         // Result may be raw on error, but should not crash
@@ -510,10 +567,12 @@ describe("OpenAI ↔ Claude Translations", () => {
       const input = encode({
         model: "claude-sonnet-4",
         messages: [{ role: "user", content: "use tool" }],
-        tools: [{
-          type: "function",
-          function: { name: "search", description: "Search", parameters: { type: "object" } },
-        }],
+        tools: [
+          {
+            type: "function",
+            function: { name: "search", description: "Search", parameters: { type: "object" } },
+          },
+        ],
       });
       const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", input, false));
       expect(result.tools).toBeDefined();
@@ -526,10 +585,12 @@ describe("OpenAI ↔ Claude Translations", () => {
     it("preserves array content structure", () => {
       const input = encode({
         model: "gpt-4o",
-        messages: [{
-          role: "user",
-          content: [{ type: "text", text: "hello" }],
-        }],
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: "hello" }],
+          },
+        ],
       });
       const result = decode(Request("claude", "openai", "gpt-4o", input, false));
       const msgs = result.messages as Array<Record<string, unknown>>;
@@ -542,21 +603,27 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: OpenAI → Claude", () => {
     it("emits message_start event", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunk);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("event: message_start");
     });
 
     it("maps finish_reason stop to end_turn", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunkDone);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"stop_reason":"end_turn"');
     });
 
     it("handles [DONE] sentinel", () => {
       const input = enc.encode(FIXTURES.openai.streamingDone);
-      const chunks = decodeSSE(Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       expect(chunks.length).toBeGreaterThan(0);
     });
   });
@@ -564,7 +631,9 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: Claude → OpenAI", () => {
     it("emits OpenAI SSE chunk", () => {
       const input = enc.encode(FIXTURES.claude.streamingDelta);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -572,14 +641,18 @@ describe("OpenAI ↔ Claude Translations", () => {
 
     it("maps end_turn to stop", () => {
       const input = enc.encode(FIXTURES.claude.streamingStop);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"finish_reason":"stop"');
     });
 
     it("emits [DONE] on message_stop", () => {
       const input = enc.encode(FIXTURES.claude.streamingStopEvent);
-      const chunks = decodeSSE(Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: [DONE]");
     });
@@ -588,7 +661,9 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: OpenAI → Claude", () => {
     it("transforms to Claude message format", () => {
       const input = encode(FIXTURES.openai.nonStreamingResponse);
-      const result = decode(ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input)
+      );
       expect(result.type).toBe("message");
       expect(result.stop_reason).toBe("end_turn");
       const content = result.content as Array<Record<string, unknown>>;
@@ -599,7 +674,9 @@ describe("OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: Claude → OpenAI", () => {
     it("transforms to OpenAI chat.completion format", () => {
       const input = encode(FIXTURES.claude.nonStreamingResponse);
-      const result = decode(ResponseNonStream("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("claude", "openai", null, "claude-sonnet-4", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].finish_reason).toBe("stop");
       expect(result.choices[0].message.content).toBe("hello world");
@@ -659,7 +736,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
   describe("Response Streaming: Gemini → OpenAI", () => {
     it("emits OpenAI SSE chunk", () => {
       const input = enc.encode(FIXTURES.gemini.streamingChunk);
-      const chunks = decodeSSE(Response("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -667,7 +746,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
 
     it("extracts text from candidates[0].content.parts", () => {
       const input = enc.encode(FIXTURES.gemini.streamingChunk);
-      const chunks = decodeSSE(Response("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"content":"hello"');
     });
@@ -676,7 +757,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
   describe("Response Streaming: OpenAI → Gemini", () => {
     it("emits Gemini SSE format", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunk);
-      const chunks = decodeSSE(Response("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"text":"hello"');
       expect(raw).toContain('"role":"model"');
@@ -684,7 +767,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
 
     it("maps finish_reason stop to STOP", () => {
       const input = enc.encode(FIXTURES.openai.streamingChunkDone);
-      const chunks = decodeSSE(Response("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"finishReason":"STOP"');
     });
@@ -693,7 +778,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
   describe("Response Non-Streaming: Gemini → OpenAI", () => {
     it("transforms to OpenAI chat.completion", () => {
       const input = encode(FIXTURES.gemini.nonStreamingResponse);
-      const result = decode(ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].message.content).toBe("hello world");
       expect(result.choices[0].finish_reason).toBe("stop");
@@ -701,7 +788,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
 
     it("maps usageMetadata to usage", () => {
       const input = encode(FIXTURES.gemini.nonStreamingResponse);
-      const result = decode(ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input)
+      );
       expect(result.usage.total_tokens).toBe(15);
     });
 
@@ -710,7 +799,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
         candidates: [{ content: { parts: [] } }],
         finishReason: "SAFETY",
       });
-      const result = decode(ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("gemini", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input)
+      );
       expect(result.choices[0].finish_reason).toBe("content_filter");
     });
   });
@@ -718,7 +809,9 @@ describe("OpenAI ↔ Gemini Translations", () => {
   describe("Response Non-Streaming: OpenAI → Gemini", () => {
     it("transforms to Gemini format", () => {
       const input = encode(FIXTURES.openai.nonStreamingResponse);
-      const result = decode(ResponseNonStream("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("openai", "gemini", null, "gpt-4o", NO_RAW, NO_RAW, input)
+      );
       expect(result.candidates).toBeDefined();
       expect(result.candidates[0].content.parts[0].text).toBe("hello world");
       expect(result.candidates[0].finishReason).toBe("STOP");
@@ -792,7 +885,9 @@ describe("Ollama ↔ OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: Ollama → Claude", () => {
     it("emits Claude SSE events", () => {
       const input = enc.encode(FIXTURES.ollama.streamingChunk);
-      const chunks = decodeSSE(Response("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("event: message_start");
       expect(raw).toContain("event: content_block_delta");
@@ -800,7 +895,9 @@ describe("Ollama ↔ OpenAI ↔ Claude Translations", () => {
 
     it("maps done_reason stop to end_turn", () => {
       const input = enc.encode(FIXTURES.ollama.streamingChunkDone);
-      const chunks = decodeSSE(Response("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"stop_reason":"end_turn"');
     });
@@ -809,7 +906,9 @@ describe("Ollama ↔ OpenAI ↔ Claude Translations", () => {
   describe("Response Streaming: Ollama → OpenAI", () => {
     it("emits OpenAI SSE chunks", () => {
       const input = enc.encode(FIXTURES.ollama.streamingChunk);
-      const chunks = decodeSSE(Response("ollama", "openai", null, "llama3", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("ollama", "openai", null, "llama3", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -819,7 +918,9 @@ describe("Ollama ↔ OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: Ollama → Claude", () => {
     it("transforms to Claude message format", () => {
       const input = encode(FIXTURES.ollama.nonStreamingResponse);
-      const result = decode(ResponseNonStream("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("ollama", "claude", null, "llama3", NO_RAW, NO_RAW, input)
+      );
       expect(result.type).toBe("message");
       expect(result.stop_reason).toBe("end_turn");
       const content = result.content as Array<Record<string, unknown>>;
@@ -830,7 +931,9 @@ describe("Ollama ↔ OpenAI ↔ Claude Translations", () => {
   describe("Response Non-Streaming: Ollama → OpenAI", () => {
     it("transforms to OpenAI chat.completion", () => {
       const input = encode(FIXTURES.ollama.nonStreamingResponse);
-      const result = decode(ResponseNonStream("ollama", "openai", null, "llama3", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("ollama", "openai", null, "llama3", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].message.content).toBe("hello world");
       expect(result.choices[0].finish_reason).toBe("stop");
@@ -859,7 +962,9 @@ describe("Kiro → OpenAI Translations", () => {
   describe("Response Streaming: Kiro → OpenAI", () => {
     it("emits OpenAI SSE chunk", () => {
       const input = enc.encode(FIXTURES.kiro.streamingChunk);
-      const chunks = decodeSSE(Response("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -867,7 +972,9 @@ describe("Kiro → OpenAI Translations", () => {
 
     it("handles [DONE] sentinel", () => {
       const input = enc.encode(FIXTURES.kiro.streamingDone);
-      const chunks = decodeSSE(Response("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("[DONE]");
     });
@@ -876,7 +983,9 @@ describe("Kiro → OpenAI Translations", () => {
   describe("Response Non-Streaming: Kiro → OpenAI", () => {
     it("transforms to OpenAI format", () => {
       const input = encode(FIXTURES.kiro.nonStreamingResponse);
-      const result = decode(ResponseNonStream("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("kiro", "openai", null, "kiro-model", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].message.content).toBe("hello world");
     });
@@ -900,7 +1009,9 @@ describe("Antigravity ↔ OpenAI Translations", () => {
   describe("Response Streaming: Antigravity → OpenAI", () => {
     it("unwraps and emits OpenAI SSE", () => {
       const input = enc.encode(FIXTURES.antigravity.streamingChunk);
-      const chunks = decodeSSE(Response("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
       expect(raw).toContain('"object":"chat.completion.chunk"');
@@ -908,7 +1019,9 @@ describe("Antigravity ↔ OpenAI Translations", () => {
 
     it("extracts text from response.candidates", () => {
       const input = enc.encode(FIXTURES.antigravity.streamingChunk);
-      const chunks = decodeSSE(Response("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain('"content":"hello"');
     });
@@ -917,14 +1030,18 @@ describe("Antigravity ↔ OpenAI Translations", () => {
   describe("Response Non-Streaming: Antigravity → OpenAI", () => {
     it("unwraps and transforms to OpenAI", () => {
       const input = encode(FIXTURES.antigravity.nonStreamingResponse);
-      const result = decode(ResponseNonStream("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
       expect(result.choices[0].message.content).toBe("hello world");
     });
 
     it("maps finishReason STOP to stop", () => {
       const input = encode(FIXTURES.antigravity.nonStreamingResponse);
-      const result = decode(ResponseNonStream("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("antigravity", "openai", null, "gemini-2.0", NO_RAW, NO_RAW, input)
+      );
       expect(result.choices[0].finish_reason).toBe("stop");
     });
   });
@@ -947,7 +1064,9 @@ describe("Vertex (Gemini-like) Translations", () => {
   describe("Response: Vertex → OpenAI", () => {
     it("uses Gemini translator", () => {
       const input = enc.encode(FIXTURES.vertex.streamingChunk);
-      const chunks = decodeSSE(Response("vertex", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined));
+      const chunks = decodeSSE(
+        Response("vertex", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input, undefined)
+      );
       const raw = chunks.join("");
       expect(raw).toContain("data: ");
     });
@@ -956,7 +1075,9 @@ describe("Vertex (Gemini-like) Translations", () => {
   describe("Response Non-Stream: Vertex → OpenAI", () => {
     it("uses Gemini translator", () => {
       const input = encode(FIXTURES.vertex.nonStreamingResponse);
-      const result = decode(ResponseNonStream("vertex", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("vertex", "openai", null, "gemini-2.0-flash", NO_RAW, NO_RAW, input)
+      );
       expect(result.object).toBe("chat.completion");
     });
   });
@@ -974,7 +1095,9 @@ describe("Round-Trip Tests (A→B→A)", () => {
           { role: "assistant", content: "test response" },
         ],
       };
-      const step1 = decode(Request("openai", "claude", "claude-sonnet-4-20250514", encode(original), false));
+      const step1 = decode(
+        Request("openai", "claude", "claude-sonnet-4-20250514", encode(original), false)
+      );
       const step2 = decode(Request("claude", "openai", "gpt-4o", encode(step1), false));
       const msgs = step2.messages as Array<Record<string, unknown>>;
       // After round-trip, content may be an array (Claude format)
@@ -996,7 +1119,9 @@ describe("Round-Trip Tests (A→B→A)", () => {
           { role: "assistant", content: "answer" },
         ],
       };
-      const step1 = decode(Request("openai", "gemini", "gemini-2.0-flash", encode(original), false));
+      const step1 = decode(
+        Request("openai", "gemini", "gemini-2.0-flash", encode(original), false)
+      );
       const step2 = decode(Request("gemini", "openai", "gpt-4o", encode(step1), false));
       const msgs = step2.messages as Array<Record<string, unknown>>;
       expect(msgs[0].role).toBe("user");
@@ -1049,7 +1174,15 @@ describe("Edge Cases", () => {
 
     it("ResponseNonStream returns raw on invalid JSON", () => {
       const input = enc.encode("not json {");
-      const result = ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input);
+      const result = ResponseNonStream(
+        "openai",
+        "claude",
+        null,
+        "claude-sonnet-4",
+        NO_RAW,
+        NO_RAW,
+        input
+      );
       expect(dec.decode(result)).toBe("not json {");
     });
   });
@@ -1060,13 +1193,17 @@ describe("Edge Cases", () => {
         id: "chatcmpl-123",
         object: "chat.completion",
         model: "gpt-4o",
-        choices: [{
-          index: 0,
-          message: { role: "assistant", content: null },
-          finish_reason: "tool_calls",
-        }],
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: null },
+            finish_reason: "tool_calls",
+          },
+        ],
       });
-      const result = decode(ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input));
+      const result = decode(
+        ResponseNonStream("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input)
+      );
       expect(result).toBeDefined();
     });
   });
@@ -1079,7 +1216,16 @@ describe("Edge Cases", () => {
 
     it("Response translator handles empty input", () => {
       const input = new Uint8Array(0);
-      const result = Response("openai", "claude", null, "claude-sonnet-4", NO_RAW, NO_RAW, input, undefined);
+      const result = Response(
+        "openai",
+        "claude",
+        null,
+        "claude-sonnet-4",
+        NO_RAW,
+        NO_RAW,
+        input,
+        undefined
+      );
       expect(Array.isArray(result)).toBe(true);
     });
   });
@@ -1099,7 +1245,7 @@ describe("Edge Cases", () => {
     it("handles newlines and special JSON chars", () => {
       const input = encode({
         model: "gpt-4o",
-        messages: [{ role: "user", content: "Line 1\nLine 2\t\"quoted\"" }],
+        messages: [{ role: "user", content: 'Line 1\nLine 2\t"quoted"' }],
       });
       const result = decode(Request("openai", "claude", "claude-sonnet-4-20250514", input, false));
       const msgs = result.messages as Array<Record<string, unknown>>;

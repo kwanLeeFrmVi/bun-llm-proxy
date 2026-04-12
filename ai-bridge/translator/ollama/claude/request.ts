@@ -1,9 +1,9 @@
 // Translates Ollama format → Anthropic API format
-export function convertOllamaRequestToClaude(
-  modelName: string,
-  inputRaw: Uint8Array
-): Uint8Array {
-  const raw = typeof inputRaw === "string" ? JSON.parse(inputRaw) : JSON.parse(new TextDecoder().decode(inputRaw));
+export function convertOllamaRequestToClaude(modelName: string, inputRaw: Uint8Array): Uint8Array {
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
   const out: Record<string, unknown> = { model: modelName };
 
   // options → temperature, num_predict, etc.

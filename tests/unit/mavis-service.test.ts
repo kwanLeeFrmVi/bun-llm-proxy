@@ -181,19 +181,20 @@ describe("mavisService", () => {
     });
 
     it("throws when the server returns non-ok status", async () => {
-      globalThis.fetch = mockFetch(async () =>
-        new Response("Unauthorized", { status: 401 }));
+      globalThis.fetch = mockFetch(async () => new Response("Unauthorized", { status: 401 }));
 
       const { login } = await freshImport();
       await expect(login()).rejects.toThrow(/login failed.*401/);
     });
 
     it("throws when no session cookie is returned", async () => {
-      globalThis.fetch = mockFetch(async () =>
-        new Response('{"ok":true}', {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }));
+      globalThis.fetch = mockFetch(
+        async () =>
+          new Response('{"ok":true}', {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+      );
 
       const { login } = await freshImport();
       await expect(login()).rejects.toThrow(/No session cookie/);
@@ -208,16 +209,11 @@ describe("mavisService", () => {
       globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         recordedHeaders = req.headers;
-        return mockLoginResponse().status === 200
-          ? mockResponse(MOCK_ME)
-          : mockLoginResponse();
+        return mockLoginResponse().status === 200 ? mockResponse(MOCK_ME) : mockLoginResponse();
       });
 
       // First login, then getMe
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         recordedHeaders = req.headers;
@@ -234,10 +230,7 @@ describe("mavisService", () => {
     });
 
     it("returns the full user profile shape", async () => {
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         return mockResponse(MOCK_ME);
@@ -245,7 +238,7 @@ describe("mavisService", () => {
 
       const { login, getMe } = await freshImport();
       await login();
-      const me = await getMe() as MavisUserProfile;
+      const me = (await getMe()) as MavisUserProfile;
 
       expect(typeof me.id).toBe("number");
       expect(typeof me.username).toBe("string");
@@ -255,10 +248,7 @@ describe("mavisService", () => {
     });
 
     it("throws when /me returns non-ok", async () => {
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         return new Response("Forbidden", { status: 403 });
@@ -275,10 +265,7 @@ describe("mavisService", () => {
   describe("getUsage", () => {
     it("GETs /api/usage with range query param", async () => {
       let recordedUrl: string | null = null;
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         recordedUrl = req.url;
@@ -294,10 +281,7 @@ describe("mavisService", () => {
 
     it("defaults to 7d range when no argument given", async () => {
       let recordedUrl: string | null = null;
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         recordedUrl = req.url;
@@ -312,10 +296,7 @@ describe("mavisService", () => {
     });
 
     it("returns the full usage response shape", async () => {
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         return mockResponse(MOCK_USAGE);
@@ -323,7 +304,7 @@ describe("mavisService", () => {
 
       const { login, getUsage } = await freshImport();
       await login();
-      const usage = await getUsage("7d") as MavisUsageResponse;
+      const usage = (await getUsage("7d")) as MavisUsageResponse;
 
       expect(Array.isArray(usage.timeseries)).toBe(true);
       expect(Array.isArray(usage.models)).toBe(true);
@@ -334,10 +315,7 @@ describe("mavisService", () => {
     });
 
     it("includes model_pricing with input and output ratios", async () => {
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         return mockResponse(MOCK_USAGE);
@@ -345,7 +323,7 @@ describe("mavisService", () => {
 
       const { login, getUsage } = await freshImport();
       await login();
-      const usage = await getUsage("7d") as MavisUsageResponse;
+      const usage = (await getUsage("7d")) as MavisUsageResponse;
 
       const gpt4o = usage.model_pricing.find((p) => p.model === "gpt-4o");
       expect(gpt4o).toBeDefined();
@@ -354,10 +332,7 @@ describe("mavisService", () => {
     });
 
     it("throws when usage endpoint returns non-ok", async () => {
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) return mockLoginResponse();
         return new Response("Not Found", { status: 404 });
@@ -374,10 +349,7 @@ describe("mavisService", () => {
   describe("refreshSession", () => {
     it("clears the session then re-logs in", async () => {
       let loginCount = 0;
-      globalThis.fetch = mockFetch(async (
-        input: Request | URL | string,
-        init?: RequestInit,
-      ) => {
+      globalThis.fetch = mockFetch(async (input: Request | URL | string, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(String(input), init);
         if (req.url.includes("/auth/login")) {
           loginCount++;
@@ -409,12 +381,9 @@ describe("cost estimation", () => {
     inputTokens: number,
     outputTokens: number,
     inputRatio: number,
-    outputRatio: number,
+    outputRatio: number
   ): number {
-    return (
-      (inputTokens * inputRatio + outputTokens * outputRatio) /
-      1_000_000
-    );
+    return (inputTokens * inputRatio + outputTokens * outputRatio) / 1_000_000;
   }
 
   it("computes cost using input and output ratios", () => {
@@ -447,7 +416,7 @@ describe("buildPricingMap", () => {
   // Mirrors the logic used in MavisUsage.tsx
 
   function buildPricingMap(
-    pricing: MavisUsageResponse["model_pricing"],
+    pricing: MavisUsageResponse["model_pricing"]
   ): Record<string, { input_ratio: number; output_ratio: number }> {
     const map: Record<string, { input_ratio: number; output_ratio: number }> = {};
     for (const p of pricing) {

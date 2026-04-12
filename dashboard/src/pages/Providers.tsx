@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, CatalogResponse, ProviderNode, ProviderConnection } from "@/lib/api";
-import {
-  isOpenAICompatibleProvider,
-  isAnthropicCompatibleProvider,
-} from "@/constants/providers";
+import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/constants/providers";
 import { ProviderCard } from "@/components/ProviderCard";
 import type { ProviderStats } from "@/components/ProviderCard";
 import { AddOpenAICompatibleModal } from "@/components/AddOpenAICompatibleModal";
@@ -16,7 +13,11 @@ import { toast } from "sonner";
 
 // ─── Section header ─────────────────────────────────────────────────────────────
 
-function SectionHeader({ title, testAllLoading, onTestAll }: {
+function SectionHeader({
+  title,
+  testAllLoading,
+  onTestAll,
+}: {
   title: string;
   testAllLoading: boolean;
   onTestAll: () => void;
@@ -39,16 +40,19 @@ function SectionHeader({ title, testAllLoading, onTestAll }: {
 
 // ─── Provider section card ──────────────────────────────────────────────────────
 
-function ProviderSection({ title, testAllLoading, onTestAll, children }: {
+function ProviderSection({
+  title,
+  testAllLoading,
+  onTestAll,
+  children,
+}: {
   title: string;
   testAllLoading: boolean;
   onTestAll: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden"
-    >
+    <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
       <div className="px-5 py-3 border-b border-[rgba(203,213,225,0.4)]">
         <SectionHeader title={title} testAllLoading={testAllLoading} onTestAll={onTestAll} />
       </div>
@@ -92,8 +96,8 @@ export default function ProvidersPage() {
         api.providers.nodes(),
       ]);
       setCatalog(catRes as CatalogResponse);
-      setConnections(((connRes as { connections: ProviderConnection[] }).connections));
-      setNodes(((nodeRes as { nodes: ProviderNode[] }).nodes));
+      setConnections((connRes as { connections: ProviderConnection[] }).connections);
+      setNodes((nodeRes as { nodes: ProviderNode[] }).nodes);
     } catch (e) {
       console.error("Failed to load providers:", e);
     } finally {
@@ -107,19 +111,28 @@ export default function ProvidersPage() {
 
   // Compute stats per provider
   function getStats(providerId: string): ProviderStats {
-    const conns = connections.filter(c => c.provider === providerId);
-    const active = conns.filter(c => (c.isActive !== false) && (c.testStatus === "active" || c.testStatus === "success"));
-    const error = conns.filter(c => (c.isActive !== false) && (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable"));
+    const conns = connections.filter((c) => c.provider === providerId);
+    const active = conns.filter(
+      (c) => c.isActive !== false && (c.testStatus === "active" || c.testStatus === "success")
+    );
+    const error = conns.filter(
+      (c) =>
+        c.isActive !== false &&
+        (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable")
+    );
     // Use total count for "connected" to match ProviderDetail page behavior
-    return { connected: conns.length, error: error.length, total: conns.length, connections: conns };
+    return {
+      connected: conns.length,
+      error: error.length,
+      total: conns.length,
+      connections: conns,
+    };
   }
 
   // Toggle provider active state
   async function handleToggleProvider(providerId: string, active: boolean) {
-    const conns = connections.filter(c => c.provider === providerId);
-    await Promise.allSettled(
-      conns.map(c => api.providers.update(c.id, { isActive: active }))
-    );
+    const conns = connections.filter((c) => c.provider === providerId);
+    await Promise.allSettled(conns.map((c) => api.providers.update(c.id, { isActive: active })));
     await fetchData();
   }
 
@@ -144,8 +157,8 @@ export default function ProvidersPage() {
   }
 
   // Toggle provider active state
-  const compatibleNodes = nodes.filter(n =>
-    isOpenAICompatibleProvider(n.id) || isAnthropicCompatibleProvider(n.id)
+  const compatibleNodes = nodes.filter(
+    (n) => isOpenAICompatibleProvider(n.id) || isAnthropicCompatibleProvider(n.id)
   );
 
   // OAuth/free providers (from free + freeTier)
@@ -154,7 +167,9 @@ export default function ProvidersPage() {
       <div className="space-y-6">
         <div className="h-16 skeleton rounded-xl animate-pulse" />
         <div className="grid grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+          {[...Array(4)].map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       </div>
     );
@@ -178,14 +193,18 @@ export default function ProvidersPage() {
           <Input
             placeholder="Search providers..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="h-9 w-52 pl-9 bg-[--surface-container-low] border border-[rgba(203,213,225,0.6)] rounded-lg text-sm"
           />
         </div>
       </div>
 
       {/* OAuth & Free Tier */}
-      <ProviderSection title="OAuth Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+      <ProviderSection
+        title="OAuth Providers"
+        testAllLoading={testAllLoading}
+        onTestAll={handleTestAll}
+      >
         {Object.entries(catalog?.free ?? {}).map(([id, meta]) => (
           <ProviderCard
             key={id}
@@ -199,7 +218,11 @@ export default function ProvidersPage() {
       </ProviderSection>
 
       {/* Free Tier */}
-      <ProviderSection title="Free &amp; Free Tier Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+      <ProviderSection
+        title="Free &amp; Free Tier Providers"
+        testAllLoading={testAllLoading}
+        onTestAll={handleTestAll}
+      >
         {Object.entries(catalog?.freeTier ?? {}).map(([id, meta]) => (
           <ProviderCard
             key={id}
@@ -213,7 +236,11 @@ export default function ProvidersPage() {
       </ProviderSection>
 
       {/* API Key Providers */}
-      <ProviderSection title="API Key Providers" testAllLoading={testAllLoading} onTestAll={handleTestAll}>
+      <ProviderSection
+        title="API Key Providers"
+        testAllLoading={testAllLoading}
+        onTestAll={handleTestAll}
+      >
         {Object.entries(catalog?.apiKey ?? {}).map(([id, meta]) => (
           <ProviderCard
             key={id}
@@ -229,7 +256,9 @@ export default function ProvidersPage() {
       {/* API Key Compatible Providers */}
       <div className="bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-3 border-b border-[rgba(203,213,225,0.4)] flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[--on-surface] tracking-wide">API Key Compatible Providers</h2>
+          <h2 className="text-sm font-semibold text-[--on-surface] tracking-wide">
+            API Key Compatible Providers
+          </h2>
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -259,7 +288,7 @@ export default function ProvidersPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {compatibleNodes.map(node => (
+              {compatibleNodes.map((node) => (
                 <ProviderCard
                   key={node.id}
                   providerId={node.id}

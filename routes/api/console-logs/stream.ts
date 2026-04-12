@@ -20,26 +20,41 @@ export async function GET(req: Request): Promise<Response> {
         const payload = `data: ${JSON.stringify(entry)}\n\n`;
         try {
           controller.enqueue(new TextEncoder().encode(payload));
-        } catch { break; }
+        } catch {
+          break;
+        }
       }
 
       const heartbeat = setInterval(() => {
-        if (!controller) { clearInterval(heartbeat); return; }
+        if (!controller) {
+          clearInterval(heartbeat);
+          return;
+        }
         try {
           controller.enqueue(new TextEncoder().encode(": ping\n\n"));
-        } catch { clearInterval(heartbeat); }
+        } catch {
+          clearInterval(heartbeat);
+        }
       }, 15_000);
 
       const onLine = (entry: ConsoleLogEntry) => {
         if (!controller) return;
         const payload = `data: ${JSON.stringify(entry)}\n\n`;
-        try { controller.enqueue(new TextEncoder().encode(payload)); } catch { /* closed */ }
+        try {
+          controller.enqueue(new TextEncoder().encode(payload));
+        } catch {
+          /* closed */
+        }
       };
 
       const onClear = () => {
         if (!controller) return;
         const payload = `data: ${JSON.stringify({ type: "clear" })}\n\n`;
-        try { controller.enqueue(new TextEncoder().encode(payload)); } catch { /* closed */ }
+        try {
+          controller.enqueue(new TextEncoder().encode(payload));
+        } catch {
+          /* closed */
+        }
       };
 
       emitter.on("line", onLine);
@@ -56,9 +71,9 @@ export async function GET(req: Request): Promise<Response> {
 
   return new Response(stream, {
     headers: {
-      "Content-Type":  "text/event-stream",
+      "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection":    "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
   });

@@ -40,9 +40,7 @@ function toBool(value: unknown): boolean {
   return false;
 }
 
-function extractProviderSpecificData(
-  data: Record<string, unknown>
-): Record<string, unknown> {
+function extractProviderSpecificData(data: Record<string, unknown>): Record<string, unknown> {
   const specificFields = [
     "id",
     "provider",
@@ -89,7 +87,10 @@ async function main() {
   let schemaVersion = 0;
   try {
     const row = db
-      .query<{ version: number }, []>("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+      .query<
+        { version: number },
+        []
+      >("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
       .get();
     schemaVersion = row?.version ?? 0;
   } catch {
@@ -99,7 +100,10 @@ async function main() {
 
   // 2. Check provider_connections schema
   const pcTable = db
-    .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_connections'")
+    .query<
+      { sql: string },
+      []
+    >("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_connections'")
     .get();
 
   const hasNameColumn = pcTable?.sql?.includes("name TEXT") ?? false;
@@ -117,9 +121,10 @@ async function main() {
     try {
       // Backup existing data
       const oldRows = db
-        .query<{ id: string; provider: string; data: string }, []>(
-          "SELECT id, provider, data FROM provider_connections"
-        )
+        .query<
+          { id: string; provider: string; data: string },
+          []
+        >("SELECT id, provider, data FROM provider_connections")
         .all();
 
       console.log(`[FIX] Backing up ${oldRows.length} rows...`);
@@ -219,7 +224,9 @@ async function main() {
   }
 
   // 4. Check if data needs to be imported from db.json
-  const pcCount = db.query<{ count: number }, []>("SELECT COUNT(*) as count FROM provider_connections").get();
+  const pcCount = db
+    .query<{ count: number }, []>("SELECT COUNT(*) as count FROM provider_connections")
+    .get();
   console.log(`[FIX] provider_connections count: ${pcCount?.count ?? 0}`);
 
   if ((pcCount?.count ?? 0) === 0) {
@@ -231,7 +238,7 @@ async function main() {
         console.log(`[FIX] No db.json found at ${DB_JSON_PATH}`);
         console.log("[FIX] Skipping data import");
       } else {
-        const data = await file.json() as Record<string, unknown>;
+        const data = (await file.json()) as Record<string, unknown>;
         console.log(`[FIX] Found db.json with keys: ${Object.keys(data).join(", ")}`);
 
         // Import provider connections
@@ -240,7 +247,9 @@ async function main() {
           console.log(`[FIX] Importing ${connections.length} provider connections...`);
 
           for (const conn of connections) {
-            const psd = (conn.providerSpecificData as Record<string, unknown>) || extractProviderSpecificData(conn);
+            const psd =
+              (conn.providerSpecificData as Record<string, unknown>) ||
+              extractProviderSpecificData(conn);
 
             db.run(
               `INSERT INTO provider_connections (
@@ -284,7 +293,9 @@ async function main() {
         // Import provider nodes
         const nodes = (data.providerNodes as Array<Record<string, unknown>>) || [];
         for (const node of nodes) {
-          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM provider_nodes WHERE id = ?").get(node.id as string);
+          const exists = db
+            .query<{ "1": number }, string>("SELECT 1 FROM provider_nodes WHERE id = ?")
+            .get(node.id as string);
           if (!exists) {
             db.run(
               "INSERT INTO provider_nodes (id, type, name, prefix, api_type, base_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -306,7 +317,9 @@ async function main() {
         // Import proxy pools
         const pools = (data.proxyPools as Array<Record<string, unknown>>) || [];
         for (const pool of pools) {
-          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM proxy_pools WHERE id = ?").get(pool.id as string);
+          const exists = db
+            .query<{ "1": number }, string>("SELECT 1 FROM proxy_pools WHERE id = ?")
+            .get(pool.id as string);
           if (!exists) {
             db.run(
               `INSERT INTO proxy_pools (id, name, proxy_url, no_proxy, is_active, strict_proxy, test_status, last_tested_at, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -329,14 +342,23 @@ async function main() {
         console.log(`[FIX] Imported ${pools.length} proxy pools`);
 
         // Import combos
-        const combos = (data.combos as Array<{ name: string; models: string[]; id?: string }>) || [];
+        const combos =
+          (data.combos as Array<{ name: string; models: string[]; id?: string }>) || [];
         for (const combo of combos) {
-          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM combos WHERE name = ?").get(combo.name);
+          const exists = db
+            .query<{ "1": number }, string>("SELECT 1 FROM combos WHERE name = ?")
+            .get(combo.name);
           if (!exists) {
             const id = combo.id || crypto.randomUUID();
             db.run(
               "INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-              [id, combo.name, JSON.stringify(combo.models || []), new Date().toISOString(), new Date().toISOString()]
+              [
+                id,
+                combo.name,
+                JSON.stringify(combo.models || []),
+                new Date().toISOString(),
+                new Date().toISOString(),
+              ]
             );
           }
         }
@@ -345,14 +367,20 @@ async function main() {
         // Import settings
         const settings = (data.settings as Record<string, unknown>) || {};
         for (const [key, value] of Object.entries(settings)) {
-          db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [key, JSON.stringify(value)]);
+          db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [
+            key,
+            JSON.stringify(value),
+          ]);
         }
         console.log(`[FIX] Imported ${Object.keys(settings).length} settings`);
 
         // Import model aliases
         const modelAliases = (data.modelAliases as Record<string, string>) || {};
         for (const [alias, model] of Object.entries(modelAliases)) {
-          db.run("INSERT OR REPLACE INTO model_aliases (alias, model) VALUES (?, ?)", [alias, model]);
+          db.run("INSERT OR REPLACE INTO model_aliases (alias, model) VALUES (?, ?)", [
+            alias,
+            model,
+          ]);
         }
         console.log(`[FIX] Imported ${Object.keys(modelAliases).length} model aliases`);
 
@@ -360,37 +388,64 @@ async function main() {
         const mitmAlias = (data.mitmAlias as Record<string, Record<string, string>>) || {};
         for (const [toolName, aliases] of Object.entries(mitmAlias)) {
           for (const [alias, model] of Object.entries(aliases)) {
-            db.run("INSERT OR REPLACE INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)", [toolName, alias, model]);
+            db.run(
+              "INSERT OR REPLACE INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)",
+              [toolName, alias, model]
+            );
           }
         }
         console.log(`[FIX] Imported MITM aliases`);
 
         // Import pricing
-        const pricing = (data.pricing as Record<string, Record<string, { input: number; output: number }>>) || {};
+        const pricing =
+          (data.pricing as Record<string, Record<string, { input: number; output: number }>>) || {};
         for (const [provider, models] of Object.entries(pricing)) {
           for (const [model, prices] of Object.entries(models)) {
-            db.run("INSERT OR REPLACE INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?)",
-              [provider, model, prices.input ?? 0, prices.output ?? 0]);
+            db.run(
+              "INSERT OR REPLACE INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?)",
+              [provider, model, prices.input ?? 0, prices.output ?? 0]
+            );
           }
         }
         console.log(`[FIX] Imported pricing data`);
 
         // Import combo configs
-        const comboConfigs = (data.comboConfigs as Record<string, { models: Array<{ model: string; weight: number }> }>) || {};
+        const comboConfigs =
+          (data.comboConfigs as Record<
+            string,
+            { models: Array<{ model: string; weight: number }> }
+          >) || {};
         for (const [comboName, config] of Object.entries(comboConfigs)) {
           for (const item of config.models || []) {
-            db.run("INSERT OR REPLACE INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)",
-              [comboName, item.model, item.weight ?? 1]);
+            db.run(
+              "INSERT OR REPLACE INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)",
+              [comboName, item.model, item.weight ?? 1]
+            );
           }
         }
         console.log(`[FIX] Imported combo configs`);
 
         // Import API keys
-        const apiKeys = (data.apiKeys as Array<{ id: string; name: string; key: string; machineId?: string; isActive?: boolean; createdAt?: string }>) || [];
+        const apiKeys =
+          (data.apiKeys as Array<{
+            id: string;
+            name: string;
+            key: string;
+            machineId?: string;
+            isActive?: boolean;
+            createdAt?: string;
+          }>) || [];
         for (const k of apiKeys) {
           db.run(
             "INSERT INTO api_keys (id, name, key, machine_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            [k.id, k.name, k.key, k.machineId ?? null, k.isActive !== false ? 1 : 0, k.createdAt ?? new Date().toISOString()]
+            [
+              k.id,
+              k.name,
+              k.key,
+              k.machineId ?? null,
+              k.isActive !== false ? 1 : 0,
+              k.createdAt ?? new Date().toISOString(),
+            ]
           );
         }
         console.log(`[FIX] Imported ${apiKeys.length} API keys`);
@@ -416,12 +471,16 @@ async function main() {
           const [prefix, ...rest] = model.split("/");
           const alias = `${prefix}-${rest.join("-")}`;
 
-          const exists = db.query<{ "1": number }, string>("SELECT 1 FROM model_aliases WHERE alias = ?").get(alias);
+          const exists = db
+            .query<{ "1": number }, string>("SELECT 1 FROM model_aliases WHERE alias = ?")
+            .get(alias);
           if (!exists) {
             console.log(`[FIX] Missing alias: ${alias} (for combo ${combo.name})`);
             // We can't auto-fix this without knowing the target provider/model
             console.log(`[FIX] Run this query manually if needed:`);
-            console.log(`[FIX] INSERT INTO model_aliases (alias, model) VALUES ('${alias}', '<provider-id>/<model>');`);
+            console.log(
+              `[FIX] INSERT INTO model_aliases (alias, model) VALUES ('${alias}', '<provider-id>/<model>');`
+            );
           }
         }
       }
@@ -433,8 +492,13 @@ async function main() {
   // 6. Ensure schema_version is correct
   if (schemaVersion === 0) {
     console.log("[FIX] Setting schema_version to 2...");
-    db.run("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");
-    db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [2, new Date().toISOString()]);
+    db.run(
+      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+    );
+    db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [
+      2,
+      new Date().toISOString(),
+    ]);
   }
 
   console.log("[FIX] Done!");

@@ -2,20 +2,54 @@
 // Written from scratch in TypeScript.
 
 const ALIAS_TO_PROVIDER_ID: Record<string, string> = {
-  cc: "claude", cx: "codex", gc: "gemini-cli", qw: "qwen", "if": "iflow",
-  ag: "antigravity", gh: "github", kr: "kiro", cu: "cursor",
-  kc: "kilocode", kmc: "kimi-coding", cl: "cline", oc: "opencode",
-  openai: "openai", anthropic: "anthropic", gemini: "gemini",
-  openrouter: "openrouter", glm: "glm", kimi: "kimi",
-  ds: "Claude", Claude: "Claude", groq: "groq", xai: "xai",
-  mistral: "mistral", pplx: "perplexity", perplexity: "perplexity",
-  together: "together", fireworks: "fireworks", cerebras: "cerebras",
-  cohere: "cohere", nvidia: "nvidia", nebius: "nebius",
-  siliconflow: "siliconflow", hyp: "hyperbolic", hyperbolic: "hyperbolic",
-  dg: "deepgram", deepgram: "deepgram", aai: "assemblyai",
-  assemblyai: "assemblyai", nb: "nanobanana", nanobanana: "nanobanana",
-  ch: "chutes", chutes: "chutes", cursor: "cursor", vx: "vertex",
-  vertex: "vertex", vxp: "vertex-partner", "vertex-partner": "vertex-partner",
+  cc: "claude",
+  cx: "codex",
+  gc: "gemini-cli",
+  qw: "qwen",
+  if: "iflow",
+  ag: "antigravity",
+  gh: "github",
+  kr: "kiro",
+  cu: "cursor",
+  kc: "kilocode",
+  kmc: "kimi-coding",
+  cl: "cline",
+  oc: "opencode",
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "gemini",
+  openrouter: "openrouter",
+  glm: "glm",
+  kimi: "kimi",
+  ds: "Claude",
+  Claude: "Claude",
+  groq: "groq",
+  xai: "xai",
+  mistral: "mistral",
+  pplx: "perplexity",
+  perplexity: "perplexity",
+  together: "together",
+  fireworks: "fireworks",
+  cerebras: "cerebras",
+  cohere: "cohere",
+  nvidia: "nvidia",
+  nebius: "nebius",
+  siliconflow: "siliconflow",
+  hyp: "hyperbolic",
+  hyperbolic: "hyperbolic",
+  dg: "deepgram",
+  deepgram: "deepgram",
+  aai: "assemblyai",
+  assemblyai: "assemblyai",
+  nb: "nanobanana",
+  nanobanana: "nanobanana",
+  ch: "chutes",
+  chutes: "chutes",
+  cursor: "cursor",
+  vx: "vertex",
+  vertex: "vertex",
+  vxp: "vertex-partner",
+  "vertex-partner": "vertex-partner",
 };
 
 export function resolveProviderAlias(aliasOrId: string): string {
@@ -69,7 +103,10 @@ export function resolveModelAliasFromMap(
   if (typeof resolved === "string" && resolved.includes("/")) {
     const firstSlash = resolved.indexOf("/");
     const providerOrAlias = resolved.slice(0, firstSlash);
-    return { provider: resolveProviderAlias(providerOrAlias), model: resolved.slice(firstSlash + 1) };
+    return {
+      provider: resolveProviderAlias(providerOrAlias),
+      model: resolved.slice(firstSlash + 1),
+    };
   }
 
   if (typeof resolved === "object" && resolved !== null) {
@@ -95,14 +132,15 @@ export async function getModelInfoCore(
     return { provider: parsed.provider ?? "openai", model: parsed.model ?? modelStr };
   }
 
-  const aliases = typeof aliasesOrGetter === "function"
-    ? await aliasesOrGetter()
-    : aliasesOrGetter;
+  const aliases = typeof aliasesOrGetter === "function" ? await aliasesOrGetter() : aliasesOrGetter;
 
   const resolved = resolveModelAliasFromMap(parsed.model ?? modelStr, aliases);
   if (resolved) return resolved;
 
-  return { provider: inferProviderFromModelName(parsed.model ?? modelStr), model: parsed.model ?? modelStr };
+  return {
+    provider: inferProviderFromModelName(parsed.model ?? modelStr),
+    model: parsed.model ?? modelStr,
+  };
 }
 
 /**

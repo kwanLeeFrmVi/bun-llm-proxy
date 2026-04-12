@@ -29,10 +29,10 @@ function mergeModels(
   enabledModels: unknown,
   outputAlias: string,
   providerId: string,
-  fallbackAlias: string,
+  fallbackAlias: string
 ): ProviderModelResponse[] {
   const prefixes = [outputAlias, fallbackAlias, providerId].filter(
-    (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index,
+    (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
   );
   const mergedModels = new Map<string, ProviderModelResponse>();
 
@@ -74,7 +74,7 @@ export async function GET(req: Request): Promise<Response> {
     const isCompatible = isOpenAICompatibleProvider(id) || isAnthropicCompatibleProvider(id);
     const alias = (PROVIDER_ID_TO_ALIAS as Record<string, string>)[id] ?? id;
     const connections = await getProviderConnections({ provider: id });
-    const activeConn = connections.find(c => c.isActive !== false);
+    const activeConn = connections.find((c) => c.isActive !== false);
     const psd = (activeConn?.providerSpecificData as Record<string, unknown> | undefined) ?? {};
 
     // Determine output alias: prefer provider node prefix, then connection prefix, then alias
@@ -113,27 +113,40 @@ export async function GET(req: Request): Promise<Response> {
         }
 
         try {
-          const response = await fetch(`${baseUrl}/models`, { method: "GET", headers, cache: "no-store" });
+          const response = await fetch(`${baseUrl}/models`, {
+            method: "GET",
+            headers,
+            cache: "no-store",
+          });
           if (response.ok) {
             const data = await response.json();
             const rawModels = Array.isArray(data)
               ? data
-              : ((data as Record<string, unknown>)?.data ?? (data as Record<string, unknown>)?.models ?? []);
+              : ((data as Record<string, unknown>)?.data ??
+                (data as Record<string, unknown>)?.models ??
+                []);
 
-            const remoteModels = (rawModels as Array<{ id?: string; name?: string; model?: string }>)
-              .map(m => {
+            const remoteModels = (
+              rawModels as Array<{ id?: string; name?: string; model?: string }>
+            )
+              .map((m) => {
                 const modelId = m?.id ?? m?.name ?? m?.model ?? "";
-                return modelId ? {
-                  id: `${outputAlias}/${modelId}`,
-                  name: m?.name ?? m?.id,
-                  type: undefined,
-                } : null;
+                return modelId
+                  ? {
+                      id: `${outputAlias}/${modelId}`,
+                      name: m?.name ?? m?.id,
+                      type: undefined,
+                    }
+                  : null;
               })
               .filter((m): m is NonNullable<typeof m> => m !== null);
 
             const models = mergeModels(remoteModels, enabledModels, outputAlias, id, alias);
 
-            return Response.json({ provider: id, alias: outputAlias, models }, { headers: CORS_HEADERS });
+            return Response.json(
+              { provider: id, alias: outputAlias, models },
+              { headers: CORS_HEADERS }
+            );
           }
         } catch {
           // Fetch failed, fall through to static models (which will be empty for compat providers)
@@ -143,7 +156,7 @@ export async function GET(req: Request): Promise<Response> {
 
     // Fallback: return static/predefined models
     const models = mergeModels(
-      getModelsByProviderId(id).map(m => ({
+      getModelsByProviderId(id).map((m) => ({
         id: `${outputAlias}/${m.id}`,
         name: m.name,
         type: m.type,
@@ -151,14 +164,17 @@ export async function GET(req: Request): Promise<Response> {
       enabledModels,
       outputAlias,
       id,
-      alias,
+      alias
     );
 
-    return Response.json({
-      provider: id,
-      alias: outputAlias,
-      models,
-    }, { headers: CORS_HEADERS });
+    return Response.json(
+      {
+        provider: id,
+        alias: outputAlias,
+        models,
+      },
+      { headers: CORS_HEADERS }
+    );
   } catch (error) {
     console.log("Error fetching provider models:", error);
     return Response.json(

@@ -18,7 +18,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!result.executed) {
     return Response.json(
       { error: "Another sync is already in progress" },
-      { status: 409, headers: CORS_HEADERS },
+      { status: 409, headers: CORS_HEADERS }
     );
   }
 
@@ -27,7 +27,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!success) {
     return Response.json(
       { error: (rest as { error?: string }).error ?? "Sync failed" },
-      { status: 502, headers: CORS_HEADERS },
+      { status: 502, headers: CORS_HEADERS }
     );
   }
 

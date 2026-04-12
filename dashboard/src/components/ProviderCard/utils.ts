@@ -17,7 +17,7 @@ export function getLogoPath(providerId: string, node?: ProviderNode): string {
 export function getProviderName(
   providerId: string,
   catalog?: ProviderCatalog,
-  node?: ProviderNode,
+  node?: ProviderNode
 ): string {
   if (node) {
     return (
@@ -38,13 +38,16 @@ export function getApiTypeLabel(node: ProviderNode): string {
 export function useProviderMeta(
   providerId: string,
   catalog?: ProviderCatalog,
-  node?: ProviderNode,
+  node?: ProviderNode
 ) {
-  return useMemo(() => ({
-    name: getProviderName(providerId, catalog, node),
-    logoPath: getLogoPath(providerId, node),
-    apiTypeLabel: node ? getApiTypeLabel(node) : undefined,
-    isAnthropicCompat: isAnthropicCompatibleProvider(node?.type ?? ""),
-    isOpenAICompat: isOpenAICompatibleProvider(node?.type ?? ""),
-  }), [providerId, catalog, node]);
+  return useMemo(
+    () => ({
+      name: getProviderName(providerId, catalog, node),
+      logoPath: getLogoPath(providerId, node),
+      apiTypeLabel: node ? getApiTypeLabel(node) : undefined,
+      isAnthropicCompat: isAnthropicCompatibleProvider(node?.type ?? ""),
+      isOpenAICompat: isOpenAICompatibleProvider(node?.type ?? ""),
+    }),
+    [providerId, catalog, node]
+  );
 }

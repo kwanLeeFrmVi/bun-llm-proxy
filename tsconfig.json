@@ -22,21 +22,11 @@
     "paths": {
       "@/lib/usageDb": ["./stubs/usageDb.ts"],
       "@/lib/localDb": ["./db/index.ts"],
-      "@/models": [
-        "./db/index.ts"
-      ],
-      "@lib/*": [
-        "./lib/*"
-      ],
-      "@handlers/*": [
-        "./handlers/*"
-      ],
-      "@db/*": [
-        "./db/*"
-      ],
-      "@stubs/*": [
-        "./stubs/*"
-      ]
+      "@/models": ["./db/index.ts"],
+      "@lib/*": ["./lib/*"],
+      "@handlers/*": ["./handlers/*"],
+      "@db/*": ["./db/*"],
+      "@stubs/*": ["./stubs/*"]
     }
   },
   "include": [

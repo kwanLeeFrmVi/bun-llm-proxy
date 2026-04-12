@@ -66,7 +66,7 @@ const server = Bun.serve({
       // Fall back to index.html for SPA routing
       const file = Bun.file(join(process.cwd(), "dashboard/dist/index.html"));
       return new Response(file, {
-        headers: { "Content-Type": "text/html" }
+        headers: { "Content-Type": "text/html" },
       });
     }
 

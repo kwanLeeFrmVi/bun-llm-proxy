@@ -25,7 +25,11 @@ type BunRequest = Request & { params: Record<string, string> };
 
 async function handleDeviceCode(provider: string, req: Request): Promise<Response> {
   let body: Record<string, unknown> = {};
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch { /* empty body ok for some */ }
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
+    /* empty body ok for some */
+  }
 
   try {
     const result = await requestDeviceCode(provider as any, body as any);
@@ -37,7 +41,9 @@ async function handleDeviceCode(provider: string, req: Request): Promise<Respons
 
 async function handlePoll(provider: string, req: Request): Promise<Response> {
   let body: Record<string, unknown>;
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch {
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -47,7 +53,12 @@ async function handlePoll(provider: string, req: Request): Promise<Response> {
   }
 
   try {
-    const result = await pollDeviceToken(provider as any, deviceCode as string, (codeVerifier as string) || "", extraData as Record<string, unknown>);
+    const result = await pollDeviceToken(
+      provider as any,
+      deviceCode as string,
+      (codeVerifier as string) || "",
+      extraData as Record<string, unknown>
+    );
 
     if (result.success && result.tokens) {
       // Auto-save connection on success
@@ -56,7 +67,10 @@ async function handlePoll(provider: string, req: Request): Promise<Response> {
 
     return Response.json(result, { headers: CORS_HEADERS });
   } catch (err: any) {
-    return Response.json({ success: false, error: err.message }, { status: 500, headers: CORS_HEADERS });
+    return Response.json(
+      { success: false, error: err.message },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 }
 
@@ -76,7 +90,9 @@ async function handleAuthorize(provider: string, req: Request): Promise<Response
 
 async function handleExchange(provider: string, req: Request): Promise<Response> {
   let body: Record<string, unknown>;
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch {
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -107,7 +123,10 @@ async function handleKiroSocialAuthorize(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const provider = url.searchParams.get("provider");
   if (!provider || !["google", "github"].includes(provider)) {
-    return Response.json({ error: "Invalid provider. Use 'google' or 'github'" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Invalid provider. Use 'google' or 'github'" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   try {
@@ -120,13 +139,18 @@ async function handleKiroSocialAuthorize(req: Request): Promise<Response> {
 
 async function handleKiroSocialExchange(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch {
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   const { code, codeVerifier } = body;
   if (!code || !codeVerifier) {
-    return Response.json({ error: "Missing code or codeVerifier" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Missing code or codeVerifier" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   try {
@@ -142,7 +166,9 @@ async function handleKiroSocialExchange(req: Request): Promise<Response> {
 
 async function handleKiroImport(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch {
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -172,7 +198,9 @@ async function handleKiroImport(req: Request): Promise<Response> {
 
 async function handleIflowCookie(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
-  try { body = asObjectRecord(await req.json()) ?? {}; } catch {
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
@@ -205,7 +233,10 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   if (!isOAuthProviderId(provider)) {
-    return Response.json({ error: `Unknown OAuth provider: ${provider}` }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: `Unknown OAuth provider: ${provider}` },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   // ─── Device Code Flow ──────────────────────────────────────────────────────
@@ -224,7 +255,10 @@ export async function POST(req: Request): Promise<Response> {
   // ─── iFlow-specific ────────────────────────────────────────────────────────
   if (provider === "iflow" && action === "cookie") return handleIflowCookie(req);
 
-  return Response.json({ error: `Unknown action: ${action}` }, { status: 400, headers: CORS_HEADERS });
+  return Response.json(
+    { error: `Unknown action: ${action}` },
+    { status: 400, headers: CORS_HEADERS }
+  );
 }
 
 // GET is used for authorize and social-authorize (convenience)
@@ -241,13 +275,19 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   if (!isOAuthProviderId(provider)) {
-    return Response.json({ error: `Unknown OAuth provider: ${provider}` }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: `Unknown OAuth provider: ${provider}` },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   if (action === "authorize") return handleAuthorize(provider, req);
   if (provider === "kiro" && action === "social-authorize") return handleKiroSocialAuthorize(req);
 
-  return Response.json({ error: `Unknown action: ${action}` }, { status: 400, headers: CORS_HEADERS });
+  return Response.json(
+    { error: `Unknown action: ${action}` },
+    { status: 400, headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

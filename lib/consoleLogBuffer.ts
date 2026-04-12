@@ -31,7 +31,9 @@ if (!(global as Record<string, unknown>)._consoleLogBufferState) {
     originals: {},
     emitter: new EventEmitter(),
   };
-  ((global as Record<string, unknown>)._consoleLogBufferState as ConsoleLogState).emitter.setMaxListeners(50);
+  (
+    (global as Record<string, unknown>)._consoleLogBufferState as ConsoleLogState
+  ).emitter.setMaxListeners(50);
 }
 
 const state = (global as Record<string, unknown>)._consoleLogBufferState as ConsoleLogState;
@@ -51,7 +53,11 @@ function stripAnsi(str: string): string {
 function formatArg(arg: unknown): string {
   if (typeof arg === "string") return stripAnsi(arg);
   if (arg instanceof Error) return stripAnsi(arg.stack || arg.message || String(arg));
-  try { return stripAnsi(JSON.stringify(arg)); } catch { return stripAnsi(String(arg)); }
+  try {
+    return stripAnsi(JSON.stringify(arg));
+  } catch {
+    return stripAnsi(String(arg));
+  }
 }
 
 function buildLine(level: ConsoleLogLevel, args: unknown[]): ConsoleLogEntry {

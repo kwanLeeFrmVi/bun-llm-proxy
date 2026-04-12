@@ -6,13 +6,11 @@ import { levelToBudget } from "../../thinking/index.ts";
 /**
  * Convert an OpenAI Chat Completions request to Anthropic API format.
  */
-export function convertOpenAIRequestToClaude(
-  modelName: string,
-  inputRaw: Uint8Array
-): Uint8Array {
-  const raw = typeof inputRaw === "string"
-    ? JSON.parse(inputRaw)
-    : JSON.parse(new TextDecoder().decode(inputRaw));
+export function convertOpenAIRequestToClaude(modelName: string, inputRaw: Uint8Array): Uint8Array {
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
 
   const out: Record<string, unknown> = {
     model: modelName,
@@ -88,7 +86,10 @@ export function convertOpenAIRequestToClaude(
       }
 
       // Regular user or assistant message
-      const claudeContent = convertOpenAIMessageContent(content, msg.tool_calls as Array<Record<string, unknown>> | undefined);
+      const claudeContent = convertOpenAIMessageContent(
+        content,
+        msg.tool_calls as Array<Record<string, unknown>> | undefined
+      );
       if (claudeContent) {
         messages.push({ role, content: claudeContent });
       }
@@ -102,7 +103,7 @@ export function convertOpenAIRequestToClaude(
   // ── Tools: OpenAI functions → Anthropic tools ─────────────────────────────────
   const tools = raw.tools as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(tools) && tools.length > 0) {
-    out.tools = tools.map(tool => {
+    out.tools = tools.map((tool) => {
       const fn = tool.function as Record<string, unknown> | undefined;
       return {
         name: fn?.name ?? "",
@@ -234,7 +235,7 @@ function convertOpenAIMessageContent(
   if (parts.length === 0 && !hasToolCalls) return null;
 
   // If only tool calls, return them directly
-  if (parts.length > 0 && parts.every(p => p.type === "tool_use")) {
+  if (parts.length > 0 && parts.every((p) => p.type === "tool_use")) {
     return parts;
   }
 

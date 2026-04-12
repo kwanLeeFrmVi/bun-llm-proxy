@@ -48,18 +48,23 @@ describe("handleChatCore", () => {
       }
       // Return non-streaming JSON response in Ollama format (what a real Ollama server returns).
       // handleChatCore will translate this to OpenAI format via convertOllamaResponseToOpenAINonStream.
-      return Promise.resolve(new globalThis.Response(JSON.stringify({
-        model: "llama3",
-        message: { role: "assistant", content: "hello from ollama" },
-        done: true,
-        done_reason: "stop",
-        total_duration: 1_000_000_000,
-        prompt_eval_count: 5,
-        eval_count: 4,
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+      return Promise.resolve(
+        new globalThis.Response(
+          JSON.stringify({
+            model: "llama3",
+            message: { role: "assistant", content: "hello from ollama" },
+            done: true,
+            done_reason: "stop",
+            total_duration: 1_000_000_000,
+            prompt_eval_count: 5,
+            eval_count: 4,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
     }) as unknown as typeof globalThis.fetch;
 
     try {
@@ -195,7 +200,7 @@ describe("handleChatCore", () => {
     const sseChunks = [
       'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n',
       'data: {"id":"chatcmpl_123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}\n\n',
-      'data: [DONE]\n\n',
+      "data: [DONE]\n\n",
     ];
 
     const origFetch = globalThis.fetch;
@@ -214,10 +219,12 @@ describe("handleChatCore", () => {
           enqueue();
         },
       });
-      return Promise.resolve(new globalThis.Response(body, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      }));
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
     }) as unknown as typeof globalThis.fetch;
 
     try {
@@ -260,10 +267,12 @@ describe("handleChatCore", () => {
           enqueue();
         },
       });
-      return Promise.resolve(new globalThis.Response(body, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
     }) as unknown as typeof globalThis.fetch;
 
     try {
@@ -302,11 +311,12 @@ describe("handleChatCore", () => {
     const origFetch = globalThis.fetch;
     // new Response(null) yields body === null, which handleStreamingResponse detects
     globalThis.fetch = (() =>
-      Promise.resolve(new globalThis.Response(null as unknown as BodyInit, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      }))
-    ) as unknown as typeof globalThis.fetch;
+      Promise.resolve(
+        new globalThis.Response(null as unknown as BodyInit, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )) as unknown as typeof globalThis.fetch;
 
     try {
       const result = await handleChatCore({

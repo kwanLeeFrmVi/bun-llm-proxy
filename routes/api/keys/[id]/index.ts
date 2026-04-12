@@ -19,17 +19,21 @@ export async function PUT(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const id = (req as BunRequest).params.id ?? "";
   const existing = await getApiKeyById(id);
-  if (!existing) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!existing)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
 
   let body: Record<string, unknown>;
-  try { body = await req.json() as Record<string, unknown>; } catch {
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
 
   const updated = await updateApiKey(id, {
     ...(body.name !== undefined && { name: body.name as string }),
     ...(body.isActive !== undefined && { isActive: body.isActive as boolean }),
-    ...(body.userId !== undefined && auth.role === "admin" && { userId: (body.userId as string | null) }),
+    ...(body.userId !== undefined &&
+      auth.role === "admin" && { userId: body.userId as string | null }),
   });
   return Response.json(updated, { headers: CORS_HEADERS });
 }
@@ -39,7 +43,8 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const id = (req as BunRequest).params.id ?? "";
   const existing = await getApiKeyById(id);
-  if (!existing) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!existing)
+    return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
   await deleteApiKey(id);
   return Response.json({ success: true }, { headers: CORS_HEADERS });
 }

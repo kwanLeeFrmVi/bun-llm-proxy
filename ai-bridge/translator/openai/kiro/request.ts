@@ -70,12 +70,17 @@ function convertMessages(
           const name = (fn.name as string) ?? (tObj.name as string) ?? "";
           let description = (fn.description as string) ?? (tObj.description as string) ?? "";
           if (!description.trim()) description = `Tool: ${name}`;
-          const schema = (fn.parameters as Record<string, unknown>) ?? (tObj.parameters as Record<string, unknown>) ?? {};
+          const schema =
+            (fn.parameters as Record<string, unknown>) ??
+            (tObj.parameters as Record<string, unknown>) ??
+            {};
           const normalizedSchema =
             Object.keys(schema).length === 0
               ? { type: "object", properties: {}, required: [] }
               : { ...schema, required: (schema.required as unknown[]) ?? [] };
-          return { toolSpecification: { name, description, inputSchema: { json: normalizedSchema } } };
+          return {
+            toolSpecification: { name, description, inputSchema: { json: normalizedSchema } },
+          };
         });
       }
 
@@ -134,7 +139,7 @@ function convertMessages(
 
         // tool_result blocks
         const toolResultBlocks = (msg.content as Array<Record<string, unknown>>).filter(
-          (c) => c.type === "tool_result",
+          (c) => c.type === "tool_result"
         );
         for (const block of toolResultBlocks) {
           const text = Array.isArray(block.content)
@@ -196,7 +201,13 @@ function convertMessages(
                 name: fn.name,
                 input:
                   typeof fn.arguments === "string"
-                    ? (() => { try { return JSON.parse(fn.arguments as string); } catch { return {}; } })()
+                    ? (() => {
+                        try {
+                          return JSON.parse(fn.arguments as string);
+                        } catch {
+                          return {};
+                        }
+                      })()
                     : (fn.arguments ?? {}),
               };
             }
@@ -223,7 +234,9 @@ function convertMessages(
   }
 
   // Grab tools from first history item BEFORE cleanup
-  const firstHistoryTools = (history[0]?.userInputMessage?.userInputMessageContext as Record<string, unknown> | undefined)?.tools;
+  const firstHistoryTools = (
+    history[0]?.userInputMessage?.userInputMessageContext as Record<string, unknown> | undefined
+  )?.tools;
 
   // Clean up history
   for (const item of history) {
@@ -243,8 +256,11 @@ function convertMessages(
     if (!currentMessage.userInputMessage.userInputMessageContext) {
       currentMessage.userInputMessage.userInputMessageContext = {};
     }
-    if (!(currentMessage.userInputMessage.userInputMessageContext as Record<string, unknown>).tools) {
-      (currentMessage.userInputMessage.userInputMessageContext as Record<string, unknown>).tools = firstHistoryTools;
+    if (
+      !(currentMessage.userInputMessage.userInputMessageContext as Record<string, unknown>).tools
+    ) {
+      (currentMessage.userInputMessage.userInputMessageContext as Record<string, unknown>).tools =
+        firstHistoryTools;
     }
   }
 
@@ -266,7 +282,10 @@ export function convertOpenAIRequestToKiro(
 
   const { history, currentMessage } = convertMessages(messages, tools, modelName);
 
-  const profileArn = (credentials?.providerSpecificData as Record<string, unknown> | undefined)?.profileArn as string | undefined ?? "";
+  const profileArn =
+    ((credentials?.providerSpecificData as Record<string, unknown> | undefined)?.profileArn as
+      | string
+      | undefined) ?? "";
 
   const timestamp = new Date().toISOString();
   let finalContent = currentMessage?.userInputMessage?.content ?? "";

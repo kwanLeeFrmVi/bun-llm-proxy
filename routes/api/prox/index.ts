@@ -94,8 +94,8 @@ async function handler(req: Request): Promise<Response> {
   return Response.json({ error: "Not found" }, { status: 404 });
 }
 
-register("/api/prox/keys",   { GET: (req) => handler(req) });
-register("/api/prox/status",  { GET: (req) => handler(req) });
+register("/api/prox/keys", { GET: (req) => handler(req) });
+register("/api/prox/status", { GET: (req) => handler(req) });
 register("/api/prox/summary", { GET: (req) => handler(req) });
-register("/api/prox/chart",   { GET: (req) => handler(req) });
-register("/api/prox/recent",  { GET: (req) => handler(req) });
+register("/api/prox/chart", { GET: (req) => handler(req) });
+register("/api/prox/recent", { GET: (req) => handler(req) });

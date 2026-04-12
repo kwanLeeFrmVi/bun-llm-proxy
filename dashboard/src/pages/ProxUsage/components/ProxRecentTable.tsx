@@ -7,11 +7,7 @@ interface ProxRecentTableProps {
   onPageChange: (page: number) => void;
 }
 
-export function ProxRecentTable({
-  recent,
-  loading,
-  onPageChange,
-}: ProxRecentTableProps) {
+export function ProxRecentTable({ recent, loading, onPageChange }: ProxRecentTableProps) {
   const page = recent?.pagination.page ?? 1;
   const totalPages = recent?.pagination.total_pages ?? 1;
 
@@ -109,10 +105,7 @@ export function ProxRecentTable({
               </thead>
               <tbody>
                 {recent.logs.map((log, i) => (
-                  <tr
-                    key={i}
-                    style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}
-                  >
+                  <tr key={i} style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}>
                     <td
                       style={{
                         padding: "8px 10px",
@@ -184,10 +177,7 @@ export function ProxRecentTable({
                 borderRadius: "6px",
                 border: "1px solid rgba(203,213,225,0.6)",
                 background: "var(--surface-container-low)",
-                color:
-                  page <= 1
-                    ? "var(--on-surface-variant)"
-                    : "var(--on-surface)",
+                color: page <= 1 ? "var(--on-surface-variant)" : "var(--on-surface)",
                 cursor: page <= 1 ? "not-allowed" : "pointer",
                 opacity: page <= 1 ? 0.5 : 1,
               }}
@@ -211,10 +201,7 @@ export function ProxRecentTable({
                 borderRadius: "6px",
                 border: "1px solid rgba(203,213,225,0.6)",
                 background: "var(--surface-container-low)",
-                color:
-                  page >= totalPages
-                    ? "var(--on-surface-variant)"
-                    : "var(--on-surface)",
+                color: page >= totalPages ? "var(--on-surface-variant)" : "var(--on-surface)",
                 cursor: page >= totalPages ? "not-allowed" : "pointer",
                 opacity: page >= totalPages ? 0.5 : 1,
               }}

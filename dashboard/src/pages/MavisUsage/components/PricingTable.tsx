@@ -37,82 +37,69 @@ export function PricingTable({ usage }: { usage: MavisUsageResponse | null }) {
       .sort((a, b) => a.model.localeCompare(b.model));
 
     // Sort top pricing by usage order
-    topPricing.sort(
-      (a, b) => topModels.indexOf(a.model) - topModels.indexOf(b.model),
-    );
+    topPricing.sort((a, b) => topModels.indexOf(a.model) - topModels.indexOf(b.model));
 
     return [...topPricing, ...restPricing];
   }, [usage, topModels]);
 
   if (sortedPricing.length === 0) return null;
 
-  const displayedPricing = isExpanded
-    ? sortedPricing
-    : sortedPricing.slice(0, TOP_MODELS_COUNT);
+  const displayedPricing = isExpanded ? sortedPricing : sortedPricing.slice(0, TOP_MODELS_COUNT);
   const hasMore = sortedPricing.length > TOP_MODELS_COUNT;
 
   return (
-    <div className='overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]'>
-      <SectionHeader
-        title='Model Pricing'
-        sub='Matches Mavis dashboard pricing'
-      />
+    <div className="overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <SectionHeader title="Model Pricing" sub="Matches Mavis dashboard pricing" />
       <Table>
         <TableHeader>
-          <TableRow className='border-b border-[rgba(203,213,225,0.4)]'>
-            <TableHead className='px-6 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+          <TableRow className="border-b border-[rgba(203,213,225,0.4)]">
+            <TableHead className="px-6 py-3 text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
               Model
             </TableHead>
-            <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+            <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
               input $/1M
             </TableHead>
-            <TableHead className='px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+            <TableHead className="px-3 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
               output $/1M
             </TableHead>
-            <TableHead className='px-6 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+            <TableHead className="px-6 py-3 text-right text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
               CACHE $/1M
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {displayedPricing.map((p) => (
-            <TableRow
-              key={p.model}
-              className='border-b border-[rgba(203,213,225,0.25)]'
-            >
-              <TableCell className='px-6 py-3'>
-                <Badge variant='secondary'>{p.model}</Badge>
+            <TableRow key={p.model} className="border-b border-[rgba(203,213,225,0.25)]">
+              <TableCell className="px-6 py-3">
+                <Badge variant="secondary">{p.model}</Badge>
               </TableCell>
-              <TableCell className='px-3 py-3 text-right tabular-nums text-[var(--primary)]'>
+              <TableCell className="px-3 py-3 text-right tabular-nums text-[var(--primary)]">
                 ${(p.input_ratio * 2).toFixed(2)}
               </TableCell>
-              <TableCell className='px-3 py-3 text-right tabular-nums'>
+              <TableCell className="px-3 py-3 text-right tabular-nums">
                 ${(p.output_ratio * 2).toFixed(2)}
               </TableCell>
-              <TableCell className='px-6 py-3 text-right tabular-nums text-[var(--on-surface-variant)]'>
+              <TableCell className="px-6 py-3 text-right tabular-nums text-[var(--on-surface-variant)]">
                 -
               </TableCell>
             </TableRow>
           ))}
           {hasMore && (
             <TableRow
-              className='cursor-pointer hover:bg-[var(--surface-container-low)] transition-colors'
+              className="cursor-pointer hover:bg-[var(--surface-container-low)] transition-colors"
               onClick={() => setIsExpanded(!isExpanded)}
             >
-              <TableCell className='px-6 py-3' colSpan={4}>
-                <div className='flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]'>
+              <TableCell className="px-6 py-3" colSpan={4}>
+                <div className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.1em] text-[var(--on-surface-variant)]">
                   {isExpanded ? (
                     <>
                       <span>Show less</span>
-                      <ChevronUp className='w-4 h-4' />
+                      <ChevronUp className="w-4 h-4" />
                     </>
                   ) : (
                     <>
-                      <span>
-                        Show {sortedPricing.length - TOP_MODELS_COUNT} more
-                        models
-                      </span>
-                      <ChevronDown className='w-4 h-4' />
+                      <span>Show {sortedPricing.length - TOP_MODELS_COUNT} more models</span>
+                      <ChevronDown className="w-4 h-4" />
                     </>
                   )}
                 </div>

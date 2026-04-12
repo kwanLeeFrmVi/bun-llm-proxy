@@ -14,16 +14,15 @@ export function sanitizeClaudeToolID(id: string): string {
  * Extract tool name map from a translated request's _toolNameMap field.
  * Used by response translators to reverse-map tool names back to original.
  */
-export function toolNameMapFromRequest(
-  rawJSON: Uint8Array | string | object
-): Map<string, string> {
+export function toolNameMapFromRequest(rawJSON: Uint8Array | string | object): Map<string, string> {
   const map = new Map<string, string>();
   try {
-    const obj = typeof rawJSON === "string"
-      ? JSON.parse(rawJSON)
-      : rawJSON instanceof Uint8Array
-      ? JSON.parse(new TextDecoder().decode(rawJSON))
-      : rawJSON;
+    const obj =
+      typeof rawJSON === "string"
+        ? JSON.parse(rawJSON)
+        : rawJSON instanceof Uint8Array
+          ? JSON.parse(new TextDecoder().decode(rawJSON))
+          : rawJSON;
 
     if (obj._toolNameMap instanceof Map) return obj._toolNameMap;
     if (typeof obj._toolNameMap === "object" && obj._toolNameMap !== null) {
@@ -63,9 +62,18 @@ export function fixPartialJSON(partial: string): string {
   let escape = false;
 
   for (const char of trimmed) {
-    if (escape) { escape = false; continue; }
-    if (char === "\\") { escape = true; continue; }
-    if (char === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
 
     if (char === "{") openBraces++;
@@ -94,7 +102,12 @@ export function fixPartialJSON(partial: string): string {
  * Check if a string is valid JSON.
  */
 export function isValidJSON(s: string): boolean {
-  try { JSON.parse(s); return true; } catch { return false; }
+  try {
+    JSON.parse(s);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -110,8 +123,14 @@ export function ensureToolCallIds(body: Record<string, unknown>): void {
     if (!Array.isArray(content)) continue;
 
     for (const part of content) {
-      if (part && typeof part === "object" && (part as Record<string, unknown>).type === "tool_calls") {
-        const calls = (part as Record<string, unknown>).tool_calls as Array<Record<string, unknown>> | undefined;
+      if (
+        part &&
+        typeof part === "object" &&
+        (part as Record<string, unknown>).type === "tool_calls"
+      ) {
+        const calls = (part as Record<string, unknown>).tool_calls as
+          | Array<Record<string, unknown>>
+          | undefined;
         if (!Array.isArray(calls)) continue;
         for (const call of calls) {
           if (!call.id) {

@@ -9,9 +9,10 @@ export function convertOpenAIRequestToGemini(
   inputRaw: Uint8Array,
   stream: boolean
 ): Uint8Array {
-  const raw = typeof inputRaw === "string"
-    ? JSON.parse(inputRaw)
-    : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
 
   const out: Record<string, unknown> = {
     contents: [],
@@ -161,10 +162,15 @@ function convertOpenAIContentToGeminiParts(content: unknown): Array<Record<strin
 
 function mapOpenAIRoleToGemini(role: string): string {
   switch (role) {
-    case "model": case "assistant": return "model";
-    case "user": return "user";
-    case "tool": return "function";
-    default: return "user";
+    case "model":
+    case "assistant":
+      return "model";
+    case "user":
+      return "user";
+    case "tool":
+      return "function";
+    default:
+      return "user";
   }
 }
 

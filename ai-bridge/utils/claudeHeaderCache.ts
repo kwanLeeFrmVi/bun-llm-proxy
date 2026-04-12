@@ -80,8 +80,9 @@ function performCleanup(): void {
 
   // If still over limit, remove least recently used entries
   if (headerCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(headerCache.entries())
-      .sort((a, b) => a[1].lastAccess - b[1].lastAccess);
+    const entries = Array.from(headerCache.entries()).sort(
+      (a, b) => a[1].lastAccess - b[1].lastAccess
+    );
 
     const toRemove = entries.slice(0, headerCache.size - MAX_CACHE_SIZE);
     for (const [key] of toRemove) {
@@ -91,7 +92,9 @@ function performCleanup(): void {
   }
 
   if (cleaned > 0) {
-    console.log(`[ClaudeHeaders] Cleaned up ${cleaned} expired cache entries, ${headerCache.size} active`);
+    console.log(
+      `[ClaudeHeaders] Cleaned up ${cleaned} expired cache entries, ${headerCache.size} active`
+    );
   }
 }
 
@@ -108,9 +111,7 @@ function startCleanupTimer(): void {
   }
 }
 
-export function cacheClaudeHeaders(
-  headers: Record<string, string>
-): void {
+export function cacheClaudeHeaders(headers: Record<string, string>): void {
   if (!headers || typeof headers !== "object") return;
   if (!isClaudeCodeClient(headers)) return;
 
@@ -139,7 +140,9 @@ export function cacheClaudeHeaders(
       startCleanupTimer();
     }
 
-    console.log(`[ClaudeHeaders] Cached ${Object.keys(captured).length} identity headers from Claude Code client (key: ${cacheKey}, total: ${headerCache.size}/${MAX_CACHE_SIZE})`);
+    console.log(
+      `[ClaudeHeaders] Cached ${Object.keys(captured).length} identity headers from Claude Code client (key: ${cacheKey}, total: ${headerCache.size}/${MAX_CACHE_SIZE})`
+    );
   }
 }
 
@@ -151,14 +154,13 @@ export function getCachedClaudeHeaders(): Record<string, string> | null {
 
   // Get the most recently used entry
   // Sort by lastAccess, then by timestamp (creation time) as a tiebreaker
-  const entries = Array.from(headerCache.values())
-    .sort((a, b) => {
-      if (b.lastAccess !== a.lastAccess) {
-        return b.lastAccess - a.lastAccess;
-      }
-      // If lastAccess is the same, use timestamp (most recently created wins)
-      return b.timestamp - a.timestamp;
-    });
+  const entries = Array.from(headerCache.values()).sort((a, b) => {
+    if (b.lastAccess !== a.lastAccess) {
+      return b.lastAccess - a.lastAccess;
+    }
+    // If lastAccess is the same, use timestamp (most recently created wins)
+    return b.timestamp - a.timestamp;
+  });
 
   if (entries.length === 0) {
     return null;

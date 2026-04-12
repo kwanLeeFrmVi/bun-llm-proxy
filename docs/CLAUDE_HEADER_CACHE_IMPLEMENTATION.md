@@ -27,6 +27,7 @@ The `buildUpstreamHeaders()` function now:
 - **Access tracking**: Tracks access count and last access time for intelligent eviction
 
 **Cache Configuration:**
+
 ```typescript
 const CACHE_TTL_MS = 60 * 60 * 1000 * 12; // 12 hours
 const MAX_CACHE_SIZE = 100; // Maximum 100 cached header sets
@@ -36,12 +37,14 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 ### 3. Helper Functions Added
 
 **`overlayCachedHeaders(baseHeaders, cached)`**
+
 - Converts lowercase cached keys to Title-Case to find conflicts
 - Special handling for `anthropic-beta`: merges static and cached flags
 - Removes conflicting Title-Case variants
 - Overlays cached headers onto base headers
 
 **`stripClaudeCodeHeaders(headers)`**
+
 - Removes `anthropic-dangerous-direct-browser-access`
 - Removes `x-app`
 - Strips `claude-code-20250219` from `anthropic-beta` flags
@@ -50,20 +53,22 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 ### 4. Monitoring & Testing Support
 
 **Added functions:**
+
 - `clearCachedClaudeHeaders()` - Clear all cache (primarily for testing)
 - `getCacheStats()` - Get cache statistics for monitoring
 
 **Cache statistics include:**
+
 ```typescript
 {
-  size: number;           // Current number of cached entries
-  maxSize: number;        // Maximum cache size (100)
-  ttlMs: number;          // Time to live in milliseconds (12 hours)
+  size: number; // Current number of cached entries
+  maxSize: number; // Maximum cache size (100)
+  ttlMs: number; // Time to live in milliseconds (12 hours)
   entries: Array<{
-    key: string;          // Cache key
-    age: number;          // Age in milliseconds
-    accessCount: number;  // Number of times accessed
-    headerCount: number;  // Number of headers in entry
+    key: string; // Cache key
+    age: number; // Age in milliseconds
+    accessCount: number; // Number of times accessed
+    headerCount: number; // Number of headers in entry
   }>;
 }
 ```
@@ -87,21 +92,27 @@ Created comprehensive test suite in `tests/unit/claude-header-forwarding.test.ts
 ## Memory Management Comparison
 
 ### 9router Implementation (Memory Issue)
+
 ```javascript
 let cachedHeaders = null; // Single entry, never expires
 ```
+
 **Problems:**
+
 - ❌ Only stores one set of headers
 - ❌ Never expires or cleans up
 - ❌ Can accumulate memory over time
 - ❌ No monitoring or statistics
 
 ### bun-llm-proxy Implementation (Memory Safe)
+
 ```typescript
 const headerCache = new Map<string, CacheEntry>();
 // With TTL, LRU eviction, and periodic cleanup
 ```
+
 **Benefits:**
+
 - ✅ Stores up to 100 different client header sets
 - ✅ Entries expire after 12 hours
 - ✅ LRU eviction when cache is full
@@ -114,6 +125,7 @@ const headerCache = new Map<string, CacheEntry>();
 ### Request Flow
 
 1. **Incoming Request** (`handlers/chat.ts`):
+
    ```typescript
    cacheClaudeHeaders(clientRawRequest.headers as Record<string, string>);
    ```
@@ -139,6 +151,7 @@ const headerCache = new Map<string, CacheEntry>();
 ### Example
 
 **Incoming Claude Code Request:**
+
 ```
 user-agent: claude-code/2.1.63 node/24.3.0
 anthropic-beta: claude-code-20250219,oauth-2025-04-20
@@ -147,6 +160,7 @@ x-claude-code-session-id: sess_abc123
 ```
 
 **Cached Headers (key: session:sess_abc123):**
+
 ```typescript
 {
   headers: {
@@ -161,6 +175,7 @@ x-claude-code-session-id: sess_abc123
 ```
 
 **Forwarded to api.anthropic.com:**
+
 ```
 user-agent: claude-code/2.1.63 node/24.3.0
 anthropic-version: 2023-06-01
@@ -170,11 +185,13 @@ x-app: cli
 ```
 
 **Forwarded to custom anthropic-compatible provider:**
+
 ```
 anthropic-version: 2023-06-01
 anthropic-beta: oauth-2025-04-20
 x-api-key: sk-ant-xxx
 ```
+
 (Note: `x-app` and `claude-code-20250219` are stripped)
 
 ## Files Modified
@@ -220,6 +237,7 @@ The implementation is production-ready with the following safeguards:
 6. **Timer Cleanup**: Uses `unref()` to prevent blocking process exit
 
 **Memory Usage Estimate:**
+
 - Each entry: ~1-2 KB (headers + metadata)
 - Maximum cache: 100 entries × 2 KB = ~200 KB
 - Negligible impact on server memory

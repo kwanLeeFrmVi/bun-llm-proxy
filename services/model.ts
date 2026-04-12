@@ -1,7 +1,14 @@
 // Model parsing, alias resolution, and combo handling.
 // Native TypeScript — no open-sse dependency.
 
-import { getModelAliases, getComboByName, getComboConfig, getProviderConnections, getProviderNodes, type ComboModelConfig } from "../db/index.ts";
+import {
+  getModelAliases,
+  getComboByName,
+  getComboConfig,
+  getProviderConnections,
+  getProviderNodes,
+  type ComboModelConfig,
+} from "../db/index.ts";
 import {
   parseModel as _parseModel,
   resolveModelAliasFromMap,
@@ -18,7 +25,7 @@ async function getStoredComboModelConfigs(modelStr: string): Promise<ComboModelC
 
   const combo = await getComboByName(modelStr);
   if (combo && combo.models && combo.models.length > 0) {
-    return combo.models.map(model => ({ model, weight: 1 }));
+    return combo.models.map((model) => ({ model, weight: 1 }));
   }
 
   return null;
@@ -26,7 +33,7 @@ async function getStoredComboModelConfigs(modelStr: string): Promise<ComboModelC
 
 async function getActiveProviderIds(): Promise<Set<string>> {
   const connections = await getProviderConnections({ isActive: true });
-  return new Set(connections.map(connection => connection.provider));
+  return new Set(connections.map((connection) => connection.provider));
 }
 
 /**
@@ -40,19 +47,26 @@ export async function resolveModelAlias(alias: string): Promise<unknown> {
 /**
  * Get full model info (parse or resolve alias/combo)
  */
-export async function getModelInfo(modelStr: string): Promise<{ provider: string | null; model: string }> {
-  const parsed = _parseModel(modelStr) as { isAlias: boolean; provider: string; providerAlias: string; model: string };
+export async function getModelInfo(
+  modelStr: string
+): Promise<{ provider: string | null; model: string }> {
+  const parsed = _parseModel(modelStr) as {
+    isAlias: boolean;
+    provider: string;
+    providerAlias: string;
+    model: string;
+  };
 
   if (!parsed.isAlias) {
     if (parsed.provider === parsed.providerAlias) {
       const openaiNodes = await getProviderNodes({ type: "openai-compatible" });
-      const matchedOpenAI = openaiNodes.find(node => node.prefix === parsed.providerAlias);
+      const matchedOpenAI = openaiNodes.find((node) => node.prefix === parsed.providerAlias);
       if (matchedOpenAI) {
         return { provider: matchedOpenAI.id as string, model: parsed.model };
       }
 
       const anthropicNodes = await getProviderNodes({ type: "anthropic-compatible" });
-      const matchedAnthropic = anthropicNodes.find(node => node.prefix === parsed.providerAlias);
+      const matchedAnthropic = anthropicNodes.find((node) => node.prefix === parsed.providerAlias);
       if (matchedAnthropic) {
         return { provider: matchedAnthropic.id as string, model: parsed.model };
       }
@@ -65,7 +79,10 @@ export async function getModelInfo(modelStr: string): Promise<{ provider: string
     return { provider: null, model: parsed.model };
   }
 
-  return _getModelInfoCore(modelStr, getModelAliases) as Promise<{ provider: string | null; model: string }>;
+  return _getModelInfoCore(modelStr, getModelAliases) as Promise<{
+    provider: string | null;
+    model: string;
+  }>;
 }
 
 /**
@@ -98,7 +115,9 @@ export async function getComboModelConfigs(modelStr: string): Promise<ComboModel
  *
  * Handles nested combos by recursively resolving them.
  */
-export async function getAvailableComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
+export async function getAvailableComboModelConfigs(
+  modelStr: string
+): Promise<ComboModelConfig[] | null> {
   if (modelStr.includes("/")) return null;
 
   const comboModels = await getStoredComboModelConfigs(modelStr);

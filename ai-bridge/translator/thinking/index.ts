@@ -2,27 +2,27 @@
 // Maps Anthropic thinking.budget_tokens to OpenAI reasoning_effort and back.
 
 export const THINKING_LEVELS = {
-  OFF:  "off",
-  LOW:  "low",
+  OFF: "off",
+  LOW: "low",
   MEDIUM: "medium",
   HIGH: "high",
   XHIGH: "x-high",
 } as const;
 
-export type ThinkingLevel = typeof THINKING_LEVELS[keyof typeof THINKING_LEVELS] | "";
+export type ThinkingLevel = (typeof THINKING_LEVELS)[keyof typeof THINKING_LEVELS] | "";
 
 // Mapping from budget token values to OpenAI reasoning_effort strings.
 // These match Anthropic's known budget→effort mapping.
 const BUDGET_TO_LEVEL: Array<[number, ThinkingLevel]> = [
-  [0,       ""],     // disabled → ""
-  [1024,    THINKING_LEVELS.LOW],
-  [4096,    THINKING_LEVELS.LOW],
-  [8192,    THINKING_LEVELS.MEDIUM],
-  [16384,   THINKING_LEVELS.HIGH],
-  [20000,   THINKING_LEVELS.HIGH],
-  [32000,   THINKING_LEVELS.XHIGH],
-  [50000,   THINKING_LEVELS.XHIGH],
-  [64000,   THINKING_LEVELS.XHIGH],
+  [0, ""], // disabled → ""
+  [1024, THINKING_LEVELS.LOW],
+  [4096, THINKING_LEVELS.LOW],
+  [8192, THINKING_LEVELS.MEDIUM],
+  [16384, THINKING_LEVELS.HIGH],
+  [20000, THINKING_LEVELS.HIGH],
+  [32000, THINKING_LEVELS.XHIGH],
+  [50000, THINKING_LEVELS.XHIGH],
+  [64000, THINKING_LEVELS.XHIGH],
 ];
 
 /**
@@ -31,7 +31,7 @@ const BUDGET_TO_LEVEL: Array<[number, ThinkingLevel]> = [
  */
 export function convertBudgetToLevel(budgetTokens: number): { effort: ThinkingLevel; ok: boolean } {
   if (budgetTokens === -1) return { effort: THINKING_LEVELS.MEDIUM, ok: true };
-  if (budgetTokens === 0)  return { effort: "", ok: true };
+  if (budgetTokens === 0) return { effort: "", ok: true };
 
   // Find the closest level for the given budget
   let closest: [number, ThinkingLevel] = BUDGET_TO_LEVEL[0]!;
@@ -64,12 +64,18 @@ export function getThinkingText(part: Record<string, unknown>): string {
  */
 export function levelToBudget(effort: string): number | null {
   switch (effort?.toLowerCase()) {
-    case "off":     return 0;
-    case "low":     return 4096;
-    case "medium":  return 8192;
-    case "high":    return 16384;
-    case "x-high":  return 32000;
-    default:        return null;
+    case "off":
+      return 0;
+    case "low":
+      return 4096;
+    case "medium":
+      return 8192;
+    case "high":
+      return 16384;
+    case "x-high":
+      return 32000;
+    default:
+      return null;
   }
 }
 

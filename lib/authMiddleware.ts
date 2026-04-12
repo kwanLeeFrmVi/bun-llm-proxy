@@ -13,10 +13,7 @@ export type AuthResult =
  * Validate the incoming API key against settings.requireApiKey.
  * Logs key identity when present. Returns an error Response if auth fails.
  */
-export async function checkAuth(
-  request: Request,
-  ctx?: RequestContext
-): Promise<AuthResult> {
+export async function checkAuth(request: Request, ctx?: RequestContext): Promise<AuthResult> {
   const apiKey = extractApiKey(request);
 
   let apiKeyId: string | null = null;
@@ -33,12 +30,18 @@ export async function checkAuth(
   if (settings.requireApiKey) {
     if (!apiKey) {
       log.warn(ctx ?? null, "AUTH", "Missing API key");
-      return { ok: false, response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key") as Response };
+      return {
+        ok: false,
+        response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key") as Response,
+      };
     }
     const valid = await isValidApiKey(apiKey);
     if (!valid) {
       log.warn(ctx ?? null, "AUTH", "Invalid API key");
-      return { ok: false, response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key") as Response };
+      return {
+        ok: false,
+        response: errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key") as Response,
+      };
     }
   }
 
@@ -46,7 +49,7 @@ export async function checkAuth(
 }
 
 export type AdminAuthResult =
-  | { ok: true; userId: string; role: 'admin' | 'user' }
+  | { ok: true; userId: string; role: "admin" | "user" }
   | { ok: false; response: Response };
 
 /**
@@ -63,7 +66,10 @@ export async function checkAdminAuth(request: Request): Promise<AdminAuthResult>
 
   const session = await getSessionByToken(token);
   if (!session) {
-    return { ok: false, response: Response.json({ error: "Invalid or expired session" }, { status: 401 }) };
+    return {
+      ok: false,
+      response: Response.json({ error: "Invalid or expired session" }, { status: 401 }),
+    };
   }
 
   const user = await getUserById(session.userId);

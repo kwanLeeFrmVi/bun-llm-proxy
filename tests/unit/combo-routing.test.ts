@@ -3,12 +3,22 @@ import { describe, it, expect, beforeEach } from "bun:test";
 
 // Mock TTFT data with insertion order for stable sorting
 let insertionCounter = 0;
-const mockComboLatency: Array<{ combo_name: string; model: string; ttft_ms: number; timestamp: string; insertOrder: number }> = [];
+const mockComboLatency: Array<{
+  combo_name: string;
+  model: string;
+  ttft_ms: number;
+  timestamp: string;
+  insertOrder: number;
+}> = [];
 
 // Mock implementations
-async function mockGetAverageTTFT(comboName: string, model: string, sampleCount = 10): Promise<number | null> {
+async function mockGetAverageTTFT(
+  comboName: string,
+  model: string,
+  sampleCount = 10
+): Promise<number | null> {
   const samples = mockComboLatency
-    .filter(l => l.combo_name === comboName && l.model === model)
+    .filter((l) => l.combo_name === comboName && l.model === model)
     .sort((a, b) => {
       // First by timestamp descending, then by insertion order for stable sorting
       const timeDiff = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
@@ -31,7 +41,7 @@ async function mockRecordComboTTFT(comboName: string, model: string, ttftMs: num
     insertOrder: insertionCounter++,
   });
   // Auto-prune to 50 samples per (combo, model)
-  const samples = mockComboLatency.filter(l => l.combo_name === comboName && l.model === model);
+  const samples = mockComboLatency.filter((l) => l.combo_name === comboName && l.model === model);
   if (samples.length > 50) {
     const toRemove = samples.length - 50;
     let removed = 0;
@@ -415,7 +425,7 @@ describe("Combo TTFT Functions", () => {
 
       // Check that only 50 samples remain
       const samples = mockComboLatency.filter(
-        l => l.combo_name === "test-combo" && l.model === "model-a"
+        (l) => l.combo_name === "test-combo" && l.model === "model-a"
       );
       expect(samples.length).toBe(50);
     });

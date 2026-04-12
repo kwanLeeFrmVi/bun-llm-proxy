@@ -5,16 +5,21 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import {
-  normalizeModelName,
-  stripSuffixes,
-  baseModelName,
-} from "../../services/pricingSync.ts";
+import { normalizeModelName, stripSuffixes, baseModelName } from "../../services/pricingSync.ts";
 
 // Module-level constants matching services/pricingSync.ts
 const STRIP_SUFFIXES = [
-  "-turbo", "-maas", "-fast", "-ultra", "-large", "-mini", "-hd",
-  "-code", "-instruct", "-preview", "-latest",
+  "-turbo",
+  "-maas",
+  "-fast",
+  "-ultra",
+  "-large",
+  "-mini",
+  "-hd",
+  "-code",
+  "-instruct",
+  "-preview",
+  "-latest",
 ];
 const KNOWN_BASES = ["claude-sonnet", "claude-opus", "gpt-4", "gpt-3.5", "gemini"];
 
@@ -120,7 +125,9 @@ describe("baseModelName", () => {
 
 describe("buildPricingMap", () => {
   // Inline helper to avoid importing private function
-  function buildPricingMap(models: Array<{ id: string; pricing: { prompt: string; completion: string } }>) {
+  function buildPricingMap(
+    models: Array<{ id: string; pricing: { prompt: string; completion: string } }>
+  ) {
     const pricing: Record<string, Record<string, number>> = {};
     for (const model of models) {
       const inputPrice = parseFloat(model.pricing.prompt ?? "0") * 1_000_000;
@@ -133,7 +140,10 @@ describe("buildPricingMap", () => {
 
   it("converts OpenRouter $/token prices to $/1M tokens", () => {
     const models = [
-      { id: "anthropic/claude-sonnet-4-5", pricing: { prompt: "0.000003", completion: "0.000015" } },
+      {
+        id: "anthropic/claude-sonnet-4-5",
+        pricing: { prompt: "0.000003", completion: "0.000015" },
+      },
     ];
     const result = buildPricingMap(models);
     expect(result["anthropic/claude-sonnet-4-5"]).toEqual({ input: 3, output: 15 });
@@ -176,7 +186,9 @@ describe("buildPricingMap", () => {
 
 describe("buildFuzzyLookup", () => {
   // Inline the function since it's not exported
-  function buildFuzzyLookup(models: Array<{ id: string; pricing: { prompt: string; completion: string } }>) {
+  function buildFuzzyLookup(
+    models: Array<{ id: string; pricing: { prompt: string; completion: string } }>
+  ) {
     function norm(n: string) {
       let name = n;
       if (name.includes("/")) name = name.split("/").slice(1).join("/");
@@ -224,7 +236,10 @@ describe("buildFuzzyLookup", () => {
 
   it("maps multiple normalization keys to the same pricing entry", () => {
     const models = [
-      { id: "anthropic/claude-sonnet-4.5-fast", pricing: { prompt: "0.000003", completion: "0.000015" } },
+      {
+        id: "anthropic/claude-sonnet-4.5-fast",
+        pricing: { prompt: "0.000003", completion: "0.000015" },
+      },
     ];
     const lookup = buildFuzzyLookup(models);
 
@@ -235,7 +250,10 @@ describe("buildFuzzyLookup", () => {
 
   it("returns undefined for keys with no match", () => {
     const lookup = buildFuzzyLookup([
-      { id: "anthropic/claude-sonnet-4-5", pricing: { prompt: "0.000003", completion: "0.000015" } },
+      {
+        id: "anthropic/claude-sonnet-4-5",
+        pricing: { prompt: "0.000003", completion: "0.000015" },
+      },
     ]);
     expect(lookup["completely-unknown-model"]).toBeUndefined();
   });
@@ -287,7 +305,7 @@ describe("findPricing & calculateCost", () => {
     pricing: Record<string, Record<string, { input: number; output: number }>>,
     provider: string,
     model: string,
-    orCache: Record<string, { id: string; input: number; output: number }> = {},
+    orCache: Record<string, { id: string; input: number; output: number }> = {}
   ): { input: number; output: number } | null {
     // Pre-compute all derived keys
     const normalized = testNormalize(model);
@@ -298,7 +316,8 @@ describe("findPricing & calculateCost", () => {
     if (pricing[provider]?.[model]) return pricing[provider][model];
 
     // 2. Normalized
-    if (normalized !== model && pricing[provider]?.[normalized]) return pricing[provider][normalized];
+    if (normalized !== model && pricing[provider]?.[normalized])
+      return pricing[provider][normalized];
 
     // 3. Suffix-stripped
     if (stripped !== model && pricing[provider]?.[stripped]) return pricing[provider][stripped];
@@ -321,11 +340,11 @@ describe("findPricing & calculateCost", () => {
     model: string,
     promptTokens: number,
     completionTokens: number,
-    orCache: Record<string, { id: string; input: number; output: number }> = {},
+    orCache: Record<string, { id: string; input: number; output: number }> = {}
   ): number {
     const entry = findPricing(pricing, provider, model, orCache);
     if (!entry) return 0;
-    return (promptTokens * entry.input / 1_000_000) + (completionTokens * entry.output / 1_000_000);
+    return (promptTokens * entry.input) / 1_000_000 + (completionTokens * entry.output) / 1_000_000;
   }
 
   // ─── findPricing tests ─────────────────────────────────────────────────────
@@ -338,7 +357,10 @@ describe("findPricing & calculateCost", () => {
 
     it("2 - normalized match (dot→dash) returns correct pricing", () => {
       const pricing = { anthropic: { "claude-sonnet-4-5": { input: 3, output: 15 } } };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({ input: 3, output: 15 });
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({
+        input: 3,
+        output: 15,
+      });
     });
 
     it("3 - suffix-stripped match returns correct pricing", () => {
@@ -348,13 +370,23 @@ describe("findPricing & calculateCost", () => {
 
     it("4 - base model match returns correct pricing", () => {
       const pricing = { anthropic: { "claude-sonnet": { input: 3, output: 15 } } };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5")).toEqual({ input: 3, output: 15 });
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5")).toEqual({
+        input: 3,
+        output: 15,
+      });
     });
 
     it("5 - OpenRouter cache fallback returns correct pricing", () => {
-      const pricing: Record<string, Record<string, { input: number; output: number }>> = { anthropic: {} };
-      const orCache = { "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 } };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5", orCache)).toEqual({ input: 3, output: 15 });
+      const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+        anthropic: {},
+      };
+      const orCache = {
+        "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 },
+      };
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5", orCache)).toEqual({
+        input: 3,
+        output: 15,
+      });
     });
 
     it("returns null when no match found anywhere", () => {
@@ -369,7 +401,10 @@ describe("findPricing & calculateCost", () => {
           "claude-sonnet-4-5": { input: 3, output: 15 },
         },
       };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({ input: 100, output: 200 });
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({
+        input: 100,
+        output: 200,
+      });
     });
 
     it("provider mismatch returns null (no cross-provider lookup)", () => {
@@ -381,15 +416,26 @@ describe("findPricing & calculateCost", () => {
       // usage_log stores provider="anthropic", model="claude-sonnet-4.5"
       // Pricing has provider="anthropic", model="claude-sonnet-4.5" (from sync)
       const pricing = { anthropic: { "claude-sonnet-4.5": { input: 3, output: 15 } } };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({ input: 3, output: 15 });
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4.5")).toEqual({
+        input: 3,
+        output: 15,
+      });
       // normalized: dot→dash — KV has exact match in normalized form
       const pricingDash = { anthropic: { "claude-sonnet-4-5": { input: 3, output: 15 } } };
-      expect(findPricing(pricingDash, "anthropic", "claude-sonnet-4-5")).toEqual({ input: 3, output: 15 });
+      expect(findPricing(pricingDash, "anthropic", "claude-sonnet-4-5")).toEqual({
+        input: 3,
+        output: 15,
+      });
       // real gap: KV has dot, request has dash, no OR cache → null
       expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5")).toBeNull();
       // but if OR cache has the raw model key, it matches
-      const orCache = { "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 } };
-      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5", orCache)).toEqual({ input: 3, output: 15 });
+      const orCache = {
+        "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 },
+      };
+      expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5", orCache)).toEqual({
+        input: 3,
+        output: 15,
+      });
     });
   });
 
@@ -429,9 +475,15 @@ describe("findPricing & calculateCost", () => {
     });
 
     it("uses OpenRouter fallback for cost calculation", () => {
-      const pricing: Record<string, Record<string, { input: number; output: number }>> = { anthropic: {} };
-      const orCache = { "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 } };
-      expect(calculateCost(pricing, "anthropic", "claude-sonnet-4-5", 1_000_000, 0, orCache)).toBe(3);
+      const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+        anthropic: {},
+      };
+      const orCache = {
+        "claude-sonnet-4-5": { id: "anthropic/claude-sonnet-4-5", input: 3, output: 15 },
+      };
+      expect(calculateCost(pricing, "anthropic", "claude-sonnet-4-5", 1_000_000, 0, orCache)).toBe(
+        3
+      );
     });
 
     it("combines prompt and completion costs correctly", () => {

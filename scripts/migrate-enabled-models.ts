@@ -36,13 +36,16 @@ async function main() {
   try {
     // Check if settings table exists
     const settingsExists = db
-      .query<{ name: string }, []>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
-      )
+      .query<
+        { name: string },
+        []
+      >("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
       .get();
 
     if (!settingsExists) {
-      console.error("[Migration] settings table does not exist. Please run the server first to initialize the database.");
+      console.error(
+        "[Migration] settings table does not exist. Please run the server first to initialize the database."
+      );
       process.exit(1);
     }
 
@@ -71,7 +74,10 @@ async function main() {
       try {
         psd = JSON.parse(conn.provider_specific_data) as ProviderSpecificData;
       } catch (e) {
-        console.warn(`[Migration] Failed to parse provider_specific_data for connection ${conn.id}:`, e);
+        console.warn(
+          `[Migration] Failed to parse provider_specific_data for connection ${conn.id}:`,
+          e
+        );
         continue;
       }
 
@@ -79,12 +85,16 @@ async function main() {
       const nodeName = typeof psd.nodeName === "string" ? psd.nodeName : null;
 
       if (!nodeName) {
-        console.warn(`[Migration] Connection ${conn.id} has enabledModels but no nodeName, skipping.`);
+        console.warn(
+          `[Migration] Connection ${conn.id} has enabledModels but no nodeName, skipping.`
+        );
         continue;
       }
 
       if (!Array.isArray(enabledModels) || enabledModels.length === 0) {
-        console.warn(`[Migration] Connection ${conn.id} (nodeName: ${nodeName}) has empty or invalid enabledModels, skipping.`);
+        console.warn(
+          `[Migration] Connection ${conn.id} (nodeName: ${nodeName}) has empty or invalid enabledModels, skipping.`
+        );
         continue;
       }
 
@@ -102,7 +112,10 @@ async function main() {
       const merged = [...new Set([...existing, ...modelIds])];
       providerModels.set(nodeName, merged);
 
-      console.log(`[Migration] Found ${modelIds.length} model(s) for provider "${nodeName}":`, modelIds);
+      console.log(
+        `[Migration] Found ${modelIds.length} model(s) for provider "${nodeName}":`,
+        modelIds
+      );
     }
 
     if (providerModels.size === 0) {
@@ -125,26 +138,29 @@ async function main() {
         .get(key);
 
       if (existing) {
-        console.log(`[Migration] Provider "${nodeName}" already has provider-level models, skipping.`);
+        console.log(
+          `[Migration] Provider "${nodeName}" already has provider-level models, skipping.`
+        );
         skippedCount++;
         continue;
       }
 
       // Insert new entry
-      db.run(
-        "INSERT INTO settings (key, value) VALUES (?, ?)",
-        [key, JSON.stringify(modelIds)]
-      );
+      db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [key, JSON.stringify(modelIds)]);
 
       console.log(`[Migration] ✓ Migrated ${modelIds.length} models for provider "${nodeName}"`);
       migratedCount++;
     }
 
-    console.log(`\n[Migration] Completed: ${migratedCount} provider(s) migrated, ${skippedCount} skipped.`);
+    console.log(
+      `\n[Migration] Completed: ${migratedCount} provider(s) migrated, ${skippedCount} skipped.`
+    );
 
     // Show verification query
     console.log(`\n[Migration] To verify, run:`);
-    console.log(`  sqlite3 ${dbPath} "SELECT key, value FROM settings WHERE key LIKE 'providerEnabledModels:%'"`);
+    console.log(
+      `  sqlite3 ${dbPath} "SELECT key, value FROM settings WHERE key LIKE 'providerEnabledModels:%'"`
+    );
   } catch (error) {
     console.error("[Migration] Error:", error);
     process.exit(1);

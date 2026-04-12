@@ -13,9 +13,10 @@ export function convertGeminiRequestToOpenAI(
   inputRaw: Uint8Array,
   stream: boolean
 ): Uint8Array {
-  const raw = typeof inputRaw === "string"
-    ? JSON.parse(inputRaw)
-    : JSON.parse(new TextDecoder().decode(inputRaw));
+  const raw =
+    typeof inputRaw === "string"
+      ? JSON.parse(inputRaw)
+      : JSON.parse(new TextDecoder().decode(inputRaw));
 
   const out: Record<string, unknown> = {
     model: modelName,
@@ -51,8 +52,8 @@ export function convertGeminiRequestToOpenAI(
         // inline_data part → image_url
         if (part.inlineData) {
           const data = part.inlineData as Record<string, unknown>;
-          const mimeType = data.mimeType as string | undefined ?? "image/jpeg";
-          const textData = data.data as string | undefined ?? "";
+          const mimeType = (data.mimeType as string | undefined) ?? "image/jpeg";
+          const textData = (data.data as string | undefined) ?? "";
           (out.messages as Array<Record<string, unknown>>).push({
             role: openaiRole,
             content: [
@@ -75,7 +76,7 @@ export function convertGeminiRequestToOpenAI(
                 type: "tool_calls",
                 tool_calls: [
                   {
-                    id: (fc.name as string ?? "").replace(/\//g, "_") + `_${Date.now()}`,
+                    id: ((fc.name as string) ?? "").replace(/\//g, "_") + `_${Date.now()}`,
                     type: "function",
                     function: {
                       name: fc.name ?? "",
@@ -140,7 +141,7 @@ export function convertGeminiRequestToOpenAI(
       }
     }
     if (functions.length > 0) {
-      out.tools = functions.map(f => ({ type: "function", function: f }));
+      out.tools = functions.map((f) => ({ type: "function", function: f }));
     }
   }
 
@@ -152,8 +153,11 @@ export function convertGeminiRequestToOpenAI(
 function mapGeminiRole(role: string | undefined): string {
   if (!role) return "user";
   switch (role.toLowerCase()) {
-    case "model": return "assistant";
-    case "user": return "user";
-    default: return "user";
+    case "model":
+      return "assistant";
+    case "user":
+      return "user";
+    default:
+      return "user";
   }
 }

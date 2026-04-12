@@ -27,17 +27,20 @@ ChartJS.register(
   LineController,
   Filler,
   Tooltip,
-  Legend,
+  Legend
 );
 
-const cardClass = "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
+const cardClass =
+  "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
 export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
   const data = usage.success ? usage.data : null;
 
   if (!data) {
     return (
-      <div className={`${cardClass} px-12 py-12 text-center text-[13px] text-[var(--on-surface-variant)]`}>
+      <div
+        className={`${cardClass} px-12 py-12 text-center text-[13px] text-[var(--on-surface-variant)]`}
+      >
         No usage data available.
       </div>
     );
@@ -63,11 +66,7 @@ export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
         value={data.granularity === "hourly" ? "Hourly" : data.granularity}
         sub="Data resolution"
       />
-      <QuotaCard
-        label="Data Points"
-        value={String(x_time.length)}
-        sub="Time intervals"
-      />
+      <QuotaCard label="Data Points" value={String(x_time.length)} sub="Time intervals" />
     </div>
   );
 
@@ -75,10 +74,7 @@ export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
   const sortedModels = [...modelSummaryList].sort((a, b) => b.totalTokens - a.totalTokens);
   const modelBreakdown = (
     <div className={cardClass}>
-      <SectionHeader
-        title="Token Usage by Model"
-        sub="Total tokens consumed per model"
-      />
+      <SectionHeader title="Token Usage by Model" sub="Total tokens consumed per model" />
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -98,7 +94,10 @@ export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
             {sortedModels.map((model) => {
               const pct = ((model.totalTokens / totalUsage.totalTokensUsage) * 100).toFixed(1);
               return (
-                <tr key={model.modelName} className="border-b border-[rgba(203,213,225,0.2)] hover:bg-[rgba(203,213,225,0.1)]">
+                <tr
+                  key={model.modelName}
+                  className="border-b border-[rgba(203,213,225,0.2)] hover:bg-[rgba(203,213,225,0.1)]"
+                >
                   <td className="px-6 py-3 text-[13px] text-[var(--on-surface)] font-500">
                     {model.modelName}
                   </td>
@@ -120,10 +119,7 @@ export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
   // Time-series chart
   const timeSeriesChart = (
     <div className={cardClass}>
-      <SectionHeader
-        title="Token Usage Over Time"
-        sub="Hourly token usage and API call volume"
-      />
+      <SectionHeader title="Token Usage Over Time" sub="Hourly token usage and API call volume" />
       <div className="h-[300px] p-5 px-6">
         <Chart
           type="bar"
@@ -179,10 +175,7 @@ export function UsageTab({ usage }: { usage: ZaiUsageResponse }) {
               },
               tooltip: {
                 callbacks: {
-                  label: (ctx: {
-                    dataset: { label?: string };
-                    parsed: { y: number | null };
-                  }) => {
+                  label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
                     const v = ctx.parsed.y ?? 0;
                     return ctx.dataset.label === "Tokens"
                       ? ` Tokens: ${fmt(v)}`

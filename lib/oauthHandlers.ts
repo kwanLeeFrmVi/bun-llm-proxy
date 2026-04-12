@@ -1,7 +1,13 @@
 // ─── Server-side OAuth flow handlers ──────────────────────────────────────────
 // Handles device code requests, token polling, code exchange, and connection saving.
 
-import { OAUTH_CONFIGS, generatePKCE, type OAuthProviderId, type QwenConfig, type KiroConfig } from "./oauthConfig.ts";
+import {
+  OAUTH_CONFIGS,
+  generatePKCE,
+  type OAuthProviderId,
+  type QwenConfig,
+  type KiroConfig,
+} from "./oauthConfig.ts";
 import { createProviderConnection } from "../db/index.ts";
 import { asObjectRecord } from "./utils.ts";
 
@@ -65,7 +71,10 @@ async function requestQwenDeviceCode(config: QwenConfig): Promise<DeviceCodeResu
     device_code: data.device_code,
     user_code: data.user_code,
     verification_uri: data.verification_uri,
-    verification_uri_complete: typeof data.verification_uri_complete === "string" ? data.verification_uri_complete : undefined,
+    verification_uri_complete:
+      typeof data.verification_uri_complete === "string"
+        ? data.verification_uri_complete
+        : undefined,
     expires_in: data.expires_in,
     interval: typeof data.interval === "number" ? data.interval : 5,
     codeVerifier,
@@ -98,7 +107,7 @@ async function requestKiroDeviceCode(
     throw new Error(`Kiro client registration failed: ${err}`);
   }
 
-  const clientInfo = await registerRes.json() as { clientId: string; clientSecret: string };
+  const clientInfo = (await registerRes.json()) as { clientId: string; clientSecret: string };
 
   // Step 2: Request device authorization
   const deviceEndpoint = `https://oidc.${region}.amazonaws.com/device_authorization`;
@@ -117,7 +126,14 @@ async function requestKiroDeviceCode(
     throw new Error(`Kiro device authorization failed: ${err}`);
   }
 
-  const deviceData = await deviceRes.json() as { deviceCode: string; userCode: string; verificationUri: string; verificationUriComplete: string; expiresIn: number; interval?: number };
+  const deviceData = (await deviceRes.json()) as {
+    deviceCode: string;
+    userCode: string;
+    verificationUri: string;
+    verificationUriComplete: string;
+    expiresIn: number;
+    interval?: number;
+  };
 
   return {
     device_code: deviceData.deviceCode,
@@ -198,7 +214,8 @@ async function pollQwenToken(
   return {
     success: false,
     error: typeof data.error === "string" ? data.error : "unknown_error",
-    errorDescription: typeof data.error_description === "string" ? data.error_description : undefined,
+    errorDescription:
+      typeof data.error_description === "string" ? data.error_description : undefined,
   };
 }
 
@@ -299,11 +316,16 @@ function buildClaudeAuthorizeUrl(
     code_challenge_method: config.codeChallengeMethod,
     state,
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier, redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier,
+    redirectUri,
+  };
 }
 
 function buildGeminiAuthorizeUrl(
-  config: typeof OAUTH_CONFIGS["gemini-cli"],
+  config: (typeof OAUTH_CONFIGS)["gemini-cli"],
   redirectUri: string
 ): AuthorizeResult {
   const state = generatePKCE().state;
@@ -316,7 +338,12 @@ function buildGeminiAuthorizeUrl(
     access_type: "offline",
     prompt: "consent",
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier: "", redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier: "",
+    redirectUri,
+  };
 }
 
 function buildIflowAuthorizeUrl(
@@ -331,7 +358,12 @@ function buildIflowAuthorizeUrl(
     state,
     client_id: config.clientId,
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier: "", redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier: "",
+    redirectUri,
+  };
 }
 
 function buildCodexAuthorizeUrl(
@@ -350,7 +382,12 @@ function buildCodexAuthorizeUrl(
     state,
     ...config.extraParams,
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier, redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier,
+    redirectUri,
+  };
 }
 
 function buildOpenAIAuthorizeUrl(
@@ -369,7 +406,12 @@ function buildOpenAIAuthorizeUrl(
     state,
     ...config.extraParams,
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier, redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier,
+    redirectUri,
+  };
 }
 
 function buildAntigravityAuthorizeUrl(
@@ -386,7 +428,12 @@ function buildAntigravityAuthorizeUrl(
     access_type: "offline",
     prompt: "consent",
   });
-  return { authUrl: `${config.authorizeUrl}?${params.toString()}`, state, codeVerifier: "", redirectUri };
+  return {
+    authUrl: `${config.authorizeUrl}?${params.toString()}`,
+    state,
+    codeVerifier: "",
+    redirectUri,
+  };
 }
 
 // ─── Token Exchange ─────────────────────────────────────────────────────────────────
@@ -465,7 +512,7 @@ async function exchangeClaudeCode(
 }
 
 async function exchangeGeminiCode(
-  config: typeof OAUTH_CONFIGS["gemini-cli"],
+  config: (typeof OAUTH_CONFIGS)["gemini-cli"],
   code: string,
   redirectUri: string
 ): Promise<ExchangeResult> {
@@ -501,7 +548,9 @@ async function exchangeGeminiCode(
       const userInfo = asObjectRecord(await userRes.json()) ?? {};
       email = typeof userInfo.email === "string" ? userInfo.email : undefined;
     }
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   // Fetch project ID
   let projectId: string | undefined;
@@ -524,7 +573,9 @@ async function exchangeGeminiCode(
             ? companionProject.id.trim()
             : undefined;
     }
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   return {
     accessToken: data.access_token,
@@ -572,22 +623,28 @@ async function exchangeIflowCode(
   let email: string | undefined;
   let apiKey: string | undefined;
   try {
-    const userRes = await fetch(`${config.userInfoUrl}?accessToken=${encodeURIComponent(data.access_token)}`, {
-      headers: { Accept: "application/json" },
-    });
+    const userRes = await fetch(
+      `${config.userInfoUrl}?accessToken=${encodeURIComponent(data.access_token)}`,
+      {
+        headers: { Accept: "application/json" },
+      }
+    );
     if (userRes.ok) {
       const result = asObjectRecord(await userRes.json()) ?? {};
       const resultData = asObjectRecord(result.data);
       if (result.success && resultData) {
-        email = typeof resultData.email === "string"
-          ? resultData.email
-          : typeof resultData.phone === "string"
-            ? resultData.phone
-            : undefined;
+        email =
+          typeof resultData.email === "string"
+            ? resultData.email
+            : typeof resultData.phone === "string"
+              ? resultData.phone
+              : undefined;
         apiKey = typeof resultData.apiKey === "string" ? resultData.apiKey : undefined;
       }
     }
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   return {
     accessToken: data.access_token,
@@ -674,7 +731,9 @@ export async function iflowCookieAuth(cookie: string): Promise<ExchangeResult> {
   if (!getRes.ok) throw new Error("Failed to fetch iFlow API key info");
   const getResult = asObjectRecord(await getRes.json()) ?? {};
   if (!getResult.success) {
-    throw new Error(`iFlow API key fetch failed: ${typeof getResult.message === "string" ? getResult.message : "unknown error"}`);
+    throw new Error(
+      `iFlow API key fetch failed: ${typeof getResult.message === "string" ? getResult.message : "unknown error"}`
+    );
   }
 
   const keyData = asObjectRecord(getResult.data);
@@ -698,7 +757,9 @@ export async function iflowCookieAuth(cookie: string): Promise<ExchangeResult> {
   if (!postRes.ok) throw new Error("Failed to refresh iFlow API key");
   const postResult = asObjectRecord(await postRes.json()) ?? {};
   if (!postResult.success) {
-    throw new Error(`iFlow API key refresh failed: ${typeof postResult.message === "string" ? postResult.message : "unknown error"}`);
+    throw new Error(
+      `iFlow API key refresh failed: ${typeof postResult.message === "string" ? postResult.message : "unknown error"}`
+    );
   }
 
   const refreshedKey = asObjectRecord(postResult.data);
@@ -745,7 +806,11 @@ export async function saveOAuthConnection(
     isActive: true,
     testStatus: "active",
     providerSpecificData: {
-      ...Object.fromEntries(Object.entries(tokens).filter(([k]) => !["accessToken", "refreshToken", "expiresIn", "email"].includes(k))),
+      ...Object.fromEntries(
+        Object.entries(tokens).filter(
+          ([k]) => !["accessToken", "refreshToken", "expiresIn", "email"].includes(k)
+        )
+      ),
       authMethod: authMethod || "oauth",
     },
   });

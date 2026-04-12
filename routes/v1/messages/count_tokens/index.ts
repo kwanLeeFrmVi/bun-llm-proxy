@@ -6,7 +6,7 @@ import { register } from "lib/routeRegistry";
 export async function POST(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
   try {
-    body = await req.json() as Record<string, unknown>;
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,

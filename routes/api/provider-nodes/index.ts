@@ -43,21 +43,30 @@ export async function POST(req: Request): Promise<Response> {
   // Sanitize prefix: only alphanumeric, dashes, and underscores allowed
   const sanitizedPrefix = (prefix as string).trim().replace(/[^a-zA-Z0-9-_]/g, "");
   if (!sanitizedPrefix) {
-    return Response.json({ error: "Prefix must contain at least one alphanumeric character" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Prefix must contain at least one alphanumeric character" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   // Check prefix uniqueness
   const existingNodes = await getProviderNodes();
   const existingNode = existingNodes.find((n) => n.prefix === sanitizedPrefix);
   if (existingNode) {
-    return Response.json({ error: `Prefix "${sanitizedPrefix}" already exists` }, { status: 409, headers: CORS_HEADERS });
+    return Response.json(
+      { error: `Prefix "${sanitizedPrefix}" already exists` },
+      { status: 409, headers: CORS_HEADERS }
+    );
   }
 
   const nodeType = (type as string) || "openai-compatible";
 
   if (nodeType === "openai-compatible") {
     if (apiType && !["chat", "responses"].includes(apiType as string)) {
-      return Response.json({ error: "Invalid API type for OpenAI Compatible" }, { status: 400, headers: CORS_HEADERS });
+      return Response.json(
+        { error: "Invalid API type for OpenAI Compatible" },
+        { status: 400, headers: CORS_HEADERS }
+      );
     }
     const resolvedType = (apiType as string) || "chat";
     const node = await createProviderNode({
@@ -72,7 +81,9 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   if (nodeType === "anthropic-compatible") {
-    let cleanBaseUrl = ((baseUrl as string) || ANTHROPIC_DEFAULT_BASE_URL).trim().replace(/\/$/, "");
+    let cleanBaseUrl = ((baseUrl as string) || ANTHROPIC_DEFAULT_BASE_URL)
+      .trim()
+      .replace(/\/$/, "");
     if (cleanBaseUrl.endsWith("/messages")) {
       cleanBaseUrl = cleanBaseUrl.slice(0, -9);
     }
@@ -86,7 +97,10 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ node }, { status: 201, headers: CORS_HEADERS });
   }
 
-  return Response.json({ error: "Invalid provider node type" }, { status: 400, headers: CORS_HEADERS });
+  return Response.json(
+    { error: "Invalid provider node type" },
+    { status: 400, headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

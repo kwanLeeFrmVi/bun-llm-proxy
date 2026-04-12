@@ -18,7 +18,7 @@ export async function PUT(req: Request): Promise<Response> {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json() as Record<string, unknown>;
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }

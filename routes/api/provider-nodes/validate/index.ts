@@ -20,10 +20,16 @@ export async function POST(req: Request): Promise<Response> {
   const { baseUrl, apiKey, type, modelId } = body;
 
   if (!baseUrl || !apiKey) {
-    return Response.json({ error: "Base URL and API key required" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Base URL and API key required" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
   if (typeof baseUrl !== "string" || typeof apiKey !== "string") {
-    return Response.json({ error: "baseUrl and apiKey must be strings" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "baseUrl and apiKey must be strings" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const isAnthropic = type === "anthropic-compatible";
@@ -38,15 +44,22 @@ export async function POST(req: Request): Promise<Response> {
     if (isAnthropic) {
       modelsRes = await fetchWithTimeout(modelsUrl, {
         method: "GET",
-        headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION, "Authorization": `Bearer ${apiKey}` },
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_API_VERSION,
+          Authorization: `Bearer ${apiKey}`,
+        },
       });
     } else {
       modelsRes = await fetchWithTimeout(modelsUrl, {
-        headers: { "Authorization": `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${apiKey}` },
       });
     }
   } catch (err) {
-    return Response.json({ valid: false, error: friendlyError(err) }, { status: 500, headers: CORS_HEADERS });
+    return Response.json(
+      { valid: false, error: friendlyError(err) },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 
   if (modelsRes.ok) {
@@ -55,7 +68,10 @@ export async function POST(req: Request): Promise<Response> {
 
   // Auth error → no point in chat fallback
   if (modelsRes.status === 401 || modelsRes.status === 403) {
-    return Response.json({ valid: false, error: "API key unauthorized" }, { headers: CORS_HEADERS });
+    return Response.json(
+      { valid: false, error: "API key unauthorized" },
+      { headers: CORS_HEADERS }
+    );
   }
 
   // Try chat/completions fallback if modelId provided
@@ -69,27 +85,48 @@ export async function POST(req: Request): Promise<Response> {
       if (isAnthropic) {
         chatRes = await fetchWithTimeout(chatUrl, {
           method: "POST",
-          headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: modelId.trim(), messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": ANTHROPIC_API_VERSION,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: modelId.trim(),
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 1,
+          }),
         });
       } else {
         chatRes = await fetchWithTimeout(chatUrl, {
           method: "POST",
-          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: modelId.trim(), messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: modelId.trim(),
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 1,
+          }),
         });
       }
     } catch (err) {
-      return Response.json({ valid: false, error: friendlyError(err), method: "chat" }, { status: 500, headers: CORS_HEADERS });
+      return Response.json(
+        { valid: false, error: friendlyError(err), method: "chat" },
+        { status: 500, headers: CORS_HEADERS }
+      );
     }
 
     if (chatRes.ok) {
       return Response.json({ valid: true, method: "chat" }, { headers: CORS_HEADERS });
     }
-    return Response.json({ valid: false, error: `Request failed (${chatRes.status})`, method: "chat" }, { headers: CORS_HEADERS });
+    return Response.json(
+      { valid: false, error: `Request failed (${chatRes.status})`, method: "chat" },
+      { headers: CORS_HEADERS }
+    );
   }
 
-  return Response.json({ valid: false, error: `/models endpoint returned ${modelsRes.status}` }, { headers: CORS_HEADERS });
+  return Response.json(
+    { valid: false, error: `/models endpoint returned ${modelsRes.status}` },
+    { headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

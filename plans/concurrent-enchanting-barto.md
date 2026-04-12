@@ -5,6 +5,7 @@
 The `pro-x` provider has 2 unreliable accounts (`tobi250`, `tobi450`) that frequently return 502 Bad Gateway errors. Currently, **each 502 immediately locks the account** (calling `markAccountUnavailable`), which forces a switch to the fallback account even if the error is transient and the same account would succeed on retry.
 
 From the logs:
+
 - `tobi450` gets a 120s lock on 502 → `tobi250` tried next
 - `tobi250` gets a 1s lock on 502 → next request immediately retries and succeeds
 - This pattern wastes accounts and adds latency
@@ -52,6 +53,7 @@ if (!result.success && TRANSIENT_ERRORS.has(result.status)) {
 ## Files to Modify
 
 1. **`ai-bridge/config/runtimeConfig.ts`** — Add:
+
    ```ts
    export const MAX_TRANSIENT_RETRIES = 2;
    export const TRANSIENT_RETRY_BASE_DELAY_MS = 250;

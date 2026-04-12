@@ -2,12 +2,12 @@ import { getProviderConnections, createProviderConnection } from "@/lib/localDb"
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
+import { FREE_PROVIDERS, FREE_TIER_PROVIDERS, APIKEY_PROVIDERS } from "lib/providerCatalog.ts";
 import {
-  FREE_PROVIDERS,
-  FREE_TIER_PROVIDERS,
-  APIKEY_PROVIDERS,
-} from "lib/providerCatalog.ts";
-import { asObjectRecord, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/utils.ts";
+  asObjectRecord,
+  isAnthropicCompatibleProvider,
+  isOpenAICompatibleProvider,
+} from "lib/utils.ts";
 
 // ─── Validation helper ──────────────────────────────────────────────────────────
 
@@ -67,7 +67,10 @@ export async function POST(req: Request): Promise<Response> {
 
   // Validate provider
   if (!provider || typeof provider !== "string") {
-    return Response.json({ error: "Missing required field: provider" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Missing required field: provider" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   // Support compatible providers (openai-compatible-* and anthropic-compatible-*)
@@ -75,7 +78,10 @@ export async function POST(req: Request): Promise<Response> {
     isOpenAICompatibleProvider(provider) || isAnthropicCompatibleProvider(provider);
 
   if (!isKnownProvider(provider) && !isCompatible) {
-    return Response.json({ error: `Unknown provider: ${provider}` }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: `Unknown provider: ${provider}` },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   // apiKey is required for non-free-tier
@@ -109,7 +115,13 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   // Sanitize response
-  const { apiKey: _ek, accessToken: _at, refreshToken: _rt, idToken: _it, ...safe } = conn as Record<string, unknown>;
+  const {
+    apiKey: _ek,
+    accessToken: _at,
+    refreshToken: _rt,
+    idToken: _it,
+    ...safe
+  } = conn as Record<string, unknown>;
   return Response.json(safe, { status: 201, headers: CORS_HEADERS });
 }
 

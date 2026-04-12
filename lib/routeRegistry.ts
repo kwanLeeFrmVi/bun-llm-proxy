@@ -6,7 +6,7 @@
 import { corsResponse } from "./cors.ts";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"] as const;
-type HttpMethod = typeof HTTP_METHODS[number];
+type HttpMethod = (typeof HTTP_METHODS)[number];
 type Handler = (req: Request) => Response | Promise<Response>;
 
 type RouteConfig = Record<string, Partial<Record<HttpMethod, Handler>>>;

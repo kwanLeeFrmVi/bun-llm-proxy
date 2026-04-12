@@ -8,7 +8,7 @@ import { register } from "lib/routeRegistry";
 export async function POST(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
   try {
-    body = await req.json() as Record<string, unknown>;
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -23,11 +23,15 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   const response = await handleChat(internalReq);
-  const ollamaRes = await transformToOllama(response, modelName) as Response;
+  const ollamaRes = (await transformToOllama(response, modelName)) as Response;
 
   const headers = new Headers(ollamaRes.headers);
   for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
-  return new Response(ollamaRes.body, { status: ollamaRes.status, statusText: ollamaRes.statusText, headers });
+  return new Response(ollamaRes.body, {
+    status: ollamaRes.status,
+    statusText: ollamaRes.statusText,
+    headers,
+  });
 }
 
 export function OPTIONS(): Response {

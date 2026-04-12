@@ -24,7 +24,7 @@ function stripVertexIncompatibleFields(body: Record<string, unknown>): Record<st
 
     // Remove synthetic thoughtSignature parts
     turn.parts = (turn.parts as Array<Record<string, unknown>>).filter(
-      (p) => !(p.thoughtSignature !== undefined && p.text === "" && !p.thought),
+      (p) => !(p.thoughtSignature !== undefined && p.text === "" && !p.thought)
     );
 
     for (const part of turn.parts as Array<Record<string, unknown>>) {

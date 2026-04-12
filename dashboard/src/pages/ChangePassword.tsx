@@ -14,10 +14,7 @@ export default function ChangePassword() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const canSubmit =
-    current.trim().length >= 6 &&
-    newPw.trim().length >= 6 &&
-    newPw === confirm;
+  const canSubmit = current.trim().length >= 6 && newPw.trim().length >= 6 && newPw === confirm;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +72,7 @@ export default function ChangePassword() {
             <Input
               type="password"
               value={current}
-              onChange={e => setCurrent(e.target.value)}
+              onChange={(e) => setCurrent(e.target.value)}
               placeholder="Enter current password"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]"
             />
@@ -88,7 +85,7 @@ export default function ChangePassword() {
             <Input
               type="password"
               value={newPw}
-              onChange={e => setNewPw(e.target.value)}
+              onChange={(e) => setNewPw(e.target.value)}
               placeholder="Minimum 6 characters"
               className="h-11 bg-[--surface-container-low] border border-[--outline-variant] rounded-lg text-sm focus:border-[--primary]"
             />
@@ -101,14 +98,14 @@ export default function ChangePassword() {
             <Input
               type="password"
               value={confirm}
-              onChange={e => setConfirm(e.target.value)}
+              onChange={(e) => setConfirm(e.target.value)}
               placeholder="Repeat new password"
-              onKeyDown={e => e.key === "Enter" && canSubmit && handleSubmit(e as unknown as React.FormEvent)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && canSubmit && handleSubmit(e as unknown as React.FormEvent)
+              }
               className={
                 "h-11 bg-[--surface-container-low] border rounded-lg text-sm focus:border-[--primary] " +
-                (confirm && newPw !== confirm
-                  ? "border-red-400"
-                  : "border-[--outline-variant]")
+                (confirm && newPw !== confirm ? "border-red-400" : "border-[--outline-variant]")
               }
             />
             {confirm && newPw !== confirm && (
@@ -135,7 +132,8 @@ export default function ChangePassword() {
 
       {/* Tip */}
       <p className="text-xs text-[--on-surface-variant] leading-relaxed">
-        Use a strong, unique password with at least 8 characters. Avoid reusing passwords from other services.
+        Use a strong, unique password with at least 8 characters. Avoid reusing passwords from other
+        services.
       </p>
     </div>
   );

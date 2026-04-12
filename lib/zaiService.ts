@@ -94,10 +94,7 @@ const ZAI_TOKEN = process.env.ZAI_USAGE_TOKEN ?? "";
 
 // ─── Core helpers ───────────────────────────────────────────────────────────────
 
-async function zaiFetch(
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
+async function zaiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/plain, */*",
@@ -125,10 +122,10 @@ export async function getQuotaLimit(): Promise<ZaiQuotaResponse> {
 
 export async function getModelPerformance(
   startTime: string,
-  endTime: string,
+  endTime: string
 ): Promise<ZaiPerformanceResponse> {
   const res = await zaiFetch(
-    `/api/monitor/usage/model-performance-day?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`,
+    `/api/monitor/usage/model-performance-day?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`
   );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -137,12 +134,9 @@ export async function getModelPerformance(
   return res.json() as Promise<ZaiPerformanceResponse>;
 }
 
-export async function getModelUsage(
-  startTime: string,
-  endTime: string,
-): Promise<ZaiUsageResponse> {
+export async function getModelUsage(startTime: string, endTime: string): Promise<ZaiUsageResponse> {
   const res = await zaiFetch(
-    `/api/monitor/usage/model-usage?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`,
+    `/api/monitor/usage/model-usage?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`
   );
   if (!res.ok) {
     const text = await res.text().catch(() => "");

@@ -203,12 +203,7 @@ export default function UserDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/users")}
-          className="h-9 w-9"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/users")} className="h-9 w-9">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -342,7 +337,9 @@ export default function UserDetail() {
         {assignedKeys.length === 0 ? (
           <div className="p-12 text-center">
             <Key className="mx-auto h-12 w-12 text-[--on-surface-variant]/40 mb-3" />
-            <p className="text-[--on-surface-variant] text-sm">No API keys assigned to this user.</p>
+            <p className="text-[--on-surface-variant] text-sm">
+              No API keys assigned to this user.
+            </p>
           </div>
         ) : (
           <Table>

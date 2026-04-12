@@ -25,7 +25,10 @@ export default function OAuthCallback() {
 
     // Also set in localStorage for cross-tab
     try {
-      localStorage.setItem("oauth_callback", JSON.stringify({ ...callbackData, timestamp: Date.now() }));
+      localStorage.setItem(
+        "oauth_callback",
+        JSON.stringify({ ...callbackData, timestamp: Date.now() })
+      );
     } catch {}
 
     // Try postMessage to opener
@@ -49,8 +52,12 @@ export default function OAuthCallback() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[--surface-container-low] flex items-center justify-center">
               <div className="w-8 h-8 border-4 border-[--primary] border-t-transparent rounded-full animate-spin" />
             </div>
-            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">Processing...</h1>
-            <p className="text-sm text-[--on-surface-variant]">Completing authorization, please wait.</p>
+            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">
+              Processing...
+            </h1>
+            <p className="text-sm text-[--on-surface-variant]">
+              Completing authorization, please wait.
+            </p>
           </>
         )}
         {status === "success" && (
@@ -58,8 +65,12 @@ export default function OAuthCallback() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">Authorization Successful!</h1>
-            <p className="text-sm text-[--on-surface-variant]">You can close this tab and return to the dashboard.</p>
+            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">
+              Authorization Successful!
+            </h1>
+            <p className="text-sm text-[--on-surface-variant]">
+              You can close this tab and return to the dashboard.
+            </p>
           </>
         )}
         {status === "error" && (
@@ -67,7 +78,9 @@ export default function OAuthCallback() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
               <span className="text-red-500 text-3xl font-bold">!</span>
             </div>
-            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">Authorization Failed</h1>
+            <h1 className="text-lg font-headline font-bold text-[--on-surface] mb-2">
+              Authorization Failed
+            </h1>
             <p className="text-sm text-red-500">{errorMsg}</p>
           </>
         )}

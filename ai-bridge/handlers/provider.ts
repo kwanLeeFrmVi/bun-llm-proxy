@@ -24,8 +24,8 @@ interface ProviderConfig {
   baseUrl?: string;
   format: string;
   headers?: Record<string, string>;
-  baseUrls?: string[];  // For providers with multiple fallback URLs (e.g., antigravity)
-  usesApiKeyInUrl?: boolean;  // For Gemini where API key goes in URL
+  baseUrls?: string[]; // For providers with multiple fallback URLs (e.g., antigravity)
+  usesApiKeyInUrl?: boolean; // For Gemini where API key goes in URL
 }
 
 export const PROVIDERS: Record<string, ProviderConfig> = {
@@ -69,7 +69,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
   },
   "vertex-partner": {
     baseUrl: "https://aiplatform.googleapis.com",
-    format: FORMATS.OPENAI,  // Uses OpenAI-compatible endpoint, not Gemini format
+    format: FORMATS.OPENAI, // Uses OpenAI-compatible endpoint, not Gemini format
   },
 
   // ── API Key providers ─────────────────────────────────────────────────────────────
@@ -242,21 +242,17 @@ export function detectFormat(body: Record<string, unknown> | null): string {
         }
       }
       // Check for Claude image format
-      const hasClaudeImage = (firstMsg.content as Array<Record<string, unknown>>).some(
-        (c) => {
-          const content = c as Record<string, unknown>;
-          const source = content.source as Record<string, unknown> | undefined;
-          return content.type === "image" && source?.type === "base64";
-        }
-      );
+      const hasClaudeImage = (firstMsg.content as Array<Record<string, unknown>>).some((c) => {
+        const content = c as Record<string, unknown>;
+        const source = content.source as Record<string, unknown> | undefined;
+        return content.type === "image" && source?.type === "base64";
+      });
       if (hasClaudeImage) return FORMATS.CLAUDE;
       // Check for Claude tool format
-      const hasClaudeTool = (firstMsg.content as Array<Record<string, unknown>>).some(
-        (c) => {
-          const content = c as Record<string, unknown>;
-          return content.type === "tool_use" || content.type === "tool_result";
-        }
-      );
+      const hasClaudeTool = (firstMsg.content as Array<Record<string, unknown>>).some((c) => {
+        const content = c as Record<string, unknown>;
+        return content.type === "tool_use" || content.type === "tool_result";
+      });
       if (hasClaudeTool) return FORMATS.CLAUDE;
     }
     if (body.system !== undefined || body.anthropic_version !== undefined) {
@@ -299,7 +295,8 @@ export function buildUpstreamUrl(
 
   // Handle anthropic-compatible-* dynamically
   if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) {
-    const base = (psd?.baseUrl as string | undefined) ?? ANTHROPIC_DEFAULT_BASE_URL.replace("/v1", "");
+    const base =
+      (psd?.baseUrl as string | undefined) ?? ANTHROPIC_DEFAULT_BASE_URL.replace("/v1", "");
     const cleanBase = base.replace(/\/v1\/?$/, "");
     return `${cleanBase}/v1/messages`;
   }
@@ -344,7 +341,11 @@ export function buildUpstreamUrl(
   }
 
   // Handle streaming for Gemini formats
-  if (config.format === FORMATS.GEMINI || config.format === FORMATS.GEMINI_CLI || config.format === FORMATS.VERTEX) {
+  if (
+    config.format === FORMATS.GEMINI ||
+    config.format === FORMATS.GEMINI_CLI ||
+    config.format === FORMATS.VERTEX
+  ) {
     const action = stream ? "streamGenerateContent" : "generateContent";
 
     // Vertex AI requires full path: /v1/projects/{project}/locations/{location}/publishers/{publisher}/models/{model}
@@ -375,7 +376,9 @@ export function buildUpstreamHeaders(
 ): Record<string, string> {
   const apiKey = credentials.apiKey as string | undefined;
   const accessToken = credentials.accessToken as string | undefined;
-  const providerSpecificData = credentials.providerSpecificData as Record<string, unknown> | undefined;
+  const providerSpecificData = credentials.providerSpecificData as
+    | Record<string, unknown>
+    | undefined;
 
   // Handle anthropic-compatible-* dynamically
   if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) {
@@ -461,8 +464,18 @@ function overlayCachedHeaders(
     // Special handling for anthropic-beta to preserve required flags
     if (lcKey === "anthropic-beta") {
       const staticBetaStr = baseHeaders[titleKey] || baseHeaders[lcKey] || "";
-      const staticFlags = new Set(staticBetaStr.split(",").map((f) => f.trim()).filter(Boolean));
-      const cachedFlags = new Set((cached[lcKey] || "").split(",").map((f) => f.trim()).filter(Boolean));
+      const staticFlags = new Set(
+        staticBetaStr
+          .split(",")
+          .map((f) => f.trim())
+          .filter(Boolean)
+      );
+      const cachedFlags = new Set(
+        (cached[lcKey] || "")
+          .split(",")
+          .map((f) => f.trim())
+          .filter(Boolean)
+      );
 
       // Merge all static flags into the cached ones
       for (const flag of staticFlags) {

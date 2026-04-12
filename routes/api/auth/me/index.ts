@@ -8,9 +8,13 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
 
   const user = await getUserById(auth.userId);
-  if (!user) return Response.json({ error: "User not found" }, { status: 404, headers: CORS_HEADERS });
+  if (!user)
+    return Response.json({ error: "User not found" }, { status: 404, headers: CORS_HEADERS });
 
-  return Response.json({ id: user.id, username: user.username, role: user.role }, { headers: CORS_HEADERS });
+  return Response.json(
+    { id: user.id, username: user.username, role: user.role },
+    { headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

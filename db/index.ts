@@ -16,19 +16,20 @@ export function openDb(): Database {
 
   // Check if we need to create tables (fresh install)
   const hasTables = db
-    .query<{ name: string }, []>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('provider_connections', 'users')"
-    )
+    .query<
+      { name: string },
+      []
+    >("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('provider_connections', 'users')")
     .all();
 
   if (hasTables.length === 0) {
     // Fresh install - create v2 schema directly
     db.run(CREATE_TABLES);
     // Record current version
-    db.run(
-      "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
-      [CURRENT_SCHEMA_VERSION, new Date().toISOString()]
-    );
+    db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [
+      CURRENT_SCHEMA_VERSION,
+      new Date().toISOString(),
+    ]);
     // Seed default settings
     seedDefaultSettings(db);
   } else {
@@ -69,10 +70,10 @@ function db(): Database {
 
 function seedDefaultSettings(database: Database): void {
   for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-    database.run(
-      "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-      [key, JSON.stringify(value)]
-    );
+    database.run("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", [
+      key,
+      JSON.stringify(value),
+    ]);
   }
 }
 
@@ -139,32 +140,35 @@ export async function getProviderConnections(
 
   if (filter.provider && filter.isActive !== undefined) {
     rows = db()
-      .query<{
-        id: string;
-        provider: string;
-        name: string;
-        display_name: string;
-        email: string;
-        auth_type: string;
-        api_key: string;
-        access_token: string;
-        refresh_token: string;
-        id_token: string;
-        expires_at: string;
-        project_id: string;
-        priority: number;
-        is_active: number;
-        test_status: string;
-        last_error: string;
-        error_code: number;
-        last_error_at: string;
-        backoff_level: number;
-        last_used_at: string;
-        consecutive_use_count: number;
-        provider_specific_data: string;
-        created_at: string;
-        updated_at: string;
-      }, [string, number]>(
+      .query<
+        {
+          id: string;
+          provider: string;
+          name: string;
+          display_name: string;
+          email: string;
+          auth_type: string;
+          api_key: string;
+          access_token: string;
+          refresh_token: string;
+          id_token: string;
+          expires_at: string;
+          project_id: string;
+          priority: number;
+          is_active: number;
+          test_status: string;
+          last_error: string;
+          error_code: number;
+          last_error_at: string;
+          backoff_level: number;
+          last_used_at: string;
+          consecutive_use_count: number;
+          provider_specific_data: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [string, number]
+      >(
         `SELECT id, provider, name, display_name, email, auth_type, api_key,
                 access_token, refresh_token, id_token, expires_at, project_id,
                 priority, is_active, test_status, last_error, error_code,
@@ -175,32 +179,35 @@ export async function getProviderConnections(
       .all(filter.provider, filter.isActive ? 1 : 0);
   } else if (filter.provider) {
     rows = db()
-      .query<{
-        id: string;
-        provider: string;
-        name: string;
-        display_name: string;
-        email: string;
-        auth_type: string;
-        api_key: string;
-        access_token: string;
-        refresh_token: string;
-        id_token: string;
-        expires_at: string;
-        project_id: string;
-        priority: number;
-        is_active: number;
-        test_status: string;
-        last_error: string;
-        error_code: number;
-        last_error_at: string;
-        backoff_level: number;
-        last_used_at: string;
-        consecutive_use_count: number;
-        provider_specific_data: string;
-        created_at: string;
-        updated_at: string;
-      }, [string]>(
+      .query<
+        {
+          id: string;
+          provider: string;
+          name: string;
+          display_name: string;
+          email: string;
+          auth_type: string;
+          api_key: string;
+          access_token: string;
+          refresh_token: string;
+          id_token: string;
+          expires_at: string;
+          project_id: string;
+          priority: number;
+          is_active: number;
+          test_status: string;
+          last_error: string;
+          error_code: number;
+          last_error_at: string;
+          backoff_level: number;
+          last_used_at: string;
+          consecutive_use_count: number;
+          provider_specific_data: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [string]
+      >(
         `SELECT id, provider, name, display_name, email, auth_type, api_key,
                 access_token, refresh_token, id_token, expires_at, project_id,
                 priority, is_active, test_status, last_error, error_code,
@@ -211,32 +218,35 @@ export async function getProviderConnections(
       .all(filter.provider);
   } else if (filter.isActive !== undefined) {
     rows = db()
-      .query<{
-        id: string;
-        provider: string;
-        name: string;
-        display_name: string;
-        email: string;
-        auth_type: string;
-        api_key: string;
-        access_token: string;
-        refresh_token: string;
-        id_token: string;
-        expires_at: string;
-        project_id: string;
-        priority: number;
-        is_active: number;
-        test_status: string;
-        last_error: string;
-        error_code: number;
-        last_error_at: string;
-        backoff_level: number;
-        last_used_at: string;
-        consecutive_use_count: number;
-        provider_specific_data: string;
-        created_at: string;
-        updated_at: string;
-      }, [number]>(
+      .query<
+        {
+          id: string;
+          provider: string;
+          name: string;
+          display_name: string;
+          email: string;
+          auth_type: string;
+          api_key: string;
+          access_token: string;
+          refresh_token: string;
+          id_token: string;
+          expires_at: string;
+          project_id: string;
+          priority: number;
+          is_active: number;
+          test_status: string;
+          last_error: string;
+          error_code: number;
+          last_error_at: string;
+          backoff_level: number;
+          last_used_at: string;
+          consecutive_use_count: number;
+          provider_specific_data: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [number]
+      >(
         `SELECT id, provider, name, display_name, email, auth_type, api_key,
                 access_token, refresh_token, id_token, expires_at, project_id,
                 priority, is_active, test_status, last_error, error_code,
@@ -247,32 +257,35 @@ export async function getProviderConnections(
       .all(filter.isActive ? 1 : 0);
   } else {
     rows = db()
-      .query<{
-        id: string;
-        provider: string;
-        name: string;
-        display_name: string;
-        email: string;
-        auth_type: string;
-        api_key: string;
-        access_token: string;
-        refresh_token: string;
-        id_token: string;
-        expires_at: string;
-        project_id: string;
-        priority: number;
-        is_active: number;
-        test_status: string;
-        last_error: string;
-        error_code: number;
-        last_error_at: string;
-        backoff_level: number;
-        last_used_at: string;
-        consecutive_use_count: number;
-        provider_specific_data: string;
-        created_at: string;
-        updated_at: string;
-      }, []>(
+      .query<
+        {
+          id: string;
+          provider: string;
+          name: string;
+          display_name: string;
+          email: string;
+          auth_type: string;
+          api_key: string;
+          access_token: string;
+          refresh_token: string;
+          id_token: string;
+          expires_at: string;
+          project_id: string;
+          priority: number;
+          is_active: number;
+          test_status: string;
+          last_error: string;
+          error_code: number;
+          last_error_at: string;
+          backoff_level: number;
+          last_used_at: string;
+          consecutive_use_count: number;
+          provider_specific_data: string;
+          created_at: string;
+          updated_at: string;
+        },
+        []
+      >(
         `SELECT id, provider, name, display_name, email, auth_type, api_key,
                 access_token, refresh_token, id_token, expires_at, project_id,
                 priority, is_active, test_status, last_error, error_code,
@@ -331,36 +344,37 @@ export async function getProviderConnections(
   return connections;
 }
 
-export async function getProviderConnectionById(
-  id: string
-): Promise<ProviderConnection | null> {
+export async function getProviderConnectionById(id: string): Promise<ProviderConnection | null> {
   const row = db()
-    .query<{
-      id: string;
-      provider: string;
-      name: string;
-      display_name: string;
-      email: string;
-      auth_type: string;
-      api_key: string;
-      access_token: string;
-      refresh_token: string;
-      id_token: string;
-      expires_at: string;
-      project_id: string;
-      priority: number;
-      is_active: number;
-      test_status: string;
-      last_error: string;
-      error_code: number;
-      last_error_at: string;
-      backoff_level: number;
-      last_used_at: string;
-      consecutive_use_count: number;
-      provider_specific_data: string;
-      created_at: string;
-      updated_at: string;
-    }, string>(
+    .query<
+      {
+        id: string;
+        provider: string;
+        name: string;
+        display_name: string;
+        email: string;
+        auth_type: string;
+        api_key: string;
+        access_token: string;
+        refresh_token: string;
+        id_token: string;
+        expires_at: string;
+        project_id: string;
+        priority: number;
+        is_active: number;
+        test_status: string;
+        last_error: string;
+        error_code: number;
+        last_error_at: string;
+        backoff_level: number;
+        last_used_at: string;
+        consecutive_use_count: number;
+        provider_specific_data: string;
+        created_at: string;
+        updated_at: string;
+      },
+      string
+    >(
       `SELECT id, provider, name, display_name, email, auth_type, api_key,
               access_token, refresh_token, id_token, expires_at, project_id,
               priority, is_active, test_status, last_error, error_code,
@@ -497,7 +511,7 @@ export async function createProviderConnection(
       toStringOrNull(data.expiresAt),
       toStringOrNull(data.projectId),
       toInt(data.priority, 1),
-      data.isActive === undefined ? 1 : (toBool(data.isActive) ? 1 : 0),
+      data.isActive === undefined ? 1 : toBool(data.isActive) ? 1 : 0,
       toStringOrNull(data.testStatus) ?? "unknown",
       toStringOrNull(data.lastError),
       toIntOrNull(data.errorCode),
@@ -505,9 +519,7 @@ export async function createProviderConnection(
       toInt(data.backoffLevel, 0),
       toStringOrNull(data.lastUsedAt),
       toInt(data.consecutiveUseCount, 0),
-      Object.keys(providerSpecificData).length > 0
-        ? JSON.stringify(providerSpecificData)
-        : null,
+      Object.keys(providerSpecificData).length > 0 ? JSON.stringify(providerSpecificData) : null,
       data.createdAt ? toStringOrNull(data.createdAt) : now,
       now,
     ]
@@ -525,7 +537,7 @@ export async function updateProviderConnection(
 
   // Get current provider-specific data
   const currentPsd = { ...(existing.providerSpecificData ?? {}) };
-  const newPsd = data.providerSpecificData as Record<string, unknown> ?? {};
+  const newPsd = (data.providerSpecificData as Record<string, unknown>) ?? {};
 
   // Column fields that are stored in the main table
   const columnFields = [
@@ -585,32 +597,29 @@ export async function updateProviderConnection(
       updates.push(`${camelToSnake(field)} = ?`);
       params.push(
         field === "priority" ||
-        field === "errorCode" ||
-        field === "backoffLevel" ||
-        field === "consecutiveUseCount"
+          field === "errorCode" ||
+          field === "backoffLevel" ||
+          field === "consecutiveUseCount"
           ? toInt(data[field], 0)
           : field === "isActive"
-          ? toBool(data[field]) ? 1 : 0
-          : toStringOrNull(data[field])
+            ? toBool(data[field])
+              ? 1
+              : 0
+            : toStringOrNull(data[field])
       );
     }
   }
 
   // Always update provider_specific_data (merged with model locks and other dynamic fields)
   updates.push("provider_specific_data = ?");
-  params.push(
-    Object.keys(mergedPsd).length > 0 ? JSON.stringify(mergedPsd) : null
-  );
+  params.push(Object.keys(mergedPsd).length > 0 ? JSON.stringify(mergedPsd) : null);
 
   updates.push("updated_at = ?");
   params.push(new Date().toISOString());
 
   params.push(id);
 
-  db().run(
-    `UPDATE provider_connections SET ${updates.join(", ")} WHERE id = ?`,
-    params
-  );
+  db().run(`UPDATE provider_connections SET ${updates.join(", ")} WHERE id = ?`, params);
 
   return getProviderConnectionById(id);
 }
@@ -620,19 +629,12 @@ export async function deleteProviderConnection(id: string): Promise<boolean> {
   return (result.changes ?? 0) > 0;
 }
 
-export async function deleteProviderConnectionsByProvider(
-  providerId: string
-): Promise<number> {
-  const result = db().run(
-    "DELETE FROM provider_connections WHERE provider = ?",
-    [providerId]
-  );
+export async function deleteProviderConnectionsByProvider(providerId: string): Promise<number> {
+  const result = db().run("DELETE FROM provider_connections WHERE provider = ?", [providerId]);
   return result.changes ?? 0;
 }
 
-export async function reorderProviderConnections(
-  _providerId: string
-): Promise<void> {
+export async function reorderProviderConnections(_providerId: string): Promise<void> {
   // SQLite handles concurrent access; no reordering needed for bun runtime
 }
 
@@ -649,39 +651,38 @@ export interface ProviderNode {
   updatedAt?: string;
 }
 
-export async function getProviderNodes(
-  filter: { type?: string } = {}
-): Promise<ProviderNode[]> {
+export async function getProviderNodes(filter: { type?: string } = {}): Promise<ProviderNode[]> {
   let rows: ProviderNode[];
   if (filter.type) {
     rows = db()
-      .query<ProviderNode, string>(
-        "SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes WHERE type = ?"
-      )
+      .query<
+        ProviderNode,
+        string
+      >("SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes WHERE type = ?")
       .all(filter.type);
   } else {
     rows = db()
-      .query<ProviderNode, []>(
-        "SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes"
-      )
+      .query<
+        ProviderNode,
+        []
+      >("SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes")
       .all();
   }
   return rows;
 }
 
-export async function getProviderNodeById(
-  id: string
-): Promise<ProviderNode | null> {
-  return db()
-    .query<ProviderNode, string>(
-      "SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes WHERE id = ?"
-    )
-    .get(id) ?? null;
+export async function getProviderNodeById(id: string): Promise<ProviderNode | null> {
+  return (
+    db()
+      .query<
+        ProviderNode,
+        string
+      >("SELECT id, type, name, prefix, api_type as apiType, base_url as baseUrl, created_at as createdAt, updated_at as updatedAt FROM provider_nodes WHERE id = ?")
+      .get(id) ?? null
+  );
 }
 
-export async function createProviderNode(
-  data: Record<string, unknown>
-): Promise<ProviderNode> {
+export async function createProviderNode(data: Record<string, unknown>): Promise<ProviderNode> {
   const id = (data.id as string) ?? randomUUID();
   const now = new Date().toISOString();
   db().run(
@@ -697,7 +698,12 @@ export async function createProviderNode(
       now,
     ]
   );
-  return { id, ...(data as Record<string, unknown>), createdAt: now, updatedAt: now } as ProviderNode;
+  return {
+    id,
+    ...(data as Record<string, unknown>),
+    createdAt: now,
+    updatedAt: now,
+  } as ProviderNode;
 }
 
 export async function updateProviderNode(
@@ -760,19 +766,22 @@ export async function getProxyPools(
 
   if (filter.isActive !== undefined && filter.testStatus) {
     rows = db()
-      .query<{
-        id: string;
-        name: string;
-        proxy_url: string;
-        no_proxy: string;
-        is_active: number;
-        strict_proxy: number;
-        test_status: string;
-        last_tested_at: string;
-        last_error: string;
-        created_at: string;
-        updated_at: string;
-      }, [number, string]>(
+      .query<
+        {
+          id: string;
+          name: string;
+          proxy_url: string;
+          no_proxy: string;
+          is_active: number;
+          strict_proxy: number;
+          test_status: string;
+          last_tested_at: string;
+          last_error: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [number, string]
+      >(
         `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
                 test_status, last_tested_at, last_error, created_at, updated_at
          FROM proxy_pools WHERE is_active = ? AND test_status = ?
@@ -781,19 +790,22 @@ export async function getProxyPools(
       .all(filter.isActive ? 1 : 0, filter.testStatus);
   } else if (filter.isActive !== undefined) {
     rows = db()
-      .query<{
-        id: string;
-        name: string;
-        proxy_url: string;
-        no_proxy: string;
-        is_active: number;
-        strict_proxy: number;
-        test_status: string;
-        last_tested_at: string;
-        last_error: string;
-        created_at: string;
-        updated_at: string;
-      }, [number]>(
+      .query<
+        {
+          id: string;
+          name: string;
+          proxy_url: string;
+          no_proxy: string;
+          is_active: number;
+          strict_proxy: number;
+          test_status: string;
+          last_tested_at: string;
+          last_error: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [number]
+      >(
         `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
                 test_status, last_tested_at, last_error, created_at, updated_at
          FROM proxy_pools WHERE is_active = ?
@@ -802,19 +814,22 @@ export async function getProxyPools(
       .all(filter.isActive ? 1 : 0);
   } else if (filter.testStatus) {
     rows = db()
-      .query<{
-        id: string;
-        name: string;
-        proxy_url: string;
-        no_proxy: string;
-        is_active: number;
-        strict_proxy: number;
-        test_status: string;
-        last_tested_at: string;
-        last_error: string;
-        created_at: string;
-        updated_at: string;
-      }, [string]>(
+      .query<
+        {
+          id: string;
+          name: string;
+          proxy_url: string;
+          no_proxy: string;
+          is_active: number;
+          strict_proxy: number;
+          test_status: string;
+          last_tested_at: string;
+          last_error: string;
+          created_at: string;
+          updated_at: string;
+        },
+        [string]
+      >(
         `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
                 test_status, last_tested_at, last_error, created_at, updated_at
          FROM proxy_pools WHERE test_status = ?
@@ -823,7 +838,50 @@ export async function getProxyPools(
       .all(filter.testStatus);
   } else {
     rows = db()
-      .query<{
+      .query<
+        {
+          id: string;
+          name: string;
+          proxy_url: string;
+          no_proxy: string;
+          is_active: number;
+          strict_proxy: number;
+          test_status: string;
+          last_tested_at: string;
+          last_error: string;
+          created_at: string;
+          updated_at: string;
+        },
+        []
+      >(
+        `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
+                test_status, last_tested_at, last_error, created_at, updated_at
+         FROM proxy_pools ORDER BY updated_at DESC`
+      )
+      .all();
+  }
+
+  return rows.map(
+    (r): ProxyPool => ({
+      id: r.id,
+      name: r.name ?? undefined,
+      proxyUrl: r.proxy_url ?? undefined,
+      noProxy: r.no_proxy ?? undefined,
+      isActive: r.is_active === 1,
+      strictProxy: r.strict_proxy === 1,
+      testStatus: r.test_status ?? undefined,
+      lastTestedAt: r.last_tested_at ?? undefined,
+      lastError: r.last_error ?? undefined,
+      createdAt: r.created_at ?? undefined,
+      updatedAt: r.updated_at ?? undefined,
+    })
+  );
+}
+
+export async function getProxyPoolById(id: string): Promise<ProxyPool | null> {
+  const row = db()
+    .query<
+      {
         id: string;
         name: string;
         proxy_url: string;
@@ -835,44 +893,9 @@ export async function getProxyPools(
         last_error: string;
         created_at: string;
         updated_at: string;
-      }, []>(
-        `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
-                test_status, last_tested_at, last_error, created_at, updated_at
-         FROM proxy_pools ORDER BY updated_at DESC`
-      )
-      .all();
-  }
-
-  return rows.map((r): ProxyPool => ({
-    id: r.id,
-    name: r.name ?? undefined,
-    proxyUrl: r.proxy_url ?? undefined,
-    noProxy: r.no_proxy ?? undefined,
-    isActive: r.is_active === 1,
-    strictProxy: r.strict_proxy === 1,
-    testStatus: r.test_status ?? undefined,
-    lastTestedAt: r.last_tested_at ?? undefined,
-    lastError: r.last_error ?? undefined,
-    createdAt: r.created_at ?? undefined,
-    updatedAt: r.updated_at ?? undefined,
-  }));
-}
-
-export async function getProxyPoolById(id: string): Promise<ProxyPool | null> {
-  const row = db()
-    .query<{
-      id: string;
-      name: string;
-      proxy_url: string;
-      no_proxy: string;
-      is_active: number;
-      strict_proxy: number;
-      test_status: string;
-      last_tested_at: string;
-      last_error: string;
-      created_at: string;
-      updated_at: string;
-    }, string>(
+      },
+      string
+    >(
       `SELECT id, name, proxy_url, no_proxy, is_active, strict_proxy,
               test_status, last_tested_at, last_error, created_at, updated_at
        FROM proxy_pools WHERE id = ?`
@@ -896,9 +919,7 @@ export async function getProxyPoolById(id: string): Promise<ProxyPool | null> {
   };
 }
 
-export async function createProxyPool(
-  data: Record<string, unknown>
-): Promise<ProxyPool> {
+export async function createProxyPool(data: Record<string, unknown>): Promise<ProxyPool> {
   const id = (data.id as string) ?? randomUUID();
   const now = new Date().toISOString();
 
@@ -961,7 +982,9 @@ export async function updateProxyPool(
       updates.push(`${camelToSnake(field)} = ?`);
       params.push(
         field === "isActive" || field === "strictProxy"
-          ? toBool(data[field]) ? 1 : 0
+          ? toBool(data[field])
+            ? 1
+            : 0
           : toStringOrNull(data[field])
       );
     }
@@ -993,11 +1016,12 @@ export interface Combo {
 
 export async function getCombos(): Promise<Combo[]> {
   return db()
-    .query<{ id: string; name: string; models: string; created_at: string; updated_at: string }, []>(
-      "SELECT id, name, models, created_at, updated_at FROM combos"
-    )
+    .query<
+      { id: string; name: string; models: string; created_at: string; updated_at: string },
+      []
+    >("SELECT id, name, models, created_at, updated_at FROM combos")
     .all()
-    .map(r => ({
+    .map((r) => ({
       id: r.id,
       name: r.name,
       models: JSON.parse(r.models) as string[],
@@ -1008,9 +1032,10 @@ export async function getCombos(): Promise<Combo[]> {
 
 export async function getComboById(id: string): Promise<Combo | null> {
   const row = db()
-    .query<{ id: string; name: string; models: string; created_at: string; updated_at: string }, string>(
-      "SELECT id, name, models, created_at, updated_at FROM combos WHERE id = ?"
-    )
+    .query<
+      { id: string; name: string; models: string; created_at: string; updated_at: string },
+      string
+    >("SELECT id, name, models, created_at, updated_at FROM combos WHERE id = ?")
     .get(id);
   if (!row) return null;
   return {
@@ -1024,9 +1049,10 @@ export async function getComboById(id: string): Promise<Combo | null> {
 
 export async function getComboByName(name: string): Promise<Combo | null> {
   const row = db()
-    .query<{ id: string; name: string; models: string; created_at: string; updated_at: string }, string>(
-      "SELECT id, name, models, created_at, updated_at FROM combos WHERE name = ?"
-    )
+    .query<
+      { id: string; name: string; models: string; created_at: string; updated_at: string },
+      string
+    >("SELECT id, name, models, created_at, updated_at FROM combos WHERE name = ?")
     .get(name);
   if (!row) return null;
   return {
@@ -1038,35 +1064,35 @@ export async function getComboByName(name: string): Promise<Combo | null> {
   };
 }
 
-export async function createCombo(data: {
-  name: string;
-  models?: string[];
-}): Promise<Combo> {
+export async function createCombo(data: { name: string; models?: string[] }): Promise<Combo> {
   const id = randomUUID();
   const now = new Date().toISOString();
-  db().run(
-    "INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-    [id, data.name, JSON.stringify(data.models ?? []), now, now]
-  );
+  db().run("INSERT INTO combos (id, name, models, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [
+    id,
+    data.name,
+    JSON.stringify(data.models ?? []),
+    now,
+    now,
+  ]);
   return { id, name: data.name, models: data.models ?? [], createdAt: now, updatedAt: now };
 }
 
-export async function updateCombo(
-  id: string,
-  data: Partial<Combo>
-): Promise<Combo | null> {
+export async function updateCombo(id: string, data: Partial<Combo>): Promise<Combo | null> {
   const now = new Date().toISOString();
   if (data.models !== undefined) {
     if (data.name !== undefined) {
-      db().run(
-        "UPDATE combos SET name = ?, models = ?, updated_at = ? WHERE id = ?",
-        [data.name, JSON.stringify(data.models), now, id]
-      );
+      db().run("UPDATE combos SET name = ?, models = ?, updated_at = ? WHERE id = ?", [
+        data.name,
+        JSON.stringify(data.models),
+        now,
+        id,
+      ]);
     } else {
-      db().run(
-        "UPDATE combos SET models = ?, updated_at = ? WHERE id = ?",
-        [JSON.stringify(data.models), now, id]
-      );
+      db().run("UPDATE combos SET models = ?, updated_at = ? WHERE id = ?", [
+        JSON.stringify(data.models),
+        now,
+        id,
+      ]);
     }
   } else if (data.name) {
     db().run("UPDATE combos SET name = ?, updated_at = ? WHERE id = ?", [data.name, now, id]);
@@ -1097,32 +1123,31 @@ export interface ComboConfig {
 
 export async function getComboConfig(name: string): Promise<ComboConfig | null> {
   const rows = db()
-    .query<{ model: string; weight: number }, string>(
-      "SELECT model, weight FROM combo_configs WHERE combo_name = ?"
-    )
+    .query<
+      { model: string; weight: number },
+      string
+    >("SELECT model, weight FROM combo_configs WHERE combo_name = ?")
     .all(name);
 
   if (rows.length === 0) return null;
 
   return {
     name,
-    models: rows.map(r => ({ model: r.model, weight: r.weight })),
+    models: rows.map((r) => ({ model: r.model, weight: r.weight })),
   };
 }
 
-export async function setComboConfig(
-  name: string,
-  config: ComboConfig
-): Promise<void> {
+export async function setComboConfig(name: string, config: ComboConfig): Promise<void> {
   // Delete existing configs for this combo
   db().run("DELETE FROM combo_configs WHERE combo_name = ?", [name]);
 
   // Insert new configs
   for (const item of config.models) {
-    db().run(
-      "INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)",
-      [name, item.model, item.weight ?? 1]
-    );
+    db().run("INSERT INTO combo_configs (combo_name, model, weight) VALUES (?, ?, ?)", [
+      name,
+      item.model,
+      item.weight ?? 1,
+    ]);
   }
 }
 
@@ -1184,21 +1209,37 @@ export interface ApiKey {
   userId?: string | null;
 }
 
-export async function getApiKeys(
-  filter: { userId?: string } = {}
-): Promise<ApiKey[]> {
+export async function getApiKeys(filter: { userId?: string } = {}): Promise<ApiKey[]> {
   const rows = filter.userId
     ? db()
-        .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
-          "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE user_id = ?"
-        )
+        .query<
+          {
+            id: string;
+            name: string;
+            key: string;
+            machine_id: string;
+            is_active: number;
+            created_at: string;
+            user_id: string | null;
+          },
+          string
+        >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE user_id = ?")
         .all(filter.userId)
     : db()
-        .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, []>(
-          "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys"
-        )
+        .query<
+          {
+            id: string;
+            name: string;
+            key: string;
+            machine_id: string;
+            is_active: number;
+            created_at: string;
+            user_id: string | null;
+          },
+          []
+        >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys")
         .all();
-  return rows.map(r => ({
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     key: r.key,
@@ -1218,9 +1259,18 @@ export async function validateApiKey(key: string): Promise<boolean> {
 
 export async function getApiKeyByKey(key: string): Promise<ApiKey | null> {
   const row = db()
-    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
-      "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE key = ?"
-    )
+    .query<
+      {
+        id: string;
+        name: string;
+        key: string;
+        machine_id: string;
+        is_active: number;
+        created_at: string;
+        user_id: string | null;
+      },
+      string
+    >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE key = ?")
     .get(key);
   if (!row) return null;
   return {
@@ -1236,9 +1286,18 @@ export async function getApiKeyByKey(key: string): Promise<ApiKey | null> {
 
 export async function getApiKeyById(id: string): Promise<ApiKey | null> {
   const row = db()
-    .query<{ id: string; name: string; key: string; machine_id: string; is_active: number; created_at: string; user_id: string | null }, string>(
-      "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE id = ?"
-    )
+    .query<
+      {
+        id: string;
+        name: string;
+        key: string;
+        machine_id: string;
+        is_active: number;
+        created_at: string;
+        user_id: string | null;
+      },
+      string
+    >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE id = ?")
     .get(id);
   if (!row) return null;
   return {
@@ -1264,13 +1323,18 @@ export async function createApiKey(
     "INSERT INTO api_keys (id, name, key, machine_id, is_active, created_at, user_id) VALUES (?, ?, ?, ?, 1, ?, ?)",
     [id, name, key, _machineId ?? null, now, userId ?? null]
   );
-  return { id, name, key, machineId: _machineId, isActive: true, createdAt: now, userId: userId ?? null };
+  return {
+    id,
+    name,
+    key,
+    machineId: _machineId,
+    isActive: true,
+    createdAt: now,
+    userId: userId ?? null,
+  };
 }
 
-export async function updateApiKey(
-  id: string,
-  data: Partial<ApiKey>
-): Promise<ApiKey | null> {
+export async function updateApiKey(id: string, data: Partial<ApiKey>): Promise<ApiKey | null> {
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
   if (data.name !== undefined) {
@@ -1310,7 +1374,7 @@ export async function getUsers(): Promise<Omit<User, "passwordHash">[]> {
       "SELECT id, username, role, created_at FROM users"
     )
     .all()
-    .map(r => ({
+    .map((r) => ({
       id: r.id,
       username: r.username,
       role: (r.role ?? "admin") as UserRole,
@@ -1339,25 +1403,18 @@ export async function createUser(
   };
 }
 
-export async function updateUserPassword(
-  id: string,
-  newHash: string
-): Promise<boolean> {
-  const result = db().run("UPDATE users SET password_hash = ? WHERE id = ?", [
-    newHash,
-    id,
-  ]);
+export async function updateUserPassword(id: string, newHash: string): Promise<boolean> {
+  const result = db().run("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, id]);
   return (result.changes ?? 0) > 0;
 }
 
-export async function getUserByUsername(
-  username: string
-): Promise<User | null> {
+export async function getUserByUsername(username: string): Promise<User | null> {
   const normalizedUsername = username.toLowerCase();
   const row = db()
-    .query<{ id: string; username: string; password_hash: string; role: string; created_at: string }, string>(
-      "SELECT id, username, password_hash, role, created_at FROM users WHERE username = ?"
-    )
+    .query<
+      { id: string; username: string; password_hash: string; role: string; created_at: string },
+      string
+    >("SELECT id, username, password_hash, role, created_at FROM users WHERE username = ?")
     .get(normalizedUsername);
   if (!row) return null;
   return {
@@ -1371,9 +1428,10 @@ export async function getUserByUsername(
 
 export async function getUserById(id: string): Promise<User | null> {
   const row = db()
-    .query<{ id: string; username: string; password_hash: string; role: string; created_at: string }, string>(
-      "SELECT id, username, password_hash, role, created_at FROM users WHERE id = ?"
-    )
+    .query<
+      { id: string; username: string; password_hash: string; role: string; created_at: string },
+      string
+    >("SELECT id, username, password_hash, role, created_at FROM users WHERE id = ?")
     .get(id);
   if (!row) return null;
   return {
@@ -1398,16 +1456,16 @@ export async function deleteUser(id: string): Promise<boolean> {
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-export async function createSession(
-  userId: string
-): Promise<{ token: string; expiresAt: string }> {
+export async function createSession(userId: string): Promise<{ token: string; expiresAt: string }> {
   const token = randomUUID();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS).toISOString();
-  db().run(
-    "INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
-    [token, userId, expiresAt, now.toISOString()]
-  );
+  db().run("INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", [
+    token,
+    userId,
+    expiresAt,
+    now.toISOString(),
+  ]);
   return { token, expiresAt };
 }
 
@@ -1415,9 +1473,10 @@ export async function getSessionByToken(
   token: string
 ): Promise<{ userId: string; expiresAt: string } | null> {
   const row = db()
-    .query<{ user_id: string; expires_at: string }, string>(
-      "SELECT user_id, expires_at FROM sessions WHERE token = ?"
-    )
+    .query<
+      { user_id: string; expires_at: string },
+      string
+    >("SELECT user_id, expires_at FROM sessions WHERE token = ?")
     .get(token);
   if (!row) return null;
   if (new Date(row.expires_at) < new Date()) {
@@ -1439,9 +1498,7 @@ export async function deleteExpiredSessions(): Promise<void> {
 
 export async function getModelAliases(): Promise<Record<string, string>> {
   const rows = db()
-    .query<{ alias: string; model: string }, []>(
-      "SELECT alias, model FROM model_aliases"
-    )
+    .query<{ alias: string; model: string }, []>("SELECT alias, model FROM model_aliases")
     .all();
 
   const result: Record<string, string> = {};
@@ -1451,10 +1508,7 @@ export async function getModelAliases(): Promise<Record<string, string>> {
   return result;
 }
 
-export async function setModelAlias(
-  alias: string,
-  model: string
-): Promise<void> {
+export async function setModelAlias(alias: string, model: string): Promise<void> {
   db().run(
     "INSERT INTO model_aliases (alias, model) VALUES (?, ?) ON CONFLICT(alias) DO UPDATE SET model = excluded.model",
     [alias, model]
@@ -1467,14 +1521,13 @@ export async function deleteModelAlias(alias: string): Promise<void> {
 
 // ─── MITM Alias (dedicated table) ────────────────────────────────────────────────
 
-export async function getMitmAlias(
-  toolName?: string
-): Promise<Record<string, unknown>> {
+export async function getMitmAlias(toolName?: string): Promise<Record<string, unknown>> {
   if (toolName) {
     const rows = db()
-      .query<{ alias: string; model: string }, string>(
-        "SELECT alias, model FROM mitm_aliases WHERE tool_name = ?"
-      )
+      .query<
+        { alias: string; model: string },
+        string
+      >("SELECT alias, model FROM mitm_aliases WHERE tool_name = ?")
       .all(toolName);
 
     const result: Record<string, string> = {};
@@ -1486,9 +1539,10 @@ export async function getMitmAlias(
 
   // Get all mitm aliases grouped by tool_name
   const rows = db()
-    .query<{ tool_name: string; alias: string; model: string }, []>(
-      "SELECT tool_name, alias, model FROM mitm_aliases"
-    )
+    .query<
+      { tool_name: string; alias: string; model: string },
+      []
+    >("SELECT tool_name, alias, model FROM mitm_aliases")
     .all();
 
   const result: Record<string, Record<string, string>> = {};
@@ -1510,18 +1564,17 @@ export async function setMitmAliasAll(
 
   // Insert new mappings
   for (const [alias, model] of Object.entries(mappings)) {
-    db().run(
-      "INSERT INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)",
-      [toolName, alias, toStringOrNull(model) ?? ""]
-    );
+    db().run("INSERT INTO mitm_aliases (tool_name, alias, model) VALUES (?, ?, ?)", [
+      toolName,
+      alias,
+      toStringOrNull(model) ?? "",
+    ]);
   }
 }
 
 // ─── Settings (dedicated table) ───────────────────────────────────────────────────
 
-export async function getSettings(): Promise<
-  typeof DEFAULT_SETTINGS & Record<string, unknown>
-> {
+export async function getSettings(): Promise<typeof DEFAULT_SETTINGS & Record<string, unknown>> {
   const rows = db()
     .query<{ key: string; value: string }, []>("SELECT key, value FROM settings")
     .all();
@@ -1535,14 +1588,10 @@ export async function getSettings(): Promise<
     }
   }
 
-  return { ...DEFAULT_SETTINGS, ...stored } as typeof DEFAULT_SETTINGS &
-    Record<string, unknown>;
+  return { ...DEFAULT_SETTINGS, ...stored } as typeof DEFAULT_SETTINGS & Record<string, unknown>;
 }
 
-export async function getSettingValue<T>(
-  key: string,
-  fallback: T
-): Promise<T> {
+export async function getSettingValue<T>(key: string, fallback: T): Promise<T> {
   const row = db()
     .query<{ value: string }, string>("SELECT value FROM settings WHERE key = ?")
     .get(key);
@@ -1584,10 +1633,7 @@ function getProviderEnabledModelsSettingKey(providerId: string): string {
 }
 
 export async function getProviderEnabledModels(providerId: string): Promise<string[]> {
-  const value = await getSettingValue<unknown>(
-    getProviderEnabledModelsSettingKey(providerId),
-    []
-  );
+  const value = await getSettingValue<unknown>(getProviderEnabledModelsSettingKey(providerId), []);
 
   if (!Array.isArray(value)) return [];
 
@@ -1640,22 +1686,22 @@ export async function getPricingForModel(
   model: string
 ): Promise<PricingEntry | null> {
   const row = db()
-    .query<{ input: number; output: number }, [string, string]>(
-      "SELECT input, output FROM pricing WHERE provider = ? AND model = ?"
-    )
+    .query<
+      { input: number; output: number },
+      [string, string]
+    >("SELECT input, output FROM pricing WHERE provider = ? AND model = ?")
     .get(provider, model);
 
   if (!row) return null;
   return { input: row.input, output: row.output };
 }
 
-export async function getPricing(): Promise<
-  Record<string, Record<string, PricingEntry>>
-> {
+export async function getPricing(): Promise<Record<string, Record<string, PricingEntry>>> {
   const rows = db()
-    .query<{ provider: string; model: string; input: number; output: number }, []>(
-      "SELECT provider, model, input, output FROM pricing"
-    )
+    .query<
+      { provider: string; model: string; input: number; output: number },
+      []
+    >("SELECT provider, model, input, output FROM pricing")
     .all();
 
   const result: Record<string, Record<string, PricingEntry>> = {};
@@ -1695,17 +1741,16 @@ export async function updatePricingForModel(
 // ─── Export / Import ───────────────────────────────────────────────────────────
 
 export async function exportDb(): Promise<Record<string, unknown>> {
-  const [connections, nodes, pools, combos, keys, settings, aliases, pricing] =
-    await Promise.all([
-      getProviderConnections(),
-      getProviderNodes(),
-      getProxyPools(),
-      getCombos(),
-      getApiKeys(),
-      getSettings(),
-      getModelAliases(),
-      getPricing(),
-    ]);
+  const [connections, nodes, pools, combos, keys, settings, aliases, pricing] = await Promise.all([
+    getProviderConnections(),
+    getProviderNodes(),
+    getProxyPools(),
+    getCombos(),
+    getApiKeys(),
+    getSettings(),
+    getModelAliases(),
+    getPricing(),
+  ]);
   return {
     providerConnections: connections,
     providerNodes: nodes,
@@ -1724,7 +1769,7 @@ export async function isCloudEnabled(): Promise<boolean> {
 
 export async function getCloudUrl(): Promise<string> {
   const value = await getSettingValue<string | null>("cloudUrl", null);
-  return value ?? (process.env.CLOUD_URL ?? "");
+  return value ?? process.env.CLOUD_URL ?? "";
 }
 
 export async function cleanupProviderConnections(): Promise<number> {
@@ -1768,5 +1813,5 @@ function toBool(value: unknown): boolean {
 }
 
 function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }

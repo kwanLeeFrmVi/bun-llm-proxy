@@ -22,17 +22,20 @@ ChartJS.register(
   LineController,
   Filler,
   Tooltip,
-  Legend,
+  Legend
 );
 
-const cardClass = "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
+const cardClass =
+  "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
 export function PerformanceTab({ performance }: { performance: ZaiPerformanceResponse }) {
   const data = performance.success ? performance.data : null;
 
   if (!data || !data.x_time?.length) {
     return (
-      <div className={`${cardClass} px-12 py-12 text-center text-[13px] text-[var(--on-surface-variant)]`}>
+      <div
+        className={`${cardClass} px-12 py-12 text-center text-[13px] text-[var(--on-surface-variant)]`}
+      >
         No performance data available.
       </div>
     );
@@ -136,10 +139,14 @@ export function PerformanceTab({ performance }: { performance: ZaiPerformanceRes
   };
 
   // Calculate averages
-  const avgProMaxSpeed = data.proMaxDecodeSpeed.reduce((a, b) => a + b, 0) / data.proMaxDecodeSpeed.length;
-  const avgLiteSpeed = data.liteDecodeSpeed.reduce((a, b) => a + b, 0) / data.liteDecodeSpeed.length;
-  const avgProMaxSuccess = (data.proMaxSuccessRate.reduce((a, b) => a + b, 0) / data.proMaxSuccessRate.length) * 100;
-  const avgLiteSuccess = (data.liteSuccessRate.reduce((a, b) => a + b, 0) / data.liteSuccessRate.length) * 100;
+  const avgProMaxSpeed =
+    data.proMaxDecodeSpeed.reduce((a, b) => a + b, 0) / data.proMaxDecodeSpeed.length;
+  const avgLiteSpeed =
+    data.liteDecodeSpeed.reduce((a, b) => a + b, 0) / data.liteDecodeSpeed.length;
+  const avgProMaxSuccess =
+    (data.proMaxSuccessRate.reduce((a, b) => a + b, 0) / data.proMaxSuccessRate.length) * 100;
+  const avgLiteSuccess =
+    (data.liteSuccessRate.reduce((a, b) => a + b, 0) / data.liteSuccessRate.length) * 100;
 
   return (
     <div className="flex flex-col gap-4">
@@ -204,10 +211,7 @@ export function PerformanceTab({ performance }: { performance: ZaiPerformanceRes
 
       {/* Success Rate Chart */}
       <div className={cardClass}>
-        <SectionHeader
-          title="Success Rate"
-          sub="API call success rate over time (%)"
-        />
+        <SectionHeader title="Success Rate" sub="API call success rate over time (%)" />
         <div className="h-[260px] p-5 px-6">
           <Line data={successChartData} options={chartOptions} />
         </div>

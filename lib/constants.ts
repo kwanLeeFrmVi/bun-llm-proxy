@@ -42,8 +42,4 @@ export const X_API_KEY_PROVIDERS = new Set([
 ]);
 
 /** Providers that only use accessToken (no API key support) */
-export const ACCESS_TOKEN_ONLY_PROVIDERS = new Set([
-  "gemini-cli",
-  "antigravity",
-  "kiro",
-]);
+export const ACCESS_TOKEN_ONLY_PROVIDERS = new Set(["gemini-cli", "antigravity", "kiro"]);

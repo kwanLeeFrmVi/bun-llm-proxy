@@ -97,26 +97,26 @@ export default function Usage() {
   }, [period, loadStats, loadRecent]);
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {/* Page Header */}
-      <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]'>
+          <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface]">
             Usage
           </h1>
-          <p className='text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium'>
+          <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 sm:mt-1.5 font-medium">
             Monitor your API usage and token consumption
           </p>
         </div>
         {/* Period selector — only relevant on Overview */}
         {activeTab === "overview" && (
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList className='h-8 sm:h-9 bg-[--surface-container-low] rounded-lg p-1'>
+            <TabsList className="h-8 sm:h-9 bg-[--surface-container-low] rounded-lg p-1">
               {PERIODS.map((p) => (
                 <TabsTrigger
                   key={p}
                   value={p}
-                  className='h-6 sm:h-7 px-2 sm:px-3 rounded text-xs sm:text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm'
+                  className="h-6 sm:h-7 px-2 sm:px-3 rounded text-xs sm:text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
                 >
                   {p}
                 </TabsTrigger>
@@ -128,25 +128,25 @@ export default function Usage() {
 
       {/* Overview / Details tab switcher */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className='h-9 bg-[--surface-container-low] rounded-lg p-1'>
+        <TabsList className="h-9 bg-[--surface-container-low] rounded-lg p-1">
           <TabsTrigger
-            value='overview'
-            className='h-7 px-4 rounded text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm'
+            value="overview"
+            className="h-7 px-4 rounded text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
           >
             Overview
           </TabsTrigger>
           <TabsTrigger
-            value='details'
-            className='h-7 px-4 rounded text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm'
+            value="details"
+            className="h-7 px-4 rounded text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
           >
             Details
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value='overview' className='mt-6'>
+        <TabsContent value="overview" className="mt-6">
           {loading && !stats ? (
-            <div className='p-12 text-center'>
-              <p className='text-[--on-surface-variant] text-sm'>Loading…</p>
+            <div className="p-12 text-center">
+              <p className="text-[--on-surface-variant] text-sm">Loading…</p>
             </div>
           ) : stats ? (
             <OverviewTab
@@ -159,7 +159,7 @@ export default function Usage() {
           ) : null}
         </TabsContent>
 
-        <TabsContent value='details' className='mt-6'>
+        <TabsContent value="details" className="mt-6">
           <DetailsTab apiKeyMap={apiKeyMap} />
         </TabsContent>
       </Tabs>

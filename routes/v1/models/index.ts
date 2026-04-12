@@ -1,7 +1,17 @@
 // Port of src/app/api/v1/models/route.js
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "ai-bridge/config/providerModels.ts";
-import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getCombos, getAllProviderEnabledModels, getProviderNodeById, type Combo } from "db/index.ts";
+import {
+  getProviderAlias,
+  isAnthropicCompatibleProvider,
+  isOpenAICompatibleProvider,
+} from "lib/providers.ts";
+import {
+  getProviderConnections,
+  getCombos,
+  getAllProviderEnabledModels,
+  getProviderNodeById,
+  type Combo,
+} from "db/index.ts";
 import { getAvailableComboModelConfigs } from "services/model.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
@@ -24,7 +34,7 @@ function normalizeModelId(modelId: string, prefixes: string[]): string {
 function mergeModelIds(
   baseModelIds: string[],
   enabledModels: unknown,
-  prefixes: string[],
+  prefixes: string[]
 ): string[] {
   const mergedModelIds = new Set<string>();
 
@@ -83,7 +93,7 @@ export async function GET(_req: Request): Promise<Response> {
   try {
     let connections: Record<string, unknown>[] = [];
     try {
-      connections = (await getProviderConnections()).filter(c => c.isActive !== false);
+      connections = (await getProviderConnections()).filter((c) => c.isActive !== false);
     } catch {
       console.log("Could not fetch providers, returning all models");
     }
@@ -114,7 +124,7 @@ export async function GET(_req: Request): Promise<Response> {
 
     for (const combo of combos) {
       const filteredComboModels = await getAvailableComboModelConfigs(combo.name);
-      const comboModelIds = filteredComboModels?.map(m => m.model) ?? [];
+      const comboModelIds = filteredComboModels?.map((m) => m.model) ?? [];
       // Only include combo if it has at least one available model
       if (comboModelIds.length > 0) {
         models.push({
@@ -133,12 +143,15 @@ export async function GET(_req: Request): Promise<Response> {
 
     if (connections.length === 0) {
       for (const [alias, pModels] of Object.entries(providerModels)) {
-        const providerId = Object.entries(providerIdToAlias).find(([, candidateAlias]) => candidateAlias === alias)?.[0] ?? alias;
+        const providerId =
+          Object.entries(providerIdToAlias).find(
+            ([, candidateAlias]) => candidateAlias === alias
+          )?.[0] ?? alias;
         const enabledModels = persistedEnabledModelsByProvider[providerId] ?? [];
         const modelIds = mergeModelIds(
-          pModels.map(model => model.id),
+          pModels.map((model) => model.id),
           enabledModels,
-          [alias, providerId],
+          [alias, providerId]
         );
         for (const modelId of modelIds) {
           models.push({
@@ -160,7 +173,8 @@ export async function GET(_req: Request): Promise<Response> {
         // For compatible providers, get prefix and name from provider_nodes table
         let nodePrefix: string | undefined;
         let nodeName: string | undefined;
-        const isCompatibleProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+        const isCompatibleProvider =
+          isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
         if (isCompatibleProvider) {
           try {
             const node = await getProviderNodeById(providerId);
@@ -171,19 +185,24 @@ export async function GET(_req: Request): Promise<Response> {
           }
         }
 
-        const outputAlias = (nodePrefix ?? (psd.prefix as string | undefined) ?? getProviderAlias(providerId) ?? staticAlias).trim();
+        const outputAlias = (
+          nodePrefix ??
+          (psd.prefix as string | undefined) ??
+          getProviderAlias(providerId) ??
+          staticAlias
+        ).trim();
         const pModels = providerModels[staticAlias] ?? [];
         // Use provider-level enabled models with the provider's name (not UUID)
         const providerName = nodeName ?? providerId;
         const enabledModels = persistedEnabledModelsByProvider[providerName] ?? [];
         const prefixes = [outputAlias, staticAlias, providerId].filter(
-          (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index,
+          (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
         );
 
         let rawModelIds = mergeModelIds(
-          pModels.map(m => m.id),
+          pModels.map((m) => m.id),
           enabledModels,
-          prefixes,
+          prefixes
         );
 
         if (isCompatibleProvider && rawModelIds.length === 0) {
@@ -191,7 +210,7 @@ export async function GET(_req: Request): Promise<Response> {
         }
 
         const modelIds = rawModelIds
-          .map(modelId => normalizeModelId(modelId, prefixes))
+          .map((modelId) => normalizeModelId(modelId, prefixes))
           .filter((id): id is string => typeof id === "string" && id.trim() !== "");
 
         for (const modelId of modelIds) {

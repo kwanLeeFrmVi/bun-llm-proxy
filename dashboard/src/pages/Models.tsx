@@ -7,16 +7,7 @@ interface LocalModelWithWeight {
   model: string;
   weight: number;
 }
-import {
-  Box,
-  Search,
-  ArrowUpDown,
-  Layers,
-  Trash2,
-  Pencil,
-  Copy,
-  Check,
-} from "lucide-react";
+import { Box, Search, ArrowUpDown, Layers, Trash2, Pencil, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,11 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaginationControls } from "@/components/PaginationControls";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Combobox,
   ComboboxInput,
@@ -162,9 +149,7 @@ export default function Models() {
           cmp = modelNameA.localeCompare(modelNameB);
           break;
         case "provider":
-          cmp =
-            providerA.localeCompare(providerB) ||
-            modelNameA.localeCompare(modelNameB);
+          cmp = providerA.localeCompare(providerB) || modelNameA.localeCompare(modelNameB);
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
@@ -176,7 +161,7 @@ export default function Models() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const paged = useMemo(
     () => sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [sorted, page],
+    [sorted, page]
   );
 
   function toggleSort(key: SortKey) {
@@ -215,7 +200,7 @@ export default function Models() {
       setEditingComboModels([...comboModels]);
       setComboDialogOpen(true);
     },
-    [],
+    []
   );
 
   const handleDeleteCombo = useCallback(
@@ -228,7 +213,7 @@ export default function Models() {
         alert(e instanceof Error ? e.message : "Failed to delete");
       }
     },
-    [deleteComboFromStore, refreshModels],
+    [deleteComboFromStore, refreshModels]
   );
 
   // ── Inline table action buttons (live inside Models so they close over state) ──
@@ -239,9 +224,9 @@ export default function Models() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant='ghost'
-            size='icon-xs'
-            className='opacity-0 group-hover:opacity-100 transition-opacity ml-2 hover:bg-muted focus:opacity-100 h-5 w-5'
+            variant="ghost"
+            size="icon-xs"
+            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 hover:bg-muted focus:opacity-100 h-5 w-5"
             onClick={() => {
               navigator.clipboard.writeText(modelName);
               setCopied(true);
@@ -249,13 +234,13 @@ export default function Models() {
             }}
           >
             {copied ? (
-              <Check className='w-3 h-3 text-green-500' />
+              <Check className="w-3 h-3 text-green-500" />
             ) : (
-              <Copy className='w-3 h-3 text-muted-foreground' />
+              <Copy className="w-3 h-3 text-muted-foreground" />
             )}
           </Button>
         </TooltipTrigger>
-        <TooltipContent side='top' className='text-[10px]'>
+        <TooltipContent side="top" className="text-[10px]">
           {copied ? "Copied!" : "Copy alias"}
         </TooltipContent>
       </Tooltip>
@@ -275,14 +260,14 @@ export default function Models() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant='ghost'
-            size='icon-sm'
+            variant="ghost"
+            size="icon-sm"
             onClick={() => openEditCombo(comboId, comboName, comboModels)}
           >
-            <Pencil className='w-3.5 h-3.5' />
+            <Pencil className="w-3.5 h-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side='top' className='text-[10px]'>
+        <TooltipContent side="top" className="text-[10px]">
           Edit combo
         </TooltipContent>
       </Tooltip>
@@ -294,15 +279,15 @@ export default function Models() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant='ghost'
-            size='icon-sm'
-            className='hover:bg-red-500/10 hover:text-red-500'
+            variant="ghost"
+            size="icon-sm"
+            className="hover:bg-red-500/10 hover:text-red-500"
             onClick={() => handleDeleteCombo(comboId)}
           >
-            <Trash2 className='w-3.5 h-3.5' />
+            <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side='top' className='text-[10px]'>
+        <TooltipContent side="top" className="text-[10px]">
           Delete combo
         </TooltipContent>
       </Tooltip>
@@ -324,53 +309,53 @@ export default function Models() {
         alert(e instanceof Error ? e.message : "Failed to save");
       }
     },
-    [editingComboId, refreshModels],
+    [editingComboId, refreshModels]
   );
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className='font-headline text-2xl sm:text-3xl font-bold tracking-tight text-foreground'>
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Models
         </h1>
-        <p className='text-xs uppercase tracking-[0.12em] text-muted-foreground mt-1 sm:mt-1.5 font-medium'>
+        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mt-1 sm:mt-1.5 font-medium">
           Available models from configured providers
         </p>
       </div>
 
       {error && (
-        <Alert variant='destructive'>
+        <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {loading ? (
-        <div className='p-12 text-center'>
-          <p className='text-muted-foreground text-sm'>Loading…</p>
+        <div className="p-12 text-center">
+          <p className="text-muted-foreground text-sm">Loading…</p>
         </div>
       ) : models.length === 0 ? (
-        <div className='bg-card rounded-xl border border-border shadow-sm overflow-hidden p-12 text-center'>
-          <Box className='w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50' />
-          <p className='text-muted-foreground text-sm'>No models available.</p>
-          <p className='text-muted-foreground text-xs mt-1'>
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden p-12 text-center">
+          <Box className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <p className="text-muted-foreground text-sm">No models available.</p>
+          <p className="text-muted-foreground text-xs mt-1">
             Configure a provider to see available models.
           </p>
         </div>
       ) : (
-        <div className='bg-card rounded-xl border border-border shadow-sm overflow-hidden'>
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           {/* Table Header Bar */}
-          <div className='px-6 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap'>
-            <div className='flex items-center gap-2'>
-              <span className='inline-flex items-center justify-center w-7 h-7 rounded bg-primary/10 text-primary'>
-                <Box className='w-3.5 h-3.5' />
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-primary/10 text-primary">
+                <Box className="w-3.5 h-3.5" />
               </span>
-              <span className='text-sm font-semibold text-foreground'>
+              <span className="text-sm font-semibold text-foreground">
                 {total} Models Available
               </span>
             </div>
-            <div className='flex items-center justify-end gap-3 flex-wrap'>
+            <div className="flex items-center justify-end gap-3 flex-wrap">
               {/* Provider filter */}
               <Combobox
                 value={providerFilter ?? ""}
@@ -380,13 +365,13 @@ export default function Models() {
                 }}
               >
                 <ComboboxInput
-                  placeholder='All Providers'
-                  className='h-8 text-xs w-40 border-input bg-background shadow-none'
+                  placeholder="All Providers"
+                  className="h-8 text-xs w-40 border-input bg-background shadow-none"
                 />
                 <ComboboxContent>
                   <ComboboxEmpty>No provider found.</ComboboxEmpty>
                   <ComboboxList>
-                    <ComboboxItem value=''>All Providers</ComboboxItem>
+                    <ComboboxItem value="">All Providers</ComboboxItem>
                     {providers.map(([alias, name]) => (
                       <ComboboxItem key={alias} value={alias}>
                         {name}
@@ -398,26 +383,26 @@ export default function Models() {
 
               {/* Combos button */}
               <Button
-                variant='outline'
-                size='sm'
-                className='h-8 text-xs gap-1.5 border-input bg-background shadow-none'
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-input bg-background shadow-none"
                 onClick={openCreateCombo}
               >
-                <Layers className='w-3.5 h-3.5' />
+                <Layers className="w-3.5 h-3.5" />
                 Combos
               </Button>
 
               {/* Search */}
-              <div className='relative w-full max-w-xs'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-60' />
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-60" />
                 <Input
-                  placeholder='Search models or providers...'
+                  placeholder="Search models or providers..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
                     setPage(0);
                   }}
-                  className='pl-9 h-8 text-sm bg-background border-input shadow-none'
+                  className="pl-9 h-8 text-sm bg-background border-input shadow-none"
                 />
               </div>
             </div>
@@ -425,39 +410,35 @@ export default function Models() {
 
           <Table stickyHeader>
             <TableHeader>
-              <TableRow className='border-b border-border hover:bg-transparent'>
+              <TableRow className="border-b border-border hover:bg-transparent">
                 <TableHead
-                  className='uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 pl-6 cursor-pointer select-none hover:text-foreground transition-colors'
+                  className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 pl-6 cursor-pointer select-none hover:text-foreground transition-colors"
                   onClick={() => toggleSort("model")}
                 >
-                  <span className='inline-flex items-center gap-1'>
+                  <span className="inline-flex items-center gap-1">
                     Model
-                    <ArrowUpDown className='w-3 h-3 opacity-50' />
+                    <ArrowUpDown className="w-3 h-3 opacity-50" />
                     {sortKey === "model" && (
-                      <span className='text-primary'>
-                        {sortDir === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>
                     )}
                   </span>
                 </TableHead>
                 <TableHead
-                  className='uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 cursor-pointer select-none hover:text-foreground transition-colors'
+                  className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 cursor-pointer select-none hover:text-foreground transition-colors"
                   onClick={() => toggleSort("provider")}
                 >
-                  <span className='inline-flex items-center gap-1'>
+                  <span className="inline-flex items-center gap-1">
                     Provider
-                    <ArrowUpDown className='w-3 h-3 opacity-50' />
+                    <ArrowUpDown className="w-3 h-3 opacity-50" />
                     {sortKey === "provider" && (
-                      <span className='text-primary'>
-                        {sortDir === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>
                     )}
                   </span>
                 </TableHead>
-                <TableHead className='uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3'>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3">
                   Alias Models
                 </TableHead>
-                <TableHead className='uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 w-10'></TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -478,41 +459,42 @@ export default function Models() {
                       ((page * PAGE_SIZE + i) % 2 === 1 ? " bg-muted/20" : "")
                     }
                   >
-                    <TableCell className='pl-6 py-3'>
-                      <div className='flex items-center'>
-                        <Badge variant='endpoint'>{modelName}</Badge>
+                    <TableCell className="pl-6 py-3">
+                      <div className="flex items-center">
+                        <Badge variant="endpoint">{modelName}</Badge>
                         <CopyModelButton modelName={modelName} />
                       </div>
                     </TableCell>
-                    <TableCell className='text-sm text-muted-foreground py-3'>
+                    <TableCell className="text-sm text-muted-foreground py-3">
                       {providerName}
                     </TableCell>
-                    <TableCell className='text-sm text-muted-foreground py-3 max-w-xs'>
-                      {isCombo &&
-                      m.combo_models &&
-                      m.combo_models.length > 0 ? (
-                        <div className='flex flex-wrap gap-1'>
+                    <TableCell className="text-sm text-muted-foreground py-3 max-w-xs">
+                      {isCombo && m.combo_models && m.combo_models.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
                           {m.combo_models.map((cm) => (
                             <Badge
                               key={cm}
-                              variant='outline'
-                              className='text-[10px] px-1.5 py-0 bg-background'
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 bg-background"
                             >
                               {cm}
                             </Badge>
                           ))}
                         </div>
                       ) : (
-                        <span className='text-muted-foreground/50'>—</span>
+                        <span className="text-muted-foreground/50">—</span>
                       )}
                     </TableCell>
-                    <TableCell className='py-3 pr-4'>
+                    <TableCell className="py-3 pr-4">
                       {isCombo && m.combo_id ? (
-                        <div className='flex gap-1 justify-end'>
+                        <div className="flex gap-1 justify-end">
                           <EditComboButton
                             comboId={m.combo_id}
                             comboName={m.id}
-                            comboModels={(m.combo_models ?? []).map(model => ({ model, weight: 1 }))}
+                            comboModels={(m.combo_models ?? []).map((model) => ({
+                              model,
+                              weight: 1,
+                            }))}
                           />
                           <DeleteComboButton comboId={m.combo_id} />
                         </div>
@@ -531,7 +513,7 @@ export default function Models() {
               total={total}
               pageSize={PAGE_SIZE}
               onPageChange={setPage}
-              label='MODELS'
+              label="MODELS"
             />
           )}
         </div>
@@ -542,7 +524,10 @@ export default function Models() {
         comboId={editingComboId}
         initialName={editingComboName}
         initialModels={editingComboModels}
-        allModels={[...models.map((m) => m.id), ...useComboStore.getState().combos.map((c) => c.name)]}
+        allModels={[
+          ...models.map((m) => m.id),
+          ...useComboStore.getState().combos.map((c) => c.name),
+        ]}
         allCombos={useComboStore.getState().combos.map((c) => c.name)}
         allModelTypes={(() => {
           const map = {} as Record<string, "combo" | "model">;

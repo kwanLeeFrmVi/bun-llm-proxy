@@ -1,15 +1,19 @@
-import { getProviderConnections, updateProviderEnabledModels, getProviderNodeById } from "db/index.ts";
+import {
+  getProviderConnections,
+  updateProviderEnabledModels,
+  getProviderNodeById,
+} from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { PROVIDERS } from "ai-bridge/handlers/provider.ts";
-import { getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
-import { X_API_KEY_PROVIDERS, ANTHROPIC_API_VERSION } from "lib/constants.ts";
 import {
-  parseOpenAIStyleModels,
-  extractModelIds,
-  deriveModelsBaseUrl,
-} from "lib/utils.ts";
+  getProviderAlias,
+  isOpenAICompatibleProvider,
+  isAnthropicCompatibleProvider,
+} from "lib/providers.ts";
+import { X_API_KEY_PROVIDERS, ANTHROPIC_API_VERSION } from "lib/constants.ts";
+import { parseOpenAIStyleModels, extractModelIds, deriveModelsBaseUrl } from "lib/utils.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -39,19 +43,19 @@ export async function POST(req: Request): Promise<Response> {
 
   // Find the first active connection for this provider
   const connections = await getProviderConnections({ provider: id });
-  const activeConn = connections.find(c => c.isActive !== false);
+  const activeConn = connections.find((c) => c.isActive !== false);
 
   if (!activeConn) {
     return Response.json(
       { error: "No active connection found for this provider" },
-      { status: 404, headers: CORS_HEADERS },
+      { status: 404, headers: CORS_HEADERS }
     );
   }
 
   if (!activeConn.apiKey) {
     return Response.json(
       { error: "Connection has no API key" },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -59,7 +63,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!apiKey) {
     return Response.json(
       { error: "Connection has no API key" },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -77,7 +81,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!baseUrl) {
     return Response.json(
       { error: "No base URL configured for this provider" },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -100,7 +104,7 @@ export async function POST(req: Request): Promise<Response> {
     const msg = err instanceof Error ? err.message : "Connection failed";
     return Response.json(
       { error: `Failed to reach ${baseUrl}/models: ${msg}` },
-      { status: 502, headers: CORS_HEADERS },
+      { status: 502, headers: CORS_HEADERS }
     );
   }
 
@@ -108,7 +112,7 @@ export async function POST(req: Request): Promise<Response> {
     const text = await response.text().catch(() => "");
     return Response.json(
       { error: `Remote returned ${response.status}: ${text.slice(0, 200)}` },
-      { status: 502, headers: CORS_HEADERS },
+      { status: 502, headers: CORS_HEADERS }
     );
   }
 
@@ -119,7 +123,7 @@ export async function POST(req: Request): Promise<Response> {
   if (modelIds.length === 0) {
     return Response.json(
       { error: "No models found from remote endpoint" },
-      { status: 404, headers: CORS_HEADERS },
+      { status: 404, headers: CORS_HEADERS }
     );
   }
 
@@ -129,16 +133,19 @@ export async function POST(req: Request): Promise<Response> {
 
   const prefix = (psd.prefix as string | undefined) ?? getProviderAlias(id) ?? id;
 
-  return Response.json({
-    success: true,
-    provider: id,
-    alias: prefix,
-    count: modelIds.length,
-    models: modelIds.map(modelId => ({
-      id: `${prefix}/${modelId}`,
-      name: modelId,
-    })),
-  }, { headers: CORS_HEADERS });
+  return Response.json(
+    {
+      success: true,
+      provider: id,
+      alias: prefix,
+      count: modelIds.length,
+      models: modelIds.map((modelId) => ({
+        id: `${prefix}/${modelId}`,
+        name: modelId,
+      })),
+    },
+    { headers: CORS_HEADERS }
+  );
 }
 
 export function OPTIONS(): Response {

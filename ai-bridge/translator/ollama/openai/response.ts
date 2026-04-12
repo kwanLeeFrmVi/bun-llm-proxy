@@ -39,35 +39,37 @@ export function convertOllamaResponseToOpenAI(
     const results: Uint8Array[] = [];
     // Send final chunk with finish_reason
     if (state.finishReason) {
-      results.push(new TextEncoder().encode(
-        `data: ${JSON.stringify({
-          id: state.messageId,
-          object: "chat.completion.chunk",
-          model: state.model,
-          choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }],
-        })}\n\n`
-      ));
+      results.push(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({
+            id: state.messageId,
+            object: "chat.completion.chunk",
+            model: state.model,
+            choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }],
+          })}\n\n`
+        )
+      );
     }
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
     return results;
   }
 
-  const stripped = rawText.startsWith("data: ")
-    ? rawText.slice(6).trim()
-    : rawText;
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(6).trim() : rawText;
 
   if (stripped === "[DONE]") {
     const state = param ?? newState();
     const results: Uint8Array[] = [];
     if (state.finishReason) {
-      results.push(new TextEncoder().encode(
-        `data: ${JSON.stringify({
-          id: state.messageId,
-          object: "chat.completion.chunk",
-          model: state.model,
-          choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }],
-        })}\n\n`
-      ));
+      results.push(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({
+            id: state.messageId,
+            object: "chat.completion.chunk",
+            model: state.model,
+            choices: [{ index: 0, delta: {}, finish_reason: state.finishReason }],
+          })}\n\n`
+        )
+      );
     }
     results.push(new TextEncoder().encode("data: [DONE]\n\n"));
     return results;
@@ -100,16 +102,18 @@ export function convertOllamaResponseToOpenAI(
     // Extract usage
     const usage = extractUsage(parsed);
 
-    results.push(new TextEncoder().encode(
-      `data: ${JSON.stringify({
-        id: state.messageId,
-        object: "chat.completion.chunk",
-        created: state.created,
-        model: state.model,
-        choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
-        usage,
-      })}\n\n`
-    ));
+    results.push(
+      new TextEncoder().encode(
+        `data: ${JSON.stringify({
+          id: state.messageId,
+          object: "chat.completion.chunk",
+          created: state.created,
+          model: state.model,
+          choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+          usage,
+        })}\n\n`
+      )
+    );
     return results;
   }
 
@@ -138,15 +142,17 @@ export function convertOllamaResponseToOpenAI(
     delta.tool_calls = convertToolCalls(toolCalls);
   }
 
-  results.push(new TextEncoder().encode(
-    `data: ${JSON.stringify({
-      id: state.messageId,
-      object: "chat.completion.chunk",
-      created: state.created,
-      model: state.model,
-      choices: [{ index: 0, delta, finish_reason: null }],
-    })}\n\n`
-  ));
+  results.push(
+    new TextEncoder().encode(
+      `data: ${JSON.stringify({
+        id: state.messageId,
+        object: "chat.completion.chunk",
+        created: state.created,
+        model: state.model,
+        choices: [{ index: 0, delta, finish_reason: null }],
+      })}\n\n`
+    )
+  );
 
   return results;
 }
@@ -165,7 +171,7 @@ export function convertOllamaResponseToOpenAINonStream(
     return raw;
   }
 
-  const msg = parsed.message as Record<string, unknown> | undefined ?? {};
+  const msg = (parsed.message as Record<string, unknown> | undefined) ?? {};
   const content = (msg.content as string | undefined) ?? "";
   const thinking = (msg.thinking as string | undefined) ?? "";
   const toolCalls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
@@ -187,11 +193,13 @@ export function convertOllamaResponseToOpenAINonStream(
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model,
-    choices: [{
-      index: 0,
-      message,
-      finish_reason: finishReason,
-    }],
+    choices: [
+      {
+        index: 0,
+        message,
+        finish_reason: finishReason,
+      },
+    ],
     usage: extractUsage(parsed),
   };
 
@@ -204,7 +212,8 @@ function extractUsage(ollamaChunk: Record<string, unknown>): Record<string, numb
   return {
     prompt_tokens: (ollamaChunk.prompt_eval_count as number) ?? 0,
     completion_tokens: (ollamaChunk.eval_count as number) ?? 0,
-    total_tokens: ((ollamaChunk.prompt_eval_count as number) ?? 0) + ((ollamaChunk.eval_count as number) ?? 0),
+    total_tokens:
+      ((ollamaChunk.prompt_eval_count as number) ?? 0) + ((ollamaChunk.eval_count as number) ?? 0),
   };
 }
 
@@ -218,9 +227,8 @@ function convertToolCalls(toolCalls: unknown[]): unknown[] {
       type: "function",
       function: {
         name: (fn?.name as string) ?? "",
-        arguments: typeof fn?.arguments === "string"
-          ? fn.arguments
-          : JSON.stringify(fn?.arguments ?? {}),
+        arguments:
+          typeof fn?.arguments === "string" ? fn.arguments : JSON.stringify(fn?.arguments ?? {}),
       },
     };
   });
