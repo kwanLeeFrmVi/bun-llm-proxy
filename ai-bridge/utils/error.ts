@@ -68,6 +68,44 @@ export function createErrorResult(
   return result;
 }
 
+// ─── SSE Error Response (for streaming clients like Claude Code) ───────────────
+
+/**
+ * Return an error as a properly-formatted SSE stream.
+ * Claude Code crashes (`undefined is not an object evaluating '_.input_tokens'`)
+ * if it receives JSON instead of SSE when expecting a streaming response.
+ */
+export function sseErrorResponse(status: number, message: string): Response {
+  const msgId = `msg_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+  const events = [
+    `event: message_start\ndata: ${JSON.stringify({
+      type: "message_start",
+      message: {
+        id: msgId, type: "message", role: "assistant", content: [],
+        stop_reason: null, stop_sequence: null,
+        usage: { input_tokens: 0, output_tokens: 0 },
+      },
+    })}`,
+    `event: message_delta\ndata: ${JSON.stringify({
+      type: "message_delta",
+      delta: { stop_reason: "end_turn", stop_sequence: null },
+      usage: { input_tokens: 0, output_tokens: 0 },
+    })}`,
+    `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}`,
+  ].join("\n\n") + "\n\ndata: [DONE]\n\n";
+
+  return new Response(events, {
+    status,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
 // ─── Antigravity-specific helpers ──────────────────────────────────────────────
 
 /**

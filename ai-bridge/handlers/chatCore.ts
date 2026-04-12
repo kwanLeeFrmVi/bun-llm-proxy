@@ -1,7 +1,7 @@
 // Core streaming chat handler — written from scratch in TypeScript.
 // Handles the full lifecycle: translate request → upstream fetch → translate response → stream back.
 
-import { Request, NeedsTranslation, ResponseNonStream } from "../translator/index.ts";
+import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
 import { HTTP_STATUS } from "../config/runtimeConfig.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import { detectFormat, getTargetFormat, buildUpstreamUrl, buildUpstreamHeaders } from "./provider.js";
@@ -205,8 +205,15 @@ async function handleStreamingResponse(
     return new globalThis.Response("Upstream returned empty body", { status: 502 });
   }
 
-  let state: unknown = undefined;
+  // Initialize translator state once; the translator mutates this object in-place
+  // across every chunk, preserving accumulated context (messageId, block indexes, etc.).
+  let state: unknown = initState(targetFormat, sourceFormat);
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let sseBuffer = "";
+  // Ollama (and similar) send NDJSON (one JSON object per line) instead of SSE
+  const isSSE = targetFormat !== "ollama";
+  let ndjsonBuffer = "";
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -217,12 +224,12 @@ async function handleStreamingResponse(
           const { done, value } = await reader.read();
           if (done) break;
 
-          let raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
+          const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
 
           // Vertex AI (Gemini format) streaming returns JSON array: [{obj},{obj},...]
           // Strip array delimiters and split into individual JSON objects for the translator
           if (opts.modelInfo.provider === "vertex") {
-            const text = new TextDecoder().decode(raw);
+            const text = decoder.decode(raw, { stream: true });
             let cleaned = text.trim();
             if (cleaned === "]" || cleaned === "]\r\n") continue;
             if (cleaned.startsWith("[")) cleaned = cleaned.slice(1);
@@ -235,7 +242,7 @@ async function handleStreamingResponse(
             const jsonObjects = splitVertexJsonObjects(cleaned);
 
             for (const jsonStr of jsonObjects) {
-              const chunkRaw = new TextEncoder().encode(jsonStr);
+              const chunkRaw = encoder.encode(jsonStr);
               const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, chunkRaw, state);
               state = translated.state;
               for (const chunk of translated.chunks) {
@@ -245,12 +252,63 @@ async function handleStreamingResponse(
             continue;
           }
 
-          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, raw, state);
-          state = translated.state;
+          // NDJSON line buffering (Ollama and similar): each line is a JSON object
+          if (!isSSE) {
+            const text = decoder.decode(raw, { stream: true });
+            ndjsonBuffer += text;
+            while (ndjsonBuffer.includes("\n")) {
+              const lineEnd = ndjsonBuffer.indexOf("\n");
+              const line = ndjsonBuffer.slice(0, lineEnd);
+              ndjsonBuffer = ndjsonBuffer.slice(lineEnd + 1);
+              if (!line.trim()) continue;
+              const lineRaw = encoder.encode(line);
+              const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, lineRaw, state);
+              state = translated.state;
+              for (const chunk of translated.chunks) {
+                controller.enqueue(chunk);
+              }
+            }
+            continue;
+          }
 
+          // SSE line buffering: accumulate text and only process complete SSE events
+          // (delimited by \n\n). This prevents split TCP chunks from breaking JSON parsing.
+          const text = decoder.decode(raw, { stream: true });
+          sseBuffer += text;
+
+          // Process complete SSE events (each ends with \n\n)
+          while (sseBuffer.includes("\n\n")) {
+            const eventEnd = sseBuffer.indexOf("\n\n");
+            const eventText = sseBuffer.slice(0, eventEnd + 2);
+            sseBuffer = sseBuffer.slice(eventEnd + 2);
+
+            const eventRaw = encoder.encode(eventText);
+            const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, eventRaw, state);
+            state = translated.state;
+            for (const chunk of translated.chunks) {
+              controller.enqueue(chunk);
+            }
+          }
+        }
+
+        // Process any remaining buffered data
+        if (ndjsonBuffer.trim()) {
+          const remainingRaw = encoder.encode(ndjsonBuffer.trim());
+          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, remainingRaw, state);
+          state = translated.state;
           for (const chunk of translated.chunks) {
             controller.enqueue(chunk);
           }
+          ndjsonBuffer = "";
+        }
+        if (sseBuffer.trim()) {
+          const remainingRaw = encoder.encode(sseBuffer.trim());
+          const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, remainingRaw, state);
+          state = translated.state;
+          for (const chunk of translated.chunks) {
+            controller.enqueue(chunk);
+          }
+          sseBuffer = "";
         }
 
         // Normal completion: flush done events
@@ -311,8 +369,10 @@ function translateChunk(
   const { Response: translate } = require("../translator/index.ts") as { Response: (from: string, to: string, ctx: unknown, modelName: string, origReq: Uint8Array, req: Uint8Array, raw: Uint8Array, state: unknown) => Uint8Array[] };
 
   const chunks = translate(sourceFormat, targetFormat, null, model, requestBytes, requestBytes, raw, state);
-  const newState = chunks.length > 0 ? chunks[chunks.length - 1] : state;
-  return { chunks, state: newState };
+  // Do NOT replace state with output chunks — translator functions mutate the state
+  // object in-place via the `param` argument, so we preserve the same reference.
+  // Previously this was `chunks[chunks.length - 1]` which corrupted state with a Uint8Array.
+  return { chunks, state };
 }
 
 // ─── Error handling ─────────────────────────────────────────────────────────────

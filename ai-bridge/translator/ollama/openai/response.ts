@@ -11,7 +11,7 @@ export interface OllamaOpenAIState {
   hadToolCalls: boolean;
 }
 
-function newState(): OllamaOpenAIState {
+export function newState(): OllamaOpenAIState {
   return {
     messageId: `chatcmpl-${Date.now()}`,
     created: Math.floor(Date.now() / 1000),

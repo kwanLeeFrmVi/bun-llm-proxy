@@ -44,7 +44,7 @@ interface ToolCallAccumulator {
   arguments: string;
 }
 
-function newState(): StreamingState {
+export function newState(): StreamingState {
   return {
     messageId: "",
     model: "",

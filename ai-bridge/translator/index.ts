@@ -3,23 +3,23 @@
 
 import { FORMATS } from "./formats.ts";
 import { convertClaudeRequestToOpenAI } from "./claude/openai/request.ts";
-import { convertOpenAIResponseToClaude, convertOpenAIResponseToClaudeNonStream } from "./claude/openai/response.ts";
+import { convertOpenAIResponseToClaude, convertOpenAIResponseToClaudeNonStream, newState as newClaudeToOpenAIState } from "./claude/openai/response.ts";
 import { convertOpenAIRequestToClaude } from "./openai/claude/request.ts";
-import { convertClaudeResponseToOpenAI, convertClaudeResponseToOpenAINonStream } from "./openai/claude/response.ts";
+import { convertClaudeResponseToOpenAI, convertClaudeResponseToOpenAINonStream, newState as newOpenAIToClaudeState } from "./openai/claude/response.ts";
 import { convertClaudeRequestToOllama } from "./claude/ollama/request.ts";
 import { convertOllamaRequestToClaude } from "./ollama/claude/request.ts";
-import { convertOllamaResponseToClaude, convertOllamaResponseToClaudeNonStream } from "./ollama/claude/response.ts";
+import { convertOllamaResponseToClaude, convertOllamaResponseToClaudeNonStream, newState as newOllamaToClaudeState } from "./ollama/claude/response.ts";
 import { convertOllamaRequestToOpenAI } from "./ollama/openai/request.ts";
-import { convertOllamaResponseToOpenAI, convertOllamaResponseToOpenAINonStream } from "./ollama/openai/response.ts";
+import { convertOllamaResponseToOpenAI, convertOllamaResponseToOpenAINonStream, newState as newOllamaToOpenAIState } from "./ollama/openai/response.ts";
 import { convertOpenAIRequestToOllama } from "./openai/ollama/request.ts";
 import { convertGeminiRequestToOpenAI } from "./gemini/openai/request.ts";
-import { convertGeminiResponseToOpenAI, convertGeminiResponseToOpenAINonStream } from "./gemini/openai/response.ts";
+import { convertGeminiResponseToOpenAI, convertGeminiResponseToOpenAINonStream, newState as newGeminiToOpenAIState } from "./gemini/openai/response.ts";
 import { convertOpenAIRequestToGemini } from "./openai/gemini/request.ts";
-import { convertOpenAIResponseToGemini, convertOpenAIResponseToGeminiNonStream } from "./openai/gemini/response.ts";
+import { convertOpenAIResponseToGemini, convertOpenAIResponseToGeminiNonStream, newState as newOpenAIToGeminiState } from "./openai/gemini/response.ts";
 import { convertOpenAIRequestToKiro } from "./openai/kiro/request.ts";
-import { convertKiroResponseToOpenAI, convertKiroResponseToOpenAINonStream } from "./kiro/openai/response.ts";
+import { convertKiroResponseToOpenAI, convertKiroResponseToOpenAINonStream, newState as newKiroToOpenAIState } from "./kiro/openai/response.ts";
 import { convertOpenAIRequestToAntigravity } from "./openai/antigravity/request.ts";
-import { convertAntigravityResponseToOpenAI, convertAntigravityResponseToOpenAINonStream } from "./antigravity/openai/response.ts";
+import { convertAntigravityResponseToOpenAI, convertAntigravityResponseToOpenAINonStream, newState as newAntigravityToOpenAIState } from "./antigravity/openai/response.ts";
 import { convertOpenAIRequestToVertex } from "./openai/vertex/request.ts";
 
 // ─── Function signatures ────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ export type ResponseNonStreamFn = (
 // ─── Registry ──────────────────────────────────────────────────────────────────
 
 const requestRegistry = new Map<string, RequestTranslatorFn>();
+const stateFactoryRegistry = new Map<string, () => unknown>();
 const responseRegistry = new Map<string, ResponseTranslatorFn>();
 const responseNonStreamRegistry = new Map<string, ResponseNonStreamFn>();
 
@@ -179,6 +180,17 @@ function init(): void {
   // Vertex responses use Gemini format, so VERTEX -> OPENAI uses Gemini translator
   register(FORMATS.VERTEX, FORMATS.OPENAI, null, convertGeminiResponseToOpenAI as ResponseTranslatorFn, convertGeminiResponseToOpenAINonStream as ResponseNonStreamFn);
 
+  // State factory registry — maps response translator keys to their initial state factories
+  stateFactoryRegistry.set(`${FORMATS.CLAUDE}:${FORMATS.OPENAI}`, newClaudeToOpenAIState);
+  stateFactoryRegistry.set(`${FORMATS.OPENAI}:${FORMATS.CLAUDE}`, newOpenAIToClaudeState);
+  stateFactoryRegistry.set(`${FORMATS.OLLAMA}:${FORMATS.CLAUDE}`, newOllamaToClaudeState);
+  stateFactoryRegistry.set(`${FORMATS.OLLAMA}:${FORMATS.OPENAI}`, newOllamaToOpenAIState);
+  stateFactoryRegistry.set(`${FORMATS.GEMINI}:${FORMATS.OPENAI}`, newGeminiToOpenAIState);
+  stateFactoryRegistry.set(`${FORMATS.OPENAI}:${FORMATS.GEMINI}`, newOpenAIToGeminiState);
+  stateFactoryRegistry.set(`${FORMATS.KIRO}:${FORMATS.OPENAI}`, newKiroToOpenAIState);
+  stateFactoryRegistry.set(`${FORMATS.ANTIGRAVITY}:${FORMATS.OPENAI}`, newAntigravityToOpenAIState);
+  stateFactoryRegistry.set(`${FORMATS.VERTEX}:${FORMATS.OPENAI}`, newGeminiToOpenAIState);
+
   // Identity (pass-through) pairs
   registerIdentity(FORMATS.OPENAI);
   registerIdentity(FORMATS.OPENAI_RESPONSES);
@@ -194,6 +206,16 @@ function init(): void {
 init();
 
 // ─── Public API ─────────────────────────────────────────────────────────────────
+
+/**
+ * Create the initial translator state for a given format pair.
+ * Call once before streaming starts; pass the returned object on every
+ * translateChunk call so the translator mutates it in-place across chunks.
+ */
+export function initState(from: string, to: string): unknown {
+  const key = `${from}:${to}`;
+  return stateFactoryRegistry.get(key)?.() ?? undefined;
+}
 
 export function Request(
   from: string,

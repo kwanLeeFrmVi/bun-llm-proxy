@@ -12,7 +12,7 @@ export interface GeminiStreamingState {
   contentAccumulator: string;
 }
 
-function newState(): GeminiStreamingState {
+export function newState(): GeminiStreamingState {
   return {
     messageId: `gemini-${Date.now()}`,
     model: "",

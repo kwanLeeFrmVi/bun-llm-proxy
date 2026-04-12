@@ -9,7 +9,7 @@ export interface OpenAIGeminiState {
   messageStopSent: boolean;
 }
 
-function newState(): OpenAIGeminiState {
+export function newState(): OpenAIGeminiState {
   return {
     messageId: `openai-${Date.now()}`,
     model: "",

@@ -31,7 +31,7 @@ export interface OpenAIStreamingState {
   currentToolId: string;
 }
 
-function newState(): OpenAIStreamingState {
+export function newState(): OpenAIStreamingState {
   return {
     messageId: "",
     model: "",

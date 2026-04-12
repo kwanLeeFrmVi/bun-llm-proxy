@@ -12,7 +12,7 @@ import { cacheClaudeHeaders } from "../ai-bridge/utils/claudeHeaderCache.ts";
 import { getSettings, getAverageTTFT, recordComboTTFT } from "../db/index.ts";
 import { getModelInfo, getComboModelConfigs } from "../services/model.ts";
 import { handleChatCore } from "../ai-bridge/handlers/chatCore.ts";
-import { errorResponse, unavailableResponse } from "../ai-bridge/utils/error.ts";
+import { errorResponse, unavailableResponse, sseErrorResponse } from "../ai-bridge/utils/error.ts";
 import { HTTP_STATUS, TRANSIENT_RETRY, TRANSIENT_ERROR_STATUSES } from "../ai-bridge/config/runtimeConfig.ts";
 import { detectFormatByEndpoint } from "../ai-bridge/translator/formats.ts";
 import * as log from "../lib/logger.ts";
@@ -25,6 +25,13 @@ import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 import { getProviderDisplayName } from "../lib/providers.ts";
 import { handleComboModel, getComboMetadata } from "../services/comboRouting.ts";
 import { incrementCircuitBreaker, resetCircuitBreaker } from "../lib/circuitBreaker.ts";
+
+function isClaudeStreamingClient(body: Record<string, unknown>, request: Request | null): boolean {
+  if (body.stream === false) return false;
+  const endpoint = request?.url ? new URL(request.url).pathname : "";
+  const fmt = detectFormatByEndpoint(endpoint, body) ?? detectFormat(body);
+  return fmt === "claude";
+}
 
 type ClientRawRequest = {
   endpoint: string;
@@ -84,6 +91,7 @@ export async function handleChat(
 
   if (!modelStr) {
     log.warn(ctx, "CHAT", "Missing model");
+    if (isClaudeStreamingClient(body, request)) return sseErrorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model") as Response;
   }
 
@@ -156,6 +164,7 @@ async function handleSingleModelChat(
       });
     }
     log.warn(ctx, "CHAT", "Invalid model format", { model: modelStr });
+    if (isClaudeStreamingClient(body, request)) return sseErrorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid model format");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid model format") as Response;
   }
 
@@ -193,15 +202,18 @@ async function handleSingleModelChat(
         const status = lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
         log.warn(ctx, "CHAT", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
         appendRequestLog(requestId, "rate_limited");
+        if (isClaudeStreamingClient(body, request)) return sseErrorResponse(status, `[${provider}/${model}] ${errorMsg}`);
         return unavailableResponse(status, `[${provider}/${model}] ${errorMsg}`, creds.retryAfter as string, creds.retryAfterHuman as string) as Response;
       }
       if (excludeConnectionIds.size === 0) {
         log.warn(ctx, "AUTH", `No active credentials for provider: ${provider}`);
         appendRequestLog(requestId, "no_credentials");
+        if (isClaudeStreamingClient(body, request)) return sseErrorResponse(HTTP_STATUS.NOT_FOUND, `No active credentials for provider: ${provider}`);
         return errorResponse(HTTP_STATUS.NOT_FOUND, `No active credentials for provider: ${provider}`) as Response;
       }
       log.warn(ctx, "CHAT", "No more accounts available", { provider });
       appendRequestLog(requestId, "unavailable");
+      if (isClaudeStreamingClient(body, request)) return sseErrorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable");
       return errorResponse(lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable") as Response;
     }
 
@@ -314,6 +326,9 @@ async function handleSingleModelChat(
     }
 
     appendRequestLog(requestId, `error_${finalResult.status}`);
+    if (isStreaming && isClaudeStreamingClient(body, request)) {
+      return sseErrorResponse(finalResult.status ?? HTTP_STATUS.BAD_GATEWAY, finalResult.error ?? "Unknown error");
+    }
     return finalResult.response ?? errorResponse(finalResult.status ?? HTTP_STATUS.BAD_GATEWAY, finalResult.error ?? "Unknown error");
   }
 }

@@ -12,7 +12,7 @@ export interface OllamaStreamingState {
   contentAccumulator: string;
 }
 
-function newState(): OllamaStreamingState {
+export function newState(): OllamaStreamingState {
   return {
     messageId: `ollama-${Date.now()}`,
     model: "",

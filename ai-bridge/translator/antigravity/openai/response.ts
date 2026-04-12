@@ -10,7 +10,7 @@ export interface AntigravityOpenAIState {
   usage: Record<string, number> | null;
 }
 
-function newState(): AntigravityOpenAIState {
+export function newState(): AntigravityOpenAIState {
   return {
     responseId: `resp_${Date.now()}`,
     modelVersion: "",

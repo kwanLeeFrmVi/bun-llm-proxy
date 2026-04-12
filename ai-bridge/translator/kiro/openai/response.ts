@@ -10,7 +10,7 @@ export interface KiroOpenAIState {
   usage: Record<string, number> | null;
 }
 
-function newState(): KiroOpenAIState {
+export function newState(): KiroOpenAIState {
   return {
     responseId: `chatcmpl-${Date.now()}`,
     created: Math.floor(Date.now() / 1000),
