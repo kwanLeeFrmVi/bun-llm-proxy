@@ -55,6 +55,7 @@ export function PaginationControls({
       </p>
       <div className="flex items-center gap-1">
         <button
+          aria-label="Previous page"
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
           className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -86,6 +87,7 @@ export function PaginationControls({
         )}
 
         <button
+          aria-label="Next page"
           disabled={page + 1 >= totalPages}
           onClick={() => onPageChange(page + 1)}
           className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

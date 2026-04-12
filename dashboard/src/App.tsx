@@ -47,6 +47,7 @@ function ProtectedLayout() {
             <span className="font-headline font-bold text-base">LLM Gateway</span>
           </div>
           <button
+            aria-label="Open sidebar"
             onClick={() => setIsSidebarOpen(true)}
             className="p-2 text-muted-foreground hover:text-foreground"
           >
