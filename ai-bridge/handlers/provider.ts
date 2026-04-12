@@ -13,6 +13,11 @@ import {
 } from "../../lib/constants.ts";
 import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.ts";
 
+/** Quick check if a string looks like a Vertex AI Service Account JSON key */
+function isVertexSaJson(apiKey: string): boolean {
+  return apiKey.startsWith('{"') && apiKey.includes('"service_account"');
+}
+
 // ─── Provider Configuration ───────────────────────────────────────────────────────
 
 interface ProviderConfig {
@@ -64,7 +69,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
   },
   "vertex-partner": {
     baseUrl: "https://aiplatform.googleapis.com",
-    format: FORMATS.VERTEX,
+    format: FORMATS.OPENAI,  // Uses OpenAI-compatible endpoint, not Gemini format
   },
 
   // ── API Key providers ─────────────────────────────────────────────────────────────
@@ -297,6 +302,19 @@ export function buildUpstreamUrl(
     const base = (psd?.baseUrl as string | undefined) ?? ANTHROPIC_DEFAULT_BASE_URL.replace("/v1", "");
     const cleanBase = base.replace(/\/v1\/?$/, "");
     return `${cleanBase}/v1/messages`;
+  }
+
+  // Handle vertex-partner: OpenAI-compatible endpoint
+  if (provider === "vertex-partner") {
+    const projectId = credentials.projectId as string | undefined;
+    if (!projectId) return null;
+    const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/endpoints/openapi/chat/completions`;
+    // Raw API key (non-SA JSON) goes in URL ?key= param
+    const apiKey = credentials.apiKey as string | undefined;
+    if (apiKey && !isVertexSaJson(apiKey)) {
+      return `${url}?key=${apiKey}`;
+    }
+    return url;
   }
 
   // Handle ollama-local special case

@@ -70,7 +70,11 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     : bodyBytes;
 
   const translatedBody = JSON.parse(new TextDecoder().decode(translatedBytes)) as Record<string, unknown>;
-  translatedBody.model = model;
+  // Vertex AI (Gemini format) uses model in URL path, not body — skip setting model field
+  // vertex-partner uses OpenAI-compatible endpoint which needs model in body
+  if (provider !== "vertex") {
+    translatedBody.model = model;
+  }
 
   // Build upstream URL and headers
   const upstreamUrl = buildUpstreamUrl(provider, model, stream !== false, credentials);
@@ -165,6 +169,30 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
 
 // ─── Streaming response ───────────────────────────────────────────────────────────
 
+/**
+ * Split a string containing multiple JSON objects separated by commas.
+ * Handles formats like: {"a":1},{"b":2} or {"a":1},\r\n{"b":2}
+ */
+function splitVertexJsonObjects(text: string): string[] {
+  const results: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (text[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        results.push(text.slice(start, i + 1));
+      }
+    }
+  }
+
+  return results;
+}
+
 async function handleStreamingResponse(
   upstream: Response,
   sourceFormat: string,
@@ -189,7 +217,34 @@ async function handleStreamingResponse(
           const { done, value } = await reader.read();
           if (done) break;
 
-          const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
+          let raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
+
+          // Vertex AI (Gemini format) streaming returns JSON array: [{obj},{obj},...]
+          // Strip array delimiters and split into individual JSON objects for the translator
+          if (opts.modelInfo.provider === "vertex") {
+            const text = new TextDecoder().decode(raw);
+            let cleaned = text.trim();
+            if (cleaned === "]" || cleaned === "]\r\n") continue;
+            if (cleaned.startsWith("[")) cleaned = cleaned.slice(1);
+            if (cleaned.startsWith(",")) cleaned = cleaned.slice(1);
+            if (cleaned.endsWith("]")) cleaned = cleaned.slice(0, -1);
+            cleaned = cleaned.trim();
+            if (!cleaned) continue;
+
+            // Split multiple JSON objects: },{ or },\r\n{ or },\n{
+            const jsonObjects = splitVertexJsonObjects(cleaned);
+
+            for (const jsonStr of jsonObjects) {
+              const chunkRaw = new TextEncoder().encode(jsonStr);
+              const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, chunkRaw, state);
+              state = translated.state;
+              for (const chunk of translated.chunks) {
+                controller.enqueue(chunk);
+              }
+            }
+            continue;
+          }
+
           const translated = translateChunk(targetFormat, sourceFormat, model, translatedBytes, raw, state);
           state = translated.state;
 

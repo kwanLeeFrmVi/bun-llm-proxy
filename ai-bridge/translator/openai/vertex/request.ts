@@ -13,6 +13,8 @@ import { convertOpenAIRequestToGemini } from "../gemini/request.ts";
 function stripVertexIncompatibleFields(body: Record<string, unknown>): Record<string, unknown> {
   // Vertex AI controls streaming via endpoint (streamGenerateContent vs generateContent), not body
   delete body.stream;
+  // Vertex AI uses model in URL path, not body — remove to avoid confusion
+  delete body.model;
 
   if (!body.contents) return body;
 
