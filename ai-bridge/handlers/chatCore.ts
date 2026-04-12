@@ -273,7 +273,11 @@ async function handleStreamingResponse(
   let chunkCount = 0;
   let eventCount = 0;
 
-  log.debug(opts.ctx ?? null, "STREAM", `Starting stream: ${sourceFormat} → ${targetFormat} | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`);
+  log.debug(
+    opts.ctx ?? null,
+    "STREAM",
+    `Starting stream: ${sourceFormat} → ${targetFormat} | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`
+  );
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -349,7 +353,10 @@ async function handleStreamingResponse(
           // SSE line buffering: accumulate text and only process complete SSE events
           // (delimited by \n\n). This prevents split TCP chunks from breaking JSON parsing.
           // Normalize \r\n → \n so that \r\n\r\n event separators become \n\n
-          const text = decoder.decode(raw, { stream: true }).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          const text = decoder
+            .decode(raw, { stream: true })
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n");
           sseBuffer += text;
 
           // Process complete SSE events (each ends with \n\n)
@@ -369,7 +376,9 @@ async function handleStreamingResponse(
                     sawValidMessageDelta = true;
                   }
                 }
-              } catch { /* ignore parse errors in tracking */ }
+              } catch {
+                /* ignore parse errors in tracking */
+              }
             }
 
             const eventRaw = encoder.encode(eventText);
@@ -439,18 +448,27 @@ async function handleStreamingResponse(
         // on missing input_tokens (e.g. Claude Code). If the upstream never sent
         // a valid message_delta with usage, emit a synthetic fallback.
         if (!sawValidMessageDelta && sourceFormat === "claude") {
-          log.debug(opts.ctx ?? null, "STREAM", "Emitting synthetic message_delta — upstream did not provide valid usage");
-          controller.enqueue(encoder.encode(
-            "event: message_delta\n" +
-            'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
-          ));
-          controller.enqueue(encoder.encode(
-            "event: message_stop\n" +
-            'data: {"type":"message_stop"}\n\n'
-          ));
+          log.debug(
+            opts.ctx ?? null,
+            "STREAM",
+            "Emitting synthetic message_delta — upstream did not provide valid usage"
+          );
+          controller.enqueue(
+            encoder.encode(
+              "event: message_delta\n" +
+                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+            )
+          );
+          controller.enqueue(
+            encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+          );
         }
 
-        log.debug(opts.ctx ?? null, "STREAM", `Stream complete: ${chunkCount} chunks, ${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}`);
+        log.debug(
+          opts.ctx ?? null,
+          "STREAM",
+          `Stream complete: ${chunkCount} chunks, ${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}`
+        );
 
         controller.close();
       } catch (streamErr) {
