@@ -1223,7 +1223,9 @@ export async function getApiKeys(filter: { userId?: string } = {}): Promise<ApiK
             user_id: string | null;
           },
           string
-        >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE user_id = ?")
+        >(
+          "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE user_id = ?"
+        )
         .all(filter.userId)
     : db()
         .query<
@@ -1270,7 +1272,9 @@ export async function getApiKeyByKey(key: string): Promise<ApiKey | null> {
         user_id: string | null;
       },
       string
-    >("SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE key = ?")
+    >(
+      "SELECT id, name, key, machine_id, is_active, created_at, user_id FROM api_keys WHERE key = ?"
+    )
     .get(key);
   if (!row) return null;
   return {

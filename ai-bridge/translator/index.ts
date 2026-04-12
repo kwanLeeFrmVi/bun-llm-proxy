@@ -109,7 +109,7 @@ function identity(_modelName: string, raw: Uint8Array): Uint8Array {
 
 function normalizeClaudeStreamingUsage(raw: Uint8Array): Uint8Array {
   try {
-    const text = new TextDecoder().decode(raw);
+    const text = new TextDecoder().decode(raw).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     if (!text.startsWith("event:")) return raw;
 
     const lines = text.split("\n");

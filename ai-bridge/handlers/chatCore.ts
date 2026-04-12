@@ -269,6 +269,11 @@ async function handleStreamingResponse(
   // Ollama (and similar) send NDJSON (one JSON object per line) instead of SSE
   const isSSE = targetFormat !== "ollama";
   let ndjsonBuffer = "";
+  let sawValidMessageDelta = false;
+  let chunkCount = 0;
+  let eventCount = 0;
+
+  log.debug(opts.ctx ?? null, "STREAM", `Starting stream: ${sourceFormat} → ${targetFormat} | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -280,6 +285,7 @@ async function handleStreamingResponse(
           if (done) break;
 
           const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
+          chunkCount++;
 
           // Vertex AI (Gemini format) streaming returns JSON array: [{obj},{obj},...]
           // Strip array delimiters and split into individual JSON objects for the translator
@@ -342,7 +348,8 @@ async function handleStreamingResponse(
 
           // SSE line buffering: accumulate text and only process complete SSE events
           // (delimited by \n\n). This prevents split TCP chunks from breaking JSON parsing.
-          const text = decoder.decode(raw, { stream: true });
+          // Normalize \r\n → \n so that \r\n\r\n event separators become \n\n
+          const text = decoder.decode(raw, { stream: true }).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
           sseBuffer += text;
 
           // Process complete SSE events (each ends with \n\n)
@@ -350,6 +357,20 @@ async function handleStreamingResponse(
             const eventEnd = sseBuffer.indexOf("\n\n");
             const eventText = sseBuffer.slice(0, eventEnd + 2);
             sseBuffer = sseBuffer.slice(eventEnd + 2);
+            eventCount++;
+
+            // Track whether we saw a valid message_delta with usage for fallback emission
+            if (eventText.includes("message_delta")) {
+              try {
+                const dataMatch = eventText.match(/data:\s*(\{.*\})/);
+                if (dataMatch) {
+                  const parsed = JSON.parse(dataMatch[1]!);
+                  if (parsed.type === "message_delta" && parsed.usage != null) {
+                    sawValidMessageDelta = true;
+                  }
+                }
+              } catch { /* ignore parse errors in tracking */ }
+            }
 
             const eventRaw = encoder.encode(eventText);
             const translated = translateChunk(
@@ -413,6 +434,23 @@ async function handleStreamingResponse(
         for (const chunk of doneChunks.chunks) {
           controller.enqueue(chunk);
         }
+
+        // Guarantee message_delta with usage for Claude SSE clients that crash
+        // on missing input_tokens (e.g. Claude Code). If the upstream never sent
+        // a valid message_delta with usage, emit a synthetic fallback.
+        if (!sawValidMessageDelta && sourceFormat === "claude") {
+          log.debug(opts.ctx ?? null, "STREAM", "Emitting synthetic message_delta — upstream did not provide valid usage");
+          controller.enqueue(encoder.encode(
+            "event: message_delta\n" +
+            'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+          ));
+          controller.enqueue(encoder.encode(
+            "event: message_stop\n" +
+            'data: {"type":"message_stop"}\n\n'
+          ));
+        }
+
+        log.debug(opts.ctx ?? null, "STREAM", `Stream complete: ${chunkCount} chunks, ${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}`);
 
         controller.close();
       } catch (streamErr) {
