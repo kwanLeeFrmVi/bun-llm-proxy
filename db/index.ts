@@ -1349,6 +1349,10 @@ export async function updateApiKey(id: string, data: Partial<ApiKey>): Promise<A
     updates.push("is_active = ?");
     params.push(data.isActive ? 1 : 0);
   }
+  if (data.userId !== undefined) {
+    updates.push("user_id = ?");
+    params.push(data.userId ?? null);
+  }
   if (updates.length === 0) return getApiKeyById(id);
   params.push(id);
   db().run(`UPDATE api_keys SET ${updates.join(", ")} WHERE id = ?`, params);
