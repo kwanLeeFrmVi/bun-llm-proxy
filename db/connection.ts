@@ -36,3 +36,10 @@ export function getRawDb(): Database {
 export function setDb(db: Database): void {
   _db = db;
 }
+
+/**
+ * Reset the database connection for testing.
+ */
+export function resetConnection(): void {
+  _db = null;
+}

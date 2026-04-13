@@ -68,6 +68,17 @@ function db(): Database {
   return _db ?? openDb();
 }
 
+/**
+ * Reset the database singleton for testing.
+ * Closes the current connection and clears the cache.
+ */
+export function resetDbForTesting(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
+
 function seedDefaultSettings(database: Database): void {
   for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
     database.run("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", [
