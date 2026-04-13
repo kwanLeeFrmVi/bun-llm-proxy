@@ -64,8 +64,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   const modelTargetFormat = getModelTargetFormat(alias, model);
   const targetFormat = modelTargetFormat ?? getTargetFormat(provider);
 
-  // Determine streaming mode
-  const stream = body.stream !== false;
+  // Determine streaming mode (default: false, matching OpenAI API behavior)
+  const stream = body.stream === true;
 
   log.debug(ctx ?? null, "CHAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
 

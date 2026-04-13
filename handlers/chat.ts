@@ -298,7 +298,7 @@ async function handleSingleModelChat(
       }
     }
 
-    const isStreaming = body.stream !== false;
+    const isStreaming = body.stream === true;
 
     // Log format detection
     const sourceFormat = detectFormat(body);

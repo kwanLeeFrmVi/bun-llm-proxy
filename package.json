@@ -34,6 +34,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "@types/bun": "latest",
     "concurrently": "^9.2.1",
+    "openai": "^6.34.0",
     "prettier": "^3.3.3"
   },
   "peerDependencies": {
