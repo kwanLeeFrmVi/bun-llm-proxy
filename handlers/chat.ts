@@ -333,6 +333,7 @@ async function handleSingleModelChat(
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model, ctx);
       },
+      onStreamError: (status: number, msg: string) => sseErrorResponse(status, msg),
       onUsage: async (usage: {
         prompt_tokens?: number;
         completion_tokens?: number;

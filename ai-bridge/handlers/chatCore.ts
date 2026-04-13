@@ -10,7 +10,7 @@ import {
   buildUpstreamUrl,
   buildUpstreamHeaders,
 } from "./provider.js";
-import { errorResponse } from "../utils/error.ts";
+import { errorResponse, sseErrorResponse } from "../utils/error.ts";
 import * as log from "../../lib/logger.ts";
 import type { RequestContext } from "../../lib/requestContext.ts";
 
@@ -31,6 +31,7 @@ export interface ChatCoreOptions {
   onCredentialsRefreshed?: (creds: Record<string, unknown>) => Promise<void>;
   onRequestSuccess?: () => Promise<void>;
   onDisconnect?: (reason: string) => void;
+  onStreamError?: (status: number, message: string) => Response;
   onUsage?: (usage: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -255,6 +256,15 @@ async function handleStreamingResponse(
 ): Promise<Response> {
   if (!upstream.body) {
     return new globalThis.Response("Upstream returned empty body", { status: 502 });
+  }
+
+  if (!upstream.ok) {
+    const errorText = await upstream.text().catch(() => "");
+    const status = upstream.status;
+    const msg = errorText || `Upstream error: ${status}`;
+    log.warn(opts.ctx ?? null, "STREAM", `Upstream error ${status}: ${msg}`);
+    if (opts.onStreamError) return opts.onStreamError(status, msg);
+    return sseErrorResponse(status, msg);
   }
 
   // Initialize translator state once; the translator mutates this object in-place
