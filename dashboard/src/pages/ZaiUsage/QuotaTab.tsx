@@ -4,6 +4,8 @@ import { CountdownCard } from "@/components/CountdownCard.tsx";
 import type { ZaiQuotaResponse } from "@/lib/zaiTypes.ts";
 import { fmt } from "@/lib/formatters.ts";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface QuotaLimitCardProps {
   limit: {
@@ -35,12 +37,16 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
   const getTypeLabel = () => {
     if (type === "TIME_LIMIT") {
       return unit === 5
-        ? "Rate Limit (5-min window)"
+        ? "Total Monthly Web Search / Reader / Zread Quota"
         : unit === 1
           ? "Requests/Second"
           : "Time Limit";
     }
     if (type === "TOKENS_LIMIT") {
+      if (unit === 6) return "Weekly Quota";
+      if (unit === 5) return "Monthly Quota";
+      if (unit === 3) return `${number} Hours Quota`;
+
       const unitLabels: Record<number, string> = {
         1: "Day",
         3: "Hours",
@@ -48,16 +54,19 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
         6: "Week",
       };
       const unitLabel = unitLabels[unit] || unit;
-      return `Tokens (${number} ${unitLabel}${number > 1 ? "s" : ""})`;
+      return `${unitLabel} Quota`;
     }
     return type;
   };
 
   const getLimitValue = () => {
     if (type === "TIME_LIMIT") {
-      return unit === 5 ? `${usage || 1000} / 5 min` : `${number} ${unit === 1 ? "req/sec" : ""}`;
+      if (unit === 5) return `${fmt(usage || number)} calls`;
+      return `${number} ${unit === 1 ? "req/sec" : ""}`;
     }
     if (type === "TOKENS_LIMIT") {
+      // If number is small (like 1 or 5), it's likely a frequency multiplier, not the token count
+      if (number < 1000) return "Based on plan level";
       return fmt(number) + " tokens";
     }
     return String(number);
@@ -65,10 +74,10 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
 
   const getUsageValue = () => {
     if (type === "TIME_LIMIT") {
-      return currentValue ? String(currentValue) : "-";
+      return currentValue !== undefined ? fmt(currentValue) : "-";
     }
     if (type === "TOKENS_LIMIT") {
-      // Calculate used from percentage: used = (percentage / 100) * number
+      if (number < 1000) return `${percentage}%`;
       const used = Math.round((percentage / 100) * number);
       return fmt(used);
     }
@@ -78,8 +87,22 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
   return (
     <div className="overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="border-b border-[rgba(203,213,225,0.4)] px-6 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] font-600 text-[var(--on-surface)]">{getTypeLabel()}</p>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <p className="text-[13px] font-600 text-[var(--on-surface)]">{getTypeLabel()}</p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-[var(--on-surface-variant)] cursor-help opacity-70 hover:opacity-100 transition-opacity" />
+                </TooltipTrigger>
+                <TooltipContent className="text-[11px] max-w-[200px]">
+                  {type === "TIME_LIMIT" && unit === 5
+                    ? "Quota for web searching, document reading, and other tool-based interactions."
+                    : `Usage limit for ${getTypeLabel().toLowerCase()}.`}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <p className="mt-0.5 text-[11px] text-[var(--on-surface-variant)]">
             Limit: {getLimitValue()}
           </p>
@@ -88,10 +111,10 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
           variant="outline"
           className={
             percentage >= 80
-              ? "text-red-600 border-red-200"
+              ? "text-red-600 border-red-200 bg-red-50/50"
               : percentage >= 50
-                ? "text-amber-600 border-amber-200"
-                : "text-green-600 border-green-200"
+                ? "text-amber-600 border-amber-200 bg-amber-50/50"
+                : "text-green-600 border-green-200 bg-green-50/50"
           }
         >
           {percentage}%
@@ -103,7 +126,15 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
           <QuotaCard
             label="Used"
             value={getUsageValue()}
-            sub={type === "TOKENS_LIMIT" ? "tokens" : ""}
+            sub={
+              type === "TOKENS_LIMIT"
+                ? number >= 1000
+                  ? "tokens"
+                  : ""
+                : type === "TIME_LIMIT" && unit === 5
+                  ? "calls"
+                  : ""
+            }
           />
           <QuotaCard
             label="Remaining"
@@ -111,19 +142,38 @@ function QuotaLimitCard({ limit }: QuotaLimitCardProps) {
               remaining !== undefined
                 ? fmt(remaining)
                 : type === "TOKENS_LIMIT"
-                  ? fmt(number - Math.round((percentage / 100) * number))
-                  : "-"
+                  ? number >= 1000
+                    ? fmt(number - Math.round((percentage / 100) * number))
+                    : `${100 - percentage}%`
+                  : type === "TIME_LIMIT" && unit === 5
+                    ? fmt((usage || number) - (currentValue || 0))
+                    : "-"
             }
-            sub={type === "TOKENS_LIMIT" ? "tokens" : ""}
+            sub={
+              type === "TOKENS_LIMIT"
+                ? number >= 1000
+                  ? "tokens"
+                  : ""
+                : type === "TIME_LIMIT" && unit === 5
+                  ? "calls"
+                  : ""
+            }
           />
         </div>
 
         <ProgressBar value={percentage} />
 
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-[12px] text-[var(--on-surface-variant)]">Resets in</span>
-          <CountdownCard target={String(nextResetTime)} compact />
-        </div>
+        {nextResetTime > 0 && (
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-[12px] text-[var(--on-surface-variant)]">Resets in</span>
+            <div className="flex flex-col items-end">
+              <CountdownCard target={String(nextResetTime)} compact />
+              <span className="text-[10px] text-[var(--on-surface-variant)] mt-1 opacity-60">
+                {new Date(nextResetTime).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
 
         {usageDetails && usageDetails.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[rgba(203,213,225,0.3)]">

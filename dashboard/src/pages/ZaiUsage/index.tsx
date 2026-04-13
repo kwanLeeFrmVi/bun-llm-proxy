@@ -16,7 +16,6 @@ import { UsageTab } from "./UsageTab.tsx";
 
 export default function ZaiUsage() {
   const [range, setRange] = useState<DateRange>("7d");
-  const [activeTab, setActiveTab] = useState<"quota" | "performance" | "usage">("quota");
 
   const [quota, setQuota] = useState<ZaiQuotaResponse | null>(null);
   const [performance, setPerformance] = useState<ZaiPerformanceResponse | null>(null);
@@ -138,31 +137,28 @@ export default function ZaiUsage() {
           <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">Loading from api.z.ai</p>
         </div>
       ) : (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-          <TabsList className="h-10 bg-[var(--surface-container-low)] rounded-lg p-1 w-full sm:w-auto">
-            <TabsTrigger value="quota" className="h-8 px-4 rounded-md text-[13px] font-500">
-              Quota
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="h-8 px-4 rounded-md text-[13px] font-500">
-              Performance
-            </TabsTrigger>
-            <TabsTrigger value="usage" className="h-8 px-4 rounded-md text-[13px] font-500">
-              Usage
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="quota" className="mt-6">
+        <div className="flex flex-col gap-10">
+          <section>
+            <h2 className="text-[14px] font-600 uppercase tracking-wider text-[var(--on-surface-variant)] mb-4 px-1">
+              Quota & Limits
+            </h2>
             <QuotaTab quota={quota} />
-          </TabsContent>
+          </section>
 
-          <TabsContent value="performance" className="mt-6">
+          <section>
+            <h2 className="text-[14px] font-600 uppercase tracking-wider text-[var(--on-surface-variant)] mb-4 px-1">
+              Model Performance
+            </h2>
             <PerformanceTab performance={performance} />
-          </TabsContent>
+          </section>
 
-          <TabsContent value="usage" className="mt-6">
+          <section>
+            <h2 className="text-[14px] font-600 uppercase tracking-wider text-[var(--on-surface-variant)] mb-4 px-1">
+              Token Usage
+            </h2>
             <UsageTab usage={usage} />
-          </TabsContent>
-        </Tabs>
+          </section>
+        </div>
       )}
 
       <style>{`

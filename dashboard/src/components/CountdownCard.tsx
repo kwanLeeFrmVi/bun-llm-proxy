@@ -18,7 +18,13 @@ export function CountdownCard({
     }
 
     const calculateTimeLeft = () => {
-      const targetDate = new Date(target).getTime();
+      if (!target || target === "0" || target === "undefined") return "-";
+
+      const targetDate = /^\d+$/.test(target)
+        ? new Date(parseInt(target)).getTime()
+        : new Date(target).getTime();
+      if (isNaN(targetDate)) return "-";
+
       const now = Date.now();
       const diff = targetDate - now;
 
@@ -41,9 +47,7 @@ export function CountdownCard({
   }, [target]);
 
   if (compact) {
-    return (
-      <span className="text-[12px] text-[var(--on-surface-variant)]">Resets in {timeLeft}</span>
-    );
+    return <span className="text-[12px] text-[var(--on-surface-variant)]">{timeLeft}</span>;
   }
 
   return (
