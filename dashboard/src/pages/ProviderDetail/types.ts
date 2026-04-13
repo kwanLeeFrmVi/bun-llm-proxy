@@ -1,4 +1,5 @@
 import type { ProviderConnection } from "@/lib/api";
+import type { TestStatus } from "@/lib/types";
 
 export interface ProviderModel {
   id: string;
@@ -11,8 +12,6 @@ export interface ModelsResponse {
   alias: string;
   models: ProviderModel[];
 }
-
-export type TestStatus = "ok" | "error" | null;
 
 export type StatusVariant = "success" | "error" | "default";
 
@@ -59,15 +58,4 @@ export interface AddCustomModelModalProps {
   providerPrefix?: string; // Effective prefix for showing the full model ID preview
   onAdd: (modelId: string) => void;
   onClose: () => void;
-}
-
-export interface ModelTileProps {
-  modelId: string;
-  alias?: string;
-  onCopy: (id: string) => void;
-  copied: string | null;
-  onTest?: () => void;
-  isTesting?: boolean;
-  testStatus?: TestStatus;
-  onDelete?: () => void;
 }

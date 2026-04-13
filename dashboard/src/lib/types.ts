@@ -41,6 +41,8 @@ export interface UsageRecord {
   durationMs: number;
 }
 
+export type TestStatus = "ok" | "error" | null;
+
 export interface ConsoleLogEntry {
   id: string;
   timestamp: string;

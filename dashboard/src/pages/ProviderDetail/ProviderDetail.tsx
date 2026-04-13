@@ -28,9 +28,10 @@ import { ConnectionRow } from "./ConnectionRow";
 import { AddApiKeyModal } from "./AddApiKeyModal";
 import { EditConnectionModal } from "./EditConnectionModal";
 import { AddCustomModelModal } from "./AddCustomModelModal";
-import { ModelTile } from "./ModelTile";
+import { ModelTile } from "@/components/ModelTile";
 import { getLogoPath } from "./utils";
-import type { ProviderModel, TestStatus } from "./types";
+import type { ProviderModel } from "./types";
+import type { TestStatus } from "@/lib/types";
 import { EditProviderModal } from "@/components/EditProviderModal";
 
 function normalizeModelId(modelId: string, prefixes: string[]) {
