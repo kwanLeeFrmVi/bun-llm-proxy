@@ -270,6 +270,9 @@ export function getTargetFormat(provider: string): string {
   const config = PROVIDERS[provider];
   if (config) return config.format;
 
+  // ollama-local uses the same format as ollama
+  if (provider === "ollama-local") return FORMATS.OLLAMA;
+
   // Handle compatible providers
   if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX)) return FORMATS.CLAUDE;
   return FORMATS.OPENAI;

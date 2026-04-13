@@ -52,8 +52,6 @@ export interface ChatCoreResult {
   };
 }
 
-const STREAM_PROVIDERS = new Set(["openai", "codex"]);
-
 export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreResult> {
   const { body, modelInfo, credentials, ctx, sourceFormatOverride } = opts;
   const { provider, model } = modelInfo;
@@ -67,8 +65,7 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   const targetFormat = modelTargetFormat ?? getTargetFormat(provider);
 
   // Determine streaming mode
-  const streamProvider = STREAM_PROVIDERS.has(provider);
-  const stream = streamProvider ? true : body.stream !== false;
+  const stream = body.stream !== false;
 
   log.debug(ctx ?? null, "CHAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
 

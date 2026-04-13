@@ -104,16 +104,15 @@ export async function getProxKeys(): Promise<ProxKeyInfo[]> {
     // provider_connections.provider = provider_nodes.id (the node UUID)
     const connRows = db()
       .query<
-        { id: string; data: string },
+        { id: string; api_key: string | null; display_name: string | null; name: string | null },
         string
-      >(`SELECT id, data FROM provider_connections WHERE provider = ?`)
+      >(`SELECT id, api_key, display_name, name FROM provider_connections WHERE provider = ?`)
       .all(row.id);
 
     for (const conn of connRows) {
-      const data = JSON.parse(conn.data) as Record<string, unknown>;
-      const apiKey = data.apiKey as string | undefined;
+      const apiKey = conn.api_key;
       if (!apiKey) continue;
-      const masked = (data.name as string | undefined) ?? row.name ?? `key#${keys.length + 1}`;
+      const masked = conn.display_name ?? conn.name ?? row.name ?? `key#${keys.length + 1}`;
       keys.push({
         id: conn.id,
         apiKey,
@@ -137,6 +136,7 @@ async function proxFetch(apiKey: string, path: string): Promise<Response> {
       Accept: "*/*",
       Referer: `${PROX_BASE}/dashboard/`,
     },
+    signal: AbortSignal.timeout(10000), // 10s timeout to prevent indefinite hangs
   });
   return res;
 }
