@@ -47,6 +47,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     >
       {/* Close Button (Mobile) */}
       <button
+        aria-label="Close sidebar"
         onClick={onClose}
         className="lg:hidden absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground"
       >

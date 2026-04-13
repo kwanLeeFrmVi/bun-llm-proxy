@@ -40,6 +40,7 @@ export function ConnectionRow({
       {/* Priority reorder */}
       <div className="flex flex-col shrink-0">
         <button
+          aria-label="Move up"
           onClick={onMoveUp}
           disabled={isFirst}
           className={`p-0.5 rounded ${isFirst ? "text-[--on-surface-variant]/30" : "text-[--on-surface-variant] hover:text-[--on-surface]"}`}
@@ -47,6 +48,7 @@ export function ConnectionRow({
           <ChevronUp className="w-3.5 h-3.5" />
         </button>
         <button
+          aria-label="Move down"
           onClick={onMoveDown}
           disabled={isLast}
           className={`p-0.5 rounded ${isLast ? "text-[--on-surface-variant]/30" : "text-[--on-surface-variant] hover:text-[--on-surface]"}`}
