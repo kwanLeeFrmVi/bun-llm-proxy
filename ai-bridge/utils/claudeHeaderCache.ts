@@ -3,7 +3,7 @@
 // for forwarding to api.anthropic.com, replacing static hardcoded values.
 //
 // Memory Management:
-// - TTL: Headers expire after CACHE_TTL_MS (default 1 hour)
+// - TTL: Headers expire after CACHE_TTL_MS (default 24 hours)
 // - Size limit: Maximum MAX_CACHE_SIZE entries (default 100)
 // - LRU eviction: Least recently used entries are evicted when limit is reached
 // - Periodic cleanup: Expired entries are removed every CLEANUP_INTERVAL_MS (default 5 minutes)
@@ -31,7 +31,7 @@ const CLAUDE_IDENTITY_HEADERS = [
 ];
 
 // Cache configuration
-const CACHE_TTL_MS = 60 * 60 * 1000 * 12; // 12 hours
+const CACHE_TTL_MS = 60 * 60 * 1000 * 24; // 24 hours
 const MAX_CACHE_SIZE = 100; // Maximum number of cached header sets
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -125,6 +125,15 @@ export function cacheClaudeHeaders(headers: Record<string, string>): void {
   if (Object.keys(captured).length > 0) {
     const cacheKey = generateCacheKey(headers);
     const now = Date.now();
+
+    // Skip overwrite if a valid (non-expired) entry already exists for this key.
+    // Just touch LRU stats to keep the entry active.
+    const existing = headerCache.get(cacheKey);
+    if (existing && (now - existing.timestamp) < CACHE_TTL_MS) {
+      existing.lastAccess = now;
+      existing.accessCount++;
+      return;
+    }
 
     const entry: CacheEntry = {
       headers: captured,

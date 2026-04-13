@@ -130,7 +130,7 @@ describe("claudeHeaderCache", () => {
     const stats = cacheModule.getCacheStats();
     expect(stats.size).toBeGreaterThanOrEqual(0);
     expect(stats.maxSize).toBe(100); // MAX_CACHE_SIZE
-    expect(stats.ttlMs).toBe(60 * 60 * 1000 * 12); // 12 hours
+    expect(stats.ttlMs).toBe(60 * 60 * 1000 * 24); // 24 hours
   });
 
   it("tracks cache statistics", () => {
