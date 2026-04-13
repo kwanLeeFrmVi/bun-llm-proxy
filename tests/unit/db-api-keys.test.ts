@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
 import {
   createApiKey,
   getApiKeyById,
@@ -16,39 +15,25 @@ import {
   resetDbForTesting,
 } from "../../db/index.ts";
 import { resetConnection } from "../../db/connection.ts";
-import { CREATE_TABLES } from "../../db/schema.ts";
 
 // ─── Test Setup ─────────────────────────────────────────────────────────────
 
-// Generate unique test DB path for each test run
-let testDbCounter = 0;
-function getTestDbPath(): string {
-  return `/tmp/bun-llm-test-${Date.now()}-${testDbCounter++}.db`;
+// Generate unique DATA_DIR for each test to ensure isolation
+let testCounter = 0;
+function getTestDataDir(): string {
+  return `/tmp/bun-llm-test-${Date.now()}-${testCounter++}`;
 }
 
-let currentTestDb: string;
+let currentDataDir: string;
 
 beforeEach(() => {
-  // Reset database singletons
+  // Reset database singletons first
   resetDbForTesting();
   resetConnection();
   
-  // Set test data directory
-  currentTestDb = getTestDbPath();
-  process.env.DATA_DIR = "/tmp";
-  
-  // Create fresh test database with schema directly
-  const testDb = new Database(currentTestDb);
-  testDb.run("PRAGMA journal_mode = WAL;");
-  testDb.run(CREATE_TABLES);
-  testDb.close();
-  
-  // Set the connection to use our test DB
-  // The db/index.ts will pick this up when it calls getRawDb()
-  process.env.DATA_DIR = "/tmp";
-  const testPath = currentTestDb.replace("/tmp/", "").replace(".db", "");
-  // We need to manipulate the DATA_DIR to include our specific file
-  // Actually, let's use a different approach - use the file directly
+  // Set unique test data directory
+  currentDataDir = getTestDataDir();
+  process.env.DATA_DIR = currentDataDir;
 });
 
 afterEach(() => {
@@ -56,12 +41,16 @@ afterEach(() => {
   resetDbForTesting();
   resetConnection();
   
-  // Clean up test database file
-  if (currentTestDb) {
+  // Clean up test data directory
+  if (currentDataDir) {
     try {
-      Bun.file(currentTestDb).delete();
+      // Delete the router.db file and the directory
+      const dbFile = `${currentDataDir}/router.db`;
+      Bun.file(dbFile).delete();
+      Bun.file(`${currentDataDir}/router.db-shm`).delete();
+      Bun.file(`${currentDataDir}/router.db-wal`).delete();
     } catch {
-      // File may not exist
+      // Files may not exist
     }
   }
   delete process.env.DATA_DIR;
