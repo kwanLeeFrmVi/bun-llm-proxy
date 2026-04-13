@@ -120,10 +120,11 @@ export default function ProvidersPage() {
         c.isActive !== false &&
         (c.testStatus === "error" || c.testStatus === "expired" || c.testStatus === "unavailable")
     );
-    // Use total count for "connected" to match ProviderDetail page behavior
+    // Use active count for "connected" to correctly reflect provider state
     return {
-      connected: conns.length,
+      connected: active.length,
       error: error.length,
+      enabled: conns.filter((c) => c.isActive !== false).length,
       total: conns.length,
       connections: conns,
     };

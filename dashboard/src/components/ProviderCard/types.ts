@@ -3,6 +3,7 @@ import type { ProviderCatalog, ProviderNode, ProviderConnection } from "@/lib/ap
 export interface ProviderStats {
   connected: number;
   error: number;
+  enabled: number;
   total: number;
   connections?: ProviderConnection[];
   lastError?: string | null;

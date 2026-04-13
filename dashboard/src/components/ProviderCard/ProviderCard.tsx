@@ -14,13 +14,10 @@ export function ProviderCard({
   onToggle,
   onRefresh,
 }: ProviderCardProps) {
-  const { connected, error, total } = stats;
+  const { connected, error, enabled, total } = stats;
   const { name, apiTypeLabel } = useProviderMeta(providerId, catalog, node);
 
-  const allDisabled = useMemo(
-    () => total > 0 && connected === 0 && error === 0,
-    [total, connected, error]
-  );
+  const allDisabled = useMemo(() => total > 0 && enabled === 0, [total, enabled]);
 
   const connections = stats.connections ?? [];
   const firstConnection = connections[0];
@@ -37,16 +34,23 @@ export function ProviderCard({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[--on-surface] truncate">{name}</p>
           <div className="flex items-center gap-2 mt-0.5">
-            {connected > 0 ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                {connected} Connected
-              </span>
-            ) : error > 0 ? (
+            {error > 0 ? (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
                 {error} Error
               </span>
+            ) : connected > 0 ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                {connected} Connected
+              </span>
+            ) : enabled > 0 ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-[--on-surface-variant]">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                {enabled} Active
+              </span>
+            ) : total > 0 ? (
+              <span className="text-xs text-[--on-surface-variant]">Disabled</span>
             ) : (
               <span className="text-xs text-[--on-surface-variant]">No connections</span>
             )}
