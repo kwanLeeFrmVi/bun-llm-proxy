@@ -493,3 +493,35 @@ describe("findPricing & calculateCost", () => {
     });
   });
 });
+
+// ─── syncOpenRouterPricing ────────────────────────────────────────────────────
+
+describe("syncOpenRouterPricing", () => {
+  it("returns error result when fetch fails", async () => {
+    const { syncOpenRouterPricing } = await import("../../services/pricingSync.ts");
+
+    const originalFetch = globalThis.fetch;
+    const mockErrorMsg = "OpenRouter returned 500: Internal Server Error";
+
+    // Mock global fetch to return a failed response
+    globalThis.fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        text: async () => "Internal Server Error"
+      } as Response;
+    };
+
+    try {
+      const result = await syncOpenRouterPricing();
+      expect(result.success).toBe(false);
+      expect(result.models).toBe(0);
+      expect(result.providers).toBe(0);
+      expect(result.cached).toBe(false);
+      expect(result.error).toBe(mockErrorMsg);
+    } finally {
+      // Restore original fetch
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
