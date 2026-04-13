@@ -263,6 +263,22 @@ async function findPricing(
     }
   }
 
+  // 6. Fallback: try openrouter provider in pricing table (for when cache is empty)
+  const openrouterPricing = pricing["openrouter"];
+  if (openrouterPricing) {
+    for (const [key, value] of Object.entries(openrouterPricing)) {
+      if (
+        key === model ||
+        key === normalized ||
+        key === stripped ||
+        key === base ||
+        normalizeModelName(key) === normalized
+      ) {
+        return { input: value.input, output: value.output };
+      }
+    }
+  }
+
   return null;
 }
 
