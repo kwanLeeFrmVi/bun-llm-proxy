@@ -98,7 +98,13 @@ export async function GET(req: Request): Promise<Response> {
 
     // For compatible providers, try fetching models from the remote endpoint
     if (isCompatible) {
-      const baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
+      let baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
+      if (!baseUrl) {
+        const node = await getProviderNodeById(id);
+        if (node?.baseUrl) {
+          baseUrl = node.baseUrl.trim().replace(/\/$/, "");
+        }
+      }
       const apiKey = typeof activeConn?.apiKey === "string" ? activeConn.apiKey : "";
 
       if (baseUrl && apiKey) {

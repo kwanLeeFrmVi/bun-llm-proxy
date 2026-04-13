@@ -67,9 +67,20 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Determine baseUrl: prefer providerSpecificData.baseUrl, fall back to provider config
+  // Determine baseUrl: prefer providerSpecificData.baseUrl, then node.baseUrl, fall back to provider config
   const psd = (activeConn.providerSpecificData as Record<string, unknown> | undefined) ?? {};
   let baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
+
+  if (!baseUrl) {
+    const node = await getProviderNodeById(id);
+    if (node?.baseUrl) {
+      baseUrl = node.baseUrl.trim().replace(/\/$/, "");
+      // If it's a chat URL, derive the models base URL
+      if (baseUrl.includes("/chat/completions") || baseUrl.includes("/messages")) {
+        baseUrl = deriveModelsBaseUrl(baseUrl);
+      }
+    }
+  }
 
   if (!baseUrl) {
     const providerConfig = PROVIDERS[id];
@@ -89,7 +100,7 @@ export async function POST(req: Request): Promise<Response> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
 
   // Use x-api-key for Claude-format providers, Bearer for OpenAI-format
-  if (X_API_KEY_PROVIDERS.has(id)) {
+  if (X_API_KEY_PROVIDERS.has(id) || isAnthropicCompatibleProvider(id)) {
     headers["x-api-key"] = apiKey;
     headers["anthropic-version"] = ANTHROPIC_API_VERSION;
   } else {
