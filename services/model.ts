@@ -168,26 +168,25 @@ export async function getAvailableComboModelConfigs(
 
 /**
  * Check if a combo would form a cycle if it included the given models.
- * Used for validation before saving/updating a combo.
+ * Returns true if targetName is reachable from any of the provided models.
  */
 export async function checkComboCycle(
-  comboName: string,
+  targetName: string,
   models: string[],
   visited: Set<string> = new Set()
 ): Promise<boolean> {
-  if (visited.has(comboName)) return true;
-  visited.add(comboName);
-
   for (const model of models) {
-    if (model === comboName) return true;
+    if (model === targetName) return true;
+    if (visited.has(model)) continue;
+    visited.add(model);
+
     const nestedCombo = await getComboByName(model);
     if (nestedCombo) {
-      if (await checkComboCycle(comboName, nestedCombo.models, visited)) {
+      if (await checkComboCycle(targetName, nestedCombo.models, visited)) {
         return true;
       }
     }
   }
 
-  visited.delete(comboName);
   return false;
 }
