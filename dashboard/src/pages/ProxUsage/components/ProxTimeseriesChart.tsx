@@ -39,14 +39,21 @@ export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
     return (
       <div className={cardClass}>
         <SectionHeader title="Token Usage Over Time" sub="Daily tokens and request volume" />
-        <div className="px-10 py-10 text-center text-[13px] text-[var(--on-surface-variant)]">
+        <div className="px-10 py-10 text-center text-[13px] text-(--on-surface-variant)">
           No timeseries data available.
         </div>
       </div>
     );
   }
 
-  const labels = points.map((d) => d.date.slice(5));
+  const labels = points.map((d) => {
+    if (d.date.length > 10) {
+      // Likely has time, e.g. "2024-01-01 12:00" -> "01-01 12:00"
+      return d.date.slice(5);
+    }
+    // Just date, e.g. "2024-01-01" -> "01-01"
+    return d.date.slice(5);
+  });
 
   const chartData = {
     labels,
@@ -126,8 +133,8 @@ export function ProxTimeseriesChart({ chart }: { chart: ProxChart | null }) {
 
   return (
     <div className={cardClass}>
-      <SectionHeader title="Token Usage Over Time" sub="Daily tokens and request volume" />
-      <div className="h-[260px] p-5 px-6">
+      <SectionHeader title="Token Usage Over Time" sub="Usage and request volume" />
+      <div className="h-65 p-5 px-6">
         <Chart type="bar" data={chartData} options={chartOptions} />
       </div>
     </div>

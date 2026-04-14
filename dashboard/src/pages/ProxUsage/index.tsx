@@ -13,7 +13,7 @@ import { ProxTimeseriesChart } from "./components/ProxTimeseriesChart.tsx";
 
 const DAYS_OPTIONS = [
   { label: "5h", value: "5h" },
-  { label: "1d", value: "1" },
+  { label: "1D", value: "1" },
   { label: "7d", value: "7" },
   { label: "14d", value: "14" },
   { label: "30d", value: "30" },
@@ -126,17 +126,17 @@ export default function ProxUsage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-headline text-[28px] font-700 text-[var(--on-surface)] tracking-[-0.02em]">
+          <h1 className="font-headline text-[28px] font-700 text-(--on-surface) tracking-[-0.02em]">
             Pro-X Usage
           </h1>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-500">
+          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-(--on-surface-variant) font-500">
             Upstream LLM Gateway &middot; pro-x.io.vn
           </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Key filter tabs */}
           <Tabs value={selectedKey} onValueChange={handleKeyChange}>
-            <TabsList className="h-9 bg-[var(--surface-container-low)] rounded-lg p-1 flex-wrap max-w-[400px]">
+            <TabsList className="h-9 bg-(--surface-container-low) rounded-lg p-1 flex-wrap max-w-100">
               <TabsTrigger key="ALL" value="" className="h-7 px-3 rounded-md text-[12px] font-500">
                 ALL
               </TabsTrigger>
@@ -153,7 +153,7 @@ export default function ProxUsage() {
           </Tabs>
           {/* Days filter */}
           <Tabs value={days} onValueChange={handleDaysChange}>
-            <TabsList className="h-9 bg-[var(--surface-container-low)] rounded-lg p-1">
+            <TabsList className="h-9 bg-(--surface-container-low) rounded-lg p-1">
               {DAYS_OPTIONS.map((opt) => (
                 <TabsTrigger
                   key={opt.value}
@@ -168,41 +168,41 @@ export default function ProxUsage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="h-9 px-4 flex items-center gap-2 rounded-md border border-[rgba(203,213,225,0.6)] bg-[var(--surface-container-low)] text-[var(--on-surface)] text-[12px] font-500 hover:bg-[var(--surface-container)] transition-colors disabled:opacity-50"
+            className="h-9 px-4 flex items-center gap-2 rounded-md border border-[rgba(203,213,225,0.6)] bg-(--surface-container-low) text-(--on-surface) text-[12px] font-500 hover:bg-(--surface-container) transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-[14px] h-[14px] ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing" : "Refresh"}
           </button>
         </div>
       </div>
 
       {lastUpdated && (
-        <p className="-mt-2 text-[11px] text-[var(--on-surface-variant)]">
+        <p className="-mt-2 text-[11px] text-(--on-surface-variant)">
           Last updated: {lastUpdated.toLocaleTimeString()}
         </p>
       )}
 
       {error && (
-        <div className="flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(203,213,225,0.6)]">
+        <div className="flex gap-3 rounded-xl bg-(--surface-container-lowest) p-6 border border-[rgba(203,213,225,0.6)]">
           <AlertCircle className="shrink-0 w-5 h-5 text-[#ef4444]" />
           <div>
             <p className="text-[13px] font-600 text-[#ef4444]">Failed to load Pro-X data</p>
-            <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{error}</p>
-            <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
+            <p className="mt-1 text-[11px] text-(--on-surface-variant)">{error}</p>
+            <p className="mt-1 text-[11px] text-(--on-surface-variant)">
               Make sure your{" "}
-              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+              <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
                 provider_nodes
               </code>{" "}
               table has entries with{" "}
-              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+              <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
                 prefix LIKE 'prox%'
               </code>{" "}
               and their{" "}
-              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+              <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
                 provider_connections
               </code>{" "}
               have valid{" "}
-              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+              <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
                 apiKey
               </code>{" "}
               values.
@@ -213,10 +213,8 @@ export default function ProxUsage() {
 
       {!status || loading ? (
         <div className="px-12 py-12 text-center">
-          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
-          <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">
-            Loading from pro-x.io.vn
-          </p>
+          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-(--primary) border-t-transparent" />
+          <p className="mt-3 text-[13px] text-(--on-surface-variant)">Loading from pro-x.io.vn</p>
         </div>
       ) : (
         <>
