@@ -5,7 +5,7 @@ import { Database } from "bun:sqlite";
 let testDb: Database;
 
 mock.module("../../db/connection.ts", () => ({
-  getRawDb: () => testDb
+  getRawDb: () => testDb,
 }));
 
 import { trackPendingRequest, appendRequestLog, saveRequestUsage } from "../../stubs/usageDb.ts";

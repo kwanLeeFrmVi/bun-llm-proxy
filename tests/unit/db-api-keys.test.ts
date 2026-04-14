@@ -30,7 +30,7 @@ beforeEach(() => {
   // Reset database singletons first
   resetDbForTesting();
   resetConnection();
-  
+
   // Set unique test data directory
   currentDataDir = getTestDataDir();
   process.env.DATA_DIR = currentDataDir;
@@ -40,7 +40,7 @@ afterEach(() => {
   // Reset singletons first
   resetDbForTesting();
   resetConnection();
-  
+
   // Clean up test data directory
   if (currentDataDir) {
     try {
