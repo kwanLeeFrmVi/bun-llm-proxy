@@ -48,14 +48,16 @@ export async function GET(req: Request): Promise<Response> {
   const combo = await getComboById(id);
   if (!combo) return Response.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
 
-  // Get weights from combo_configs
+  // Get weights from combo_configs while preserving order from combos table
   const config = await getComboConfig(combo.name);
-  let models;
-  if (config && config.models.length > 0) {
-    models = config.models; // { model, weight }[]
-  } else {
-    models = combo.models.map((m) => ({ model: m, weight: 1 }));
-  }
+  // Always use combo.models as the source of truth for order
+  const models = combo.models.map((modelId) => {
+    const configItem = config?.models.find((m) => m.model === modelId);
+    return {
+      model: modelId,
+      weight: configItem ? configItem.weight : 1,
+    };
+  });
 
   return Response.json({ ...combo, models }, { headers: CORS_HEADERS });
 }
@@ -107,7 +109,7 @@ export async function PUT(req: Request): Promise<Response> {
 
   const updated = await updateCombo(id, {
     ...(name !== undefined && { name }),
-    ...(rawModels !== undefined && { models }),
+    ...(rawModels !== undefined && { models: models }),
   });
 
   // Update combo config if name or models changed
@@ -134,7 +136,22 @@ export async function PUT(req: Request): Promise<Response> {
     }
   }
 
-  return Response.json(updated, { headers: CORS_HEADERS });
+  // Fetch the final state to return to the client with weights and correct order
+  const finalCombo = await getComboById(id);
+  if (!finalCombo) {
+    return Response.json({ error: "Failed to retrieve updated combo" }, { status: 500, headers: CORS_HEADERS });
+  }
+
+  const finalConfig = await getComboConfig(finalCombo.name);
+  const finalModels = finalCombo.models.map((modelId) => {
+    const configItem = finalConfig?.models.find((m) => m.model === modelId);
+    return {
+      model: modelId,
+      weight: configItem ? configItem.weight : 1,
+    };
+  });
+
+  return Response.json({ ...finalCombo, models: finalModels }, { headers: CORS_HEADERS });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

@@ -44,20 +44,22 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const combos = await getCombos();
 
-  // Fetch combo configs for all combos to get weights
+  // Fetch combo configs for all combos to get weights, while preserving the order from combos table
   const combosWithWeights = await Promise.all(
     combos.map(async (combo) => {
       const config = await getComboConfig(combo.name);
-      if (config && config.models.length > 0) {
+      // Always use combo.models as the source of truth for order
+      const models = combo.models.map((modelId) => {
+        const configItem = config?.models.find((m) => m.model === modelId);
         return {
-          ...combo,
-          models: config.models, // { model, weight }[]
+          model: modelId,
+          weight: configItem ? configItem.weight : 1,
         };
-      }
-      // Fall back to plain models array with weight=1
+      });
+
       return {
         ...combo,
-        models: combo.models.map((m) => ({ model: m, weight: 1 })),
+        models,
       };
     })
   );

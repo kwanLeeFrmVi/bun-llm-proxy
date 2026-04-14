@@ -18,17 +18,19 @@ import {
 export { parseModel as parseModel } from "../ai-bridge/services/model.ts";
 
 async function getStoredComboModelConfigs(modelStr: string): Promise<ComboModelConfig[] | null> {
-  const comboConfig = await getComboConfig(modelStr);
-  if (comboConfig && comboConfig.models.length > 0) {
-    return comboConfig.models;
-  }
-
   const combo = await getComboByName(modelStr);
-  if (combo && combo.models && combo.models.length > 0) {
-    return combo.models.map((model) => ({ model, weight: 1 }));
+  if (!combo || !combo.models || combo.models.length === 0) {
+    return null;
   }
 
-  return null;
+  const comboConfig = await getComboConfig(modelStr);
+  return combo.models.map((model) => {
+    const configItem = comboConfig?.models.find((item) => item.model === model);
+    return {
+      model,
+      weight: configItem ? configItem.weight : 1,
+    };
+  });
 }
 
 async function getActiveProviderIds(): Promise<Set<string>> {
@@ -175,18 +177,13 @@ export async function checkComboCycle(
   models: string[],
   visited: Set<string> = new Set()
 ): Promise<boolean> {
-  console.log(`[checkComboCycle] target=${targetName} models=${JSON.stringify(models)} visited=${JSON.stringify(Array.from(visited))}`);
   for (const model of models) {
-    if (model === targetName) {
-      console.log(`[checkComboCycle] Found direct cycle: ${model} === ${targetName}`);
-      return true;
-    }
+    if (model === targetName) return true;
     if (visited.has(model)) continue;
     visited.add(model);
 
     const nestedCombo = await getComboByName(model);
     if (nestedCombo) {
-      console.log(`[checkComboCycle] Checking nested combo: ${model}`);
       if (await checkComboCycle(targetName, nestedCombo.models, visited)) {
         return true;
       }
