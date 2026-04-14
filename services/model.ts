@@ -169,6 +169,47 @@ export async function getAvailableComboModelConfigs(
 }
 
 /**
+ * Get combo model configs filtered by provider availability, but WITHOUT flattening nested combos.
+ * This preserves hierarchical strategy execution while still skipping unavailable models/combos.
+ */
+export async function getFilteredComboModelConfigs(
+  modelStr: string,
+  activeProviderIds?: Set<string>
+): Promise<ComboModelConfig[] | null> {
+  const comboModels = await getStoredComboModelConfigs(modelStr);
+  if (!comboModels) return null;
+
+  if (!activeProviderIds) {
+    activeProviderIds = await getActiveProviderIds();
+  }
+
+  const filteredModels: ComboModelConfig[] = [];
+
+  for (const comboModel of comboModels) {
+    try {
+      const nestedCombo = await getComboByName(comboModel.model);
+      if (nestedCombo) {
+        // For nested combos, check if they have ANY available models
+        // Use the existing expansion logic for this check
+        const availableNested = await getAvailableComboModelConfigs(comboModel.model);
+        if (availableNested && availableNested.length > 0) {
+          filteredModels.push(comboModel);
+        }
+      } else {
+        const modelInfo = await getModelInfo(comboModel.model);
+        if (modelInfo.provider && activeProviderIds.has(modelInfo.provider)) {
+          filteredModels.push(comboModel);
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  return filteredModels.length > 0 ? filteredModels : null;
+}
+
+/**
  * Check if a combo would form a cycle if it included the given models.
  * Returns true if targetName is reachable from any of the provided models.
  */

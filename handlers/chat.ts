@@ -10,7 +10,7 @@ import {
 import { checkAuth } from "../lib/authMiddleware.ts";
 import { cacheClaudeHeaders } from "../ai-bridge/utils/claudeHeaderCache.ts";
 import { getSettings, getAverageTTFT, recordComboTTFT } from "../db/index.ts";
-import { getModelInfo, getComboModelConfigs } from "../services/model.ts";
+import { getModelInfo, getFilteredComboModelConfigs } from "../services/model.ts";
 import { handleChatCore } from "../ai-bridge/handlers/chatCore.ts";
 import { errorResponse, unavailableResponse, sseErrorResponse } from "../ai-bridge/utils/error.ts";
 import {
@@ -106,7 +106,7 @@ export async function handleChat(
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model") as Response;
   }
 
-  const comboModels = await getComboModelConfigs(modelStr);
+  const comboModels = await getFilteredComboModelConfigs(modelStr);
   if (comboModels) {
     const comboStrategies =
       (settings.comboStrategies as Record<string, Record<string, string>> | undefined) ?? {};
@@ -163,7 +163,7 @@ async function handleSingleModelChat(
   const modelInfo = await getModelInfo(modelStr);
 
   if (!modelInfo.provider) {
-    const comboModels = await getComboModelConfigs(modelStr);
+    const comboModels = await getFilteredComboModelConfigs(modelStr);
     if (comboModels) {
       const chatSettings = await getSettings();
       const comboStrategies =
