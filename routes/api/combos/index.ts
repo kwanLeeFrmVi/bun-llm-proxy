@@ -4,6 +4,7 @@ import {
   createCombo,
   setComboConfig,
   getComboConfig,
+  deleteComboConfig,
 } from "@/lib/localDb";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
@@ -97,6 +98,9 @@ export async function POST(req: Request): Promise<Response> {
   const configModels = normalizeComboConfig(rawModels);
   if (configModels) {
     await setComboConfig(name, { name, models: configModels });
+  } else {
+    // Clear any stale config if this name was used before
+    await deleteComboConfig(name);
   }
 
   // Return combo with models (including weights)

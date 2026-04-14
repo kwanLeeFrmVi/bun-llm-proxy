@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { uniq } from "lodash";
 import {
   Dialog,
   DialogContent,
@@ -130,13 +131,15 @@ export default function ComboFormDialog({
 
   // Filter available models (not already selected) by search
   // Also exclude current combo being edited to prevent self-reference
-  const available = useMemo(() => {
+  const available = useMemo<string[]>(() => {
     const q = modelSearch.toLowerCase();
     const currentComboName = comboId ? initialName : null;
-    return allModels
-      .filter((m) => !selected.some((s) => s.model === m))
-      .filter((m) => m !== currentComboName) // Prevent self-reference
-      .filter((m) => m.toLowerCase().includes(q));
+    return uniq(
+      allModels
+        .filter((m) => !selected.some((s) => s.model === m))
+        .filter((m) => m !== currentComboName) // Prevent self-reference
+        .filter((m) => m.toLowerCase().includes(q))
+    );
   }, [allModels, selected, modelSearch, comboId, initialName]);
 
   const isEdit = !!comboId;
@@ -307,7 +310,10 @@ export default function ComboFormDialog({
           {/* Search & pick models */}
           <div className="space-y-1.5">
             <Label>Add Models</Label>
-            <Command className="rounded-lg border border-input shadow-sm bg-card">
+            <Command
+              shouldFilter={false}
+              className="rounded-lg border border-input shadow-sm bg-card"
+            >
               <CommandInput
                 placeholder="Search models..."
                 value={modelSearch}
@@ -318,7 +324,7 @@ export default function ComboFormDialog({
                   No matching models
                 </CommandEmpty>
                 <CommandGroup>
-                  {available.slice(0, 50).map((modelId) => {
+                  {available.slice(0, 50).map((modelId: string) => {
                     const isCombo = allModelTypes?.[modelId] === "combo";
                     return (
                       <CommandItem
@@ -353,7 +359,11 @@ export default function ComboFormDialog({
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={!name.trim() || !!nameError || saving}>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={!name.trim() || !!nameError || saving || selected.length === 0}
+          >
             {saving ? "Saving…" : isEdit ? "Save" : "Create"}
           </Button>
         </DialogFooter>

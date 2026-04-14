@@ -31,14 +31,13 @@ import {
   ComboboxList,
   ComboboxItem,
 } from "@/components/ui/combobox";
+import { toast } from "sonner";
 import ComboFormDialog from "@/components/ComboFormDialog";
 
 type SortKey = "model" | "provider";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
-const cardStyle =
-  "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
 type ModelEntry = {
   id: string;
@@ -49,7 +48,6 @@ type ModelEntry = {
 };
 
 export default function Models() {
-  // Combo store for managing combo state
   const { combos, deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +64,6 @@ export default function Models() {
       .then((data) => setModels(data.data ?? []))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-    // Load combos for combo management
     useComboStore.getState().loadCombos();
   }, []);
 
@@ -80,7 +77,6 @@ export default function Models() {
     return PROVIDER_NAMES[alias] ?? alias;
   }
 
-  // Unique providers for filter dropdown
   const providers = useMemo(() => {
     const set = new Map<string, string>();
     for (const m of models) {
@@ -93,13 +89,9 @@ export default function Models() {
 
   const filtered = useMemo(() => {
     let result = models;
-
-    // Filter by provider
     if (providerFilter) {
       result = result.filter((m) => getAlias(m) === providerFilter);
     }
-
-    // Filter by search
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((m) => {
@@ -119,11 +111,9 @@ export default function Models() {
         );
       });
     }
-
     return result;
   }, [models, search, providerFilter]);
 
-  // Sort
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
@@ -174,7 +164,6 @@ export default function Models() {
     }
   }
 
-  // ── Combo dialog state ──
   const [comboDialogOpen, setComboDialogOpen] = useState(false);
   const [editingComboId, setEditingComboId] = useState<string | null>(null);
   const [editingComboName, setEditingComboName] = useState<string>("");
@@ -185,6 +174,7 @@ export default function Models() {
       .list()
       .then((d) => setModels(d.data ?? []))
       .catch(() => {});
+    useComboStore.getState().loadCombos();
   }, []);
 
   const openCreateCombo = useCallback(() => {
@@ -209,18 +199,17 @@ export default function Models() {
       if (!confirm("Delete this combo?")) return;
       try {
         await deleteComboFromStore(comboId);
+        toast.success("Combo deleted");
         refreshModels();
       } catch (e) {
-        alert(e instanceof Error ? e.message : "Failed to delete");
+        toast.error(e instanceof Error ? e.message : "Failed to delete");
       }
     },
     [deleteComboFromStore, refreshModels]
   );
 
-  // ── Inline table action buttons (live inside Models so they close over state) ──
   function CopyModelButton({ modelName }: { modelName: string }) {
     const [copied, setCopied] = useState(false);
-
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -301,13 +290,15 @@ export default function Models() {
         const store = useComboStore.getState();
         if (editingComboId) {
           await store.updateCombo(editingComboId, name.trim(), comboModels);
+          toast.success("Combo updated");
         } else {
           await store.createCombo(name.trim(), comboModels);
+          toast.success("Combo created");
         }
         setComboDialogOpen(false);
         refreshModels();
       } catch (e) {
-        alert(e instanceof Error ? e.message : "Failed to save");
+        toast.error(e instanceof Error ? e.message : "Failed to save");
       }
     },
     [editingComboId, refreshModels]
@@ -315,7 +306,6 @@ export default function Models() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Models
@@ -346,7 +336,6 @@ export default function Models() {
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          {/* Table Header Bar */}
           <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-primary/10 text-primary">
@@ -357,7 +346,6 @@ export default function Models() {
               </span>
             </div>
             <div className="flex items-center justify-end gap-3 flex-wrap">
-              {/* Provider filter */}
               <Combobox
                 value={providerFilter ?? ""}
                 onValueChange={(value) => {
@@ -382,7 +370,6 @@ export default function Models() {
                 </ComboboxContent>
               </Combobox>
 
-              {/* Combos button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -393,7 +380,6 @@ export default function Models() {
                 Combos
               </Button>
 
-              {/* Search */}
               <div className="relative w-full max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-60" />
                 <Input
@@ -401,7 +387,7 @@ export default function Models() {
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setPage(0);
+                    setPage( page => 0);
                   }}
                   className="pl-9 h-8 text-sm bg-background border-input shadow-none"
                 />
@@ -470,34 +456,56 @@ export default function Models() {
                       {providerName}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-3 max-w-xs">
-                      {isCombo && m.combo_models && m.combo_models.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {m.combo_models.map((cm) => (
-                            <Badge
-                              key={cm}
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 bg-background"
-                            >
-                              {cm}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/50">—</span>
-                      )}
+                      {(() => {
+                        if (!isCombo) return <span className="text-muted-foreground/50">—</span>;
+                        const storeCombo = combos.find(
+                          (c) => (m.combo_id && c.id === m.combo_id) || c.name === m.id
+                        );
+                        const displayModels = storeCombo
+                          ? storeCombo.models.map((cm) => cm.model)
+                          : (m.combo_models ?? []);
+
+                        if (displayModels.length === 0)
+                          return <span className="text-muted-foreground/50">—</span>;
+
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            {displayModels.map((cm) => (
+                              <Badge
+                                key={cm}
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 bg-background"
+                              >
+                                {cm}
+                              </Badge>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="py-3 pr-4">
-                      {isCombo && m.combo_id ? (
+                      {isCombo && (m.combo_id || combos.find((c) => c.name === m.id)) ? (
                         <div className="flex gap-1 justify-end">
-                          <EditComboButton
-                            comboId={m.combo_id}
-                            comboName={m.id}
-                            comboModels={(m.combo_models ?? []).map((model) => ({
-                              model,
-                              weight: 1,
-                            }))}
-                          />
-                          <DeleteComboButton comboId={m.combo_id} />
+                          {(() => {
+                            const storeCombo = combos.find(
+                              (c) => (m.combo_id && c.id === m.combo_id) || c.name === m.id
+                            );
+                            return (
+                              <EditComboButton
+                                comboId={m.combo_id || storeCombo?.id || ""}
+                                comboName={m.id}
+                                comboModels={
+                                  storeCombo
+                                    ? storeCombo.models
+                                    : (m.combo_models ?? []).map((model) => ({
+                                        model,
+                                        weight: 1,
+                                      }))
+                                }
+                              />
+                            );
+                          })()}
+                          <DeleteComboButton comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""} />
                         </div>
                       ) : null}
                     </TableCell>
@@ -519,7 +527,6 @@ export default function Models() {
           )}
         </div>
       )}
-      {/* ── Combo Form Dialog ── */}
       <ComboFormDialog
         isOpen={comboDialogOpen}
         comboId={editingComboId}

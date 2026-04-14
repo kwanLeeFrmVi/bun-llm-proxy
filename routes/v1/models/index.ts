@@ -123,10 +123,10 @@ export async function GET(_req: Request): Promise<Response> {
     const timestamp = Math.floor(Date.now() / 1000);
 
     for (const combo of combos) {
+      // Use direct models for the dashboard to show unexpanded view
+      // but only if the combo has at least one available model (via expansion)
       const filteredComboModels = await getAvailableComboModelConfigs(combo.name);
-      const comboModelIds = filteredComboModels?.map((m) => m.model) ?? [];
-      // Only include combo if it has at least one available model
-      if (comboModelIds.length > 0) {
+      if (filteredComboModels && filteredComboModels.length > 0) {
         modelsMap.set(combo.name, {
           id: combo.name,
           object: "model",
@@ -136,7 +136,8 @@ export async function GET(_req: Request): Promise<Response> {
           root: combo.name,
           parent: null,
           combo_id: combo.id,
-          combo_models: comboModelIds,
+          // Use direct models from the combos table for unexpanded view in dashboard
+          combo_models: combo.models,
         });
       }
     }

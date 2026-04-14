@@ -99,10 +99,17 @@ export async function PUT(req: Request): Promise<Response> {
 
   // Update combo config if models changed
   if (rawModels !== undefined) {
+    const targetName = name ?? combo.name;
     const configModels = normalizeComboConfig(rawModels);
     if (configModels) {
-      const targetName = name ?? combo.name;
       await setComboConfig(targetName, { name: targetName, models: configModels });
+    } else {
+      // Clear stale combo_configs so GET doesn't return old data
+      await deleteComboConfig(targetName);
+    }
+    // If name changed, also delete config under old name
+    if (name && name !== combo.name) {
+      await deleteComboConfig(combo.name);
     }
   }
 
