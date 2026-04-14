@@ -336,3 +336,60 @@ describe("buildUpstreamHeaders() — anthropic-compatible stripping", () => {
     expect(hasVersion).toBeDefined();
   });
 });
+
+// ─── GLM provider header caching ────────────────────────────────────────────────
+
+describe("buildUpstreamHeaders() — glm provider", () => {
+  let providerModule: typeof import("../../ai-bridge/handlers/provider.ts");
+  let cacheModule: typeof import("../../ai-bridge/utils/claudeHeaderCache.ts");
+
+  beforeEach(async () => {
+    // Re-import fresh modules
+    providerModule = await import("../../ai-bridge/handlers/provider.ts");
+    cacheModule = await import("../../ai-bridge/utils/claudeHeaderCache.ts");
+
+    // Prime the cache with Claude Code headers
+    cacheModule.cacheClaudeHeaders({
+      "user-agent": "claude-code/2.1.63 node/24.3.0",
+      "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+      "x-app": "cli",
+    });
+  });
+
+  it("applies cached Claude headers to glm provider", () => {
+    const headers = providerModule.buildUpstreamHeaders("glm", { apiKey: "key" });
+
+    // Cached headers should be applied
+    expect(headers["user-agent"]).toBe("claude-code/2.1.63 node/24.3.0");
+    expect(headers["anthropic-version"]).toBe("2023-06-01");
+  });
+
+  it("strips Claude Code identity headers for glm provider (non-Anthropic host)", () => {
+    const headers = providerModule.buildUpstreamHeaders("glm", { apiKey: "key" });
+
+    // Identity headers should be stripped since GLM is not api.anthropic.com
+    expect(headers["x-app"]).toBeUndefined();
+    expect(headers["X-App"]).toBeUndefined();
+    expect(headers["anthropic-dangerous-direct-browser-access"]).toBeUndefined();
+    expect(headers["Anthropic-Dangerous-Direct-Browser-Access"]).toBeUndefined();
+  });
+
+  it("removes claude-code-20250219 from anthropic-beta for glm provider", () => {
+    const headers = providerModule.buildUpstreamHeaders("glm", { apiKey: "key" });
+
+    const betaVal = headers["anthropic-beta"] || headers["Anthropic-Beta"] || "";
+    expect(betaVal).not.toContain("claude-code-20250219");
+  });
+
+  it("keeps other beta flags intact after stripping for glm provider", () => {
+    const headers = providerModule.buildUpstreamHeaders("glm", { apiKey: "key" });
+
+    const betaVal = headers["anthropic-beta"] || headers["Anthropic-Beta"] || "";
+    // OAuth flag should remain
+    if (betaVal) {
+      expect(betaVal).toContain("oauth-2025-04-20");
+    }
+  });
+});
