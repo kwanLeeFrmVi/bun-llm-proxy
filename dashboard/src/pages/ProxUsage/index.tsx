@@ -13,10 +13,10 @@ import { ProxTimeseriesChart } from "./components/ProxTimeseriesChart.tsx";
 
 const DAYS_OPTIONS = [
   { label: "5h", value: "5h" },
-  { label: "1D", value: "1" },
-  { label: "7d", value: "7" },
-  { label: "14d", value: "14" },
-  { label: "30d", value: "30" },
+  { label: "1D", value: "1d" },
+  { label: "7d", value: "7d" },
+  { label: "14d", value: "14d" },
+  { label: "30d", value: "30d" },
 ];
 
 export default function ProxUsage() {
