@@ -5,6 +5,8 @@ import {
   setComboConfig,
   getComboConfig,
   deleteComboConfig,
+  getSettings,
+  updateSetting,
 } from "@/lib/localDb";
 import { checkComboCycle } from "@/services/model";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
@@ -44,6 +46,10 @@ export async function GET(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const combos = await getCombos();
 
+  // Fetch settings to get combo strategies
+  const settings = await getSettings();
+  const comboStrategies = (settings.comboStrategies as Record<string, any>) || {};
+
   // Fetch combo configs for all combos to get weights, while preserving the order from combos table
   const combosWithWeights = await Promise.all(
     combos.map(async (combo) => {
@@ -57,9 +63,12 @@ export async function GET(req: Request): Promise<Response> {
         };
       });
 
+      const strategy = comboStrategies[combo.name]?.fallbackStrategy || "fallback";
+
       return {
         ...combo,
         models,
+        strategy,
       };
     })
   );
@@ -80,6 +89,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const name = body.name as string | undefined;
   const rawModels = body.models as ComboModelsInput | undefined;
+  const strategy = body.strategy as string | undefined;
 
   if (!name || !NAME_REGEX.test(name))
     return Response.json(
@@ -114,9 +124,20 @@ export async function POST(req: Request): Promise<Response> {
     await deleteComboConfig(name);
   }
 
+  // Update strategy in settings if provided
+  if (strategy !== undefined) {
+    const settings = await getSettings();
+    const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
+    comboStrategies[name] = {
+      ...comboStrategies[name],
+      fallbackStrategy: strategy,
+    };
+    await updateSetting("comboStrategies", comboStrategies);
+  }
+
   // Return combo with models (including weights)
   return Response.json(
-    { ...combo, models: configModels ?? models.map((m) => ({ model: m, weight: 1 })) },
+    { ...combo, models: configModels ?? models.map((m) => ({ model: m, weight: 1 })), strategy: strategy || "fallback" },
     { status: 201, headers: CORS_HEADERS }
   );
 }

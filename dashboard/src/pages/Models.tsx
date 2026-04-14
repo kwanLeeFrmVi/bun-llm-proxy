@@ -169,6 +169,7 @@ export default function Models() {
   const [editingComboId, setEditingComboId] = useState<string | null>(null);
   const [editingComboName, setEditingComboName] = useState<string>("");
   const [editingComboModels, setEditingComboModels] = useState<LocalModelWithWeight[]>([]);
+  const [editingComboStrategy, setEditingComboStrategy] = useState<string>("fallback");
 
   const refreshModels = useCallback(() => {
     api.models
@@ -182,14 +183,21 @@ export default function Models() {
     setEditingComboId(null);
     setEditingComboName("");
     setEditingComboModels([] as LocalModelWithWeight[]);
+    setEditingComboStrategy("fallback");
     setComboDialogOpen(true);
   }, []);
 
   const openEditCombo = useCallback(
-    (comboId: string, comboName: string, comboModels: LocalModelWithWeight[]) => {
+    (
+      comboId: string,
+      comboName: string,
+      comboModels: LocalModelWithWeight[],
+      comboStrategy?: string
+    ) => {
       setEditingComboId(comboId);
       setEditingComboName(comboName);
       setEditingComboModels([...comboModels]);
+      setEditingComboStrategy(comboStrategy || "fallback");
       setComboDialogOpen(true);
     },
     []
@@ -242,10 +250,12 @@ export default function Models() {
     comboId,
     comboName,
     comboModels,
+    comboStrategy,
   }: {
     comboId: string;
     comboName: string;
     comboModels: LocalModelWithWeight[];
+    comboStrategy?: string;
   }) {
     return (
       <Tooltip>
@@ -253,7 +263,7 @@ export default function Models() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => openEditCombo(comboId, comboName, comboModels)}
+            onClick={() => openEditCombo(comboId, comboName, comboModels, comboStrategy)}
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
@@ -286,14 +296,14 @@ export default function Models() {
   }
 
   const handleComboSaved = useCallback(
-    async (name: string, comboModels: LocalModelWithWeight[]) => {
+    async (name: string, comboModels: LocalModelWithWeight[], strategy?: string) => {
       try {
         const store = useComboStore.getState();
         if (editingComboId) {
-          await store.updateCombo(editingComboId, name.trim(), comboModels);
+          await store.updateCombo(editingComboId, name.trim(), comboModels, strategy);
           toast.success("Combo updated");
         } else {
-          await store.createCombo(name.trim(), comboModels);
+          await store.createCombo(name.trim(), comboModels, strategy);
           toast.success("Combo created");
         }
         setComboDialogOpen(false);
@@ -503,6 +513,7 @@ export default function Models() {
                                         weight: 1,
                                       }))
                                 }
+                                comboStrategy={storeCombo?.strategy}
                               />
                             );
                           })()}
@@ -535,6 +546,7 @@ export default function Models() {
         comboId={editingComboId}
         initialName={editingComboName}
         initialModels={editingComboModels}
+        initialStrategy={editingComboStrategy}
         allModels={uniq([...models.map((m) => m.id), ...combos.map((c) => c.name)])}
         allCombos={combos.map((c) => c.name)}
         allModelTypes={(() => {

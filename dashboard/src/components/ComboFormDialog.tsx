@@ -43,6 +43,7 @@ export default function ComboFormDialog({
   comboId,
   initialName,
   initialModels,
+  initialStrategy,
   allModels,
   allCombos,
   allModelTypes,
@@ -53,10 +54,11 @@ export default function ComboFormDialog({
   comboId: string | null;
   initialName: string;
   initialModels: ModelWithWeight[];
+  initialStrategy?: string;
   allModels: string[];
   allCombos?: string[]; // List of combo names for nested support
   allModelTypes?: Record<string, "combo" | "model">; // Mark which models are combos
-  onSave: (name: string, models: ModelWithWeight[]) => Promise<void>;
+  onSave: (name: string, models: ModelWithWeight[], strategy: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
@@ -71,11 +73,11 @@ export default function ComboFormDialog({
     if (isOpen) {
       setName(initialName);
       setSelected([...initialModels]);
-      setStrategy("fallback");
+      setStrategy((initialStrategy as any) || "fallback");
       setModelSearch("");
       setNameError("");
     }
-  }, [isOpen, initialName, initialModels]);
+  }, [isOpen, initialName, initialModels, initialStrategy]);
 
   const validateName = (v: string) => {
     if (!v.trim()) {
@@ -125,7 +127,7 @@ export default function ComboFormDialog({
   const handleSave = async () => {
     if (!validateName(name)) return;
     setSaving(true);
-    await onSave(name.trim(), selected);
+    await onSave(name.trim(), selected, strategy);
     setSaving(false);
   };
 

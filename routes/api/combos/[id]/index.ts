@@ -7,6 +7,8 @@ import {
   setComboConfig,
   getComboConfig,
   deleteComboConfig,
+  getSettings,
+  updateSetting,
 } from "@/lib/localDb";
 import { checkComboCycle } from "@/services/model";
 import { CORS_HEADERS } from "lib/cors.ts";
@@ -59,7 +61,12 @@ export async function GET(req: Request): Promise<Response> {
     };
   });
 
-  return Response.json({ ...combo, models }, { headers: CORS_HEADERS });
+  // Get strategy from settings
+  const settings = await getSettings();
+  const comboStrategies = (settings.comboStrategies as Record<string, any>) || {};
+  const strategy = comboStrategies[combo.name]?.fallbackStrategy || "fallback";
+
+  return Response.json({ ...combo, models, strategy }, { headers: CORS_HEADERS });
 }
 
 export async function PUT(req: Request): Promise<Response> {
@@ -79,6 +86,7 @@ export async function PUT(req: Request): Promise<Response> {
 
   const name = body.name as string | undefined;
   const rawModels = body.models as ComboModelsInput | undefined;
+  const strategy = body.strategy as string | undefined;
 
   if (name !== undefined) {
     if (!NAME_REGEX.test(name))
@@ -136,6 +144,29 @@ export async function PUT(req: Request): Promise<Response> {
     }
   }
 
+  // Update strategy in settings if provided
+  if (strategy !== undefined || (name !== undefined && name !== combo.name)) {
+    const settings = await getSettings();
+    const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
+    const targetName = name ?? combo.name;
+
+    if (strategy !== undefined) {
+      comboStrategies[targetName] = {
+        ...comboStrategies[targetName],
+        fallbackStrategy: strategy,
+      };
+    } else if (name !== undefined && name !== combo.name && comboStrategies[combo.name]) {
+      // Migrate strategy if only name changed
+      comboStrategies[name] = comboStrategies[combo.name];
+    }
+
+    if (name && name !== combo.name) {
+      delete comboStrategies[combo.name];
+    }
+
+    await updateSetting("comboStrategies", comboStrategies);
+  }
+
   // Fetch the final state to return to the client with weights and correct order
   const finalCombo = await getComboById(id);
   if (!finalCombo) {
@@ -151,7 +182,11 @@ export async function PUT(req: Request): Promise<Response> {
     };
   });
 
-  return Response.json({ ...finalCombo, models: finalModels }, { headers: CORS_HEADERS });
+  const finalSettings = await getSettings();
+  const finalComboStrategies = (finalSettings.comboStrategies as Record<string, any>) || {};
+  const finalStrategy = finalComboStrategies[finalCombo.name]?.fallbackStrategy || "fallback";
+
+  return Response.json({ ...finalCombo, models: finalModels, strategy: finalStrategy }, { headers: CORS_HEADERS });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

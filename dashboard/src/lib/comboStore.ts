@@ -10,6 +10,7 @@ export interface Combo {
   id: string;
   name: string;
   models: ComboModel[];
+  strategy?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -28,8 +29,8 @@ interface ComboStore {
 
   // Actions
   loadCombos: () => Promise<void>;
-  createCombo: (name: string, models: ComboModel[]) => Promise<void>;
-  updateCombo: (id: string, name: string, models: ComboModel[]) => Promise<void>;
+  createCombo: (name: string, models: ComboModel[], strategy?: string) => Promise<void>;
+  updateCombo: (id: string, name: string, models: ComboModel[], strategy?: string) => Promise<void>;
   deleteCombo: (id: string) => Promise<void>;
   reset: () => void;
 }
@@ -63,10 +64,10 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  createCombo: async (name: string, models: ComboModel[]) => {
+  createCombo: async (name: string, models: ComboModel[], strategy?: string) => {
     set({ error: null });
     try {
-      const newCombo = await api.combos.create({ name, models });
+      const newCombo = await api.combos.create({ name, models, strategy });
       set((state) => ({ combos: [...state.combos, newCombo] }));
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "Failed to create combo" });
@@ -74,12 +75,12 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  updateCombo: async (id: string, name: string, models: ComboModel[]) => {
+  updateCombo: async (id: string, name: string, models: ComboModel[], strategy?: string) => {
     set({ error: null });
     try {
-      await api.combos.update(id, { name, models });
+      const updatedCombo = await api.combos.update(id, { name, models, strategy });
       set((state) => ({
-        combos: state.combos.map((c) => (c.id === id ? { ...c, name, models } : c)),
+        combos: state.combos.map((c) => (c.id === id ? updatedCombo : c)),
       }));
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "Failed to update combo" });

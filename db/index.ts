@@ -1116,6 +1116,14 @@ export async function deleteCombo(id: string): Promise<boolean> {
   const result = db().run("DELETE FROM combos WHERE id = ?", [id]);
   if ((result.changes ?? 0) > 0 && combo) {
     await deleteComboConfig(combo.name);
+
+    // Clean up strategy from settings
+    const settings = await getSettings();
+    const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
+    if (comboStrategies[combo.name]) {
+      delete comboStrategies[combo.name];
+      await updateSetting("comboStrategies", comboStrategies);
+    }
   }
   return (result.changes ?? 0) > 0;
 }

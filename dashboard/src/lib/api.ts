@@ -341,6 +341,7 @@ export const api = {
           id: string;
           name: string;
           models: { model: string; weight: number }[];
+          strategy?: string;
           createdAt?: string;
           updatedAt?: string;
         }[];
@@ -350,18 +351,35 @@ export const api = {
         id: string;
         name: string;
         models: { model: string; weight: number }[];
+        strategy?: string;
         createdAt?: string;
         updatedAt?: string;
       }>(`/api/combos/${id}`),
-    create: (data: { name: string; models?: Array<{ model: string; weight: number }> }) =>
-      request<{ id: string; name: string; models: { model: string; weight: number }[] }>(
-        "/api/combos",
-        { method: "POST", body: JSON.stringify(data) }
-      ),
+    create: (data: {
+      name: string;
+      models?: Array<{ model: string; weight: number }>;
+      strategy?: string;
+    }) =>
+      request<{
+        id: string;
+        name: string;
+        models: { model: string; weight: number }[];
+        strategy?: string;
+      }>("/api/combos", { method: "POST", body: JSON.stringify(data) }),
     update: (
       id: string,
-      data: { name?: string; models?: Array<{ model: string; weight: number }> }
-    ) => request(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+      data: {
+        name?: string;
+        models?: Array<{ model: string; weight: number }>;
+        strategy?: string;
+      }
+    ) =>
+      request<{
+        id: string;
+        name: string;
+        models: { model: string; weight: number }[];
+        strategy?: string;
+      }>(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },
 
