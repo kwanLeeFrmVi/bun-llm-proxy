@@ -1,138 +1,113 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { RequestContext } from "../../lib/requestContext.ts";
-import * as db from "../../db/index.ts";
-import * as modelService from "../../services/model.ts";
-import { handleChat } from "../../handlers/chat.ts";
-import * as authService from "../../services/auth.ts";
-import * as chatCore from "../../ai-bridge/handlers/chatCore.ts";
+import { describe, it, expect, mock, beforeEach } from "bun:test";
 
-describe("Combo Provider Skip", () => {
+const mockGetComboByName = mock(() => Promise.resolve(null));
+const mockGetComboConfig = mock(() => Promise.resolve(null));
+const mockGetProviderConnections = mock(() => Promise.resolve([]));
+const mockGetProviderNodes = mock(() => Promise.resolve([]));
+const mockGetModelAliases = mock(() => Promise.resolve({}));
+const mockParseModel = mock((s: string) => ({
+  isAlias: false, provider: s.split("/")[0], providerAlias: s.split("/")[0], model: s.split("/")[1] ?? s,
+}));
+
+mock.module("../../db/index.ts", () => ({
+  getComboByName: mockGetComboByName, getComboConfig: mockGetComboConfig,
+  getProviderConnections: mockGetProviderConnections, getProviderNodes: mockGetProviderNodes,
+  getModelAliases: mockGetModelAliases,
+}));
+mock.module("../../ai-bridge/services/model.ts", () => ({
+  parseModel: mockParseModel, resolveModelAliasFromMap: () => null, getModelInfoCore: () => Promise.resolve({ provider: null, model: null }),
+}));
+
+import { getFilteredComboModelConfigs } from "../../services/model.ts";
+
+describe("getFilteredComboModelConfigs", () => {
   beforeEach(() => {
-    // Mock DB functions
-    spyOn(db, "getSettings").mockImplementation(async () => ({
-      comboStrategy: "fallback",
-      comboStrategies: {},
-    }));
-    
-    spyOn(db, "getComboByName").mockImplementation(async (name) => {
-      if (name === "test-combo") {
-        return {
-          id: "1",
-          name: "test-combo",
-          models: ["provider1/model1", "provider2/model2"],
-          created_at: "",
-          updated_at: "",
-        };
-      }
-      return null;
-    });
-
-    spyOn(db, "getComboConfig").mockImplementation(async (name) => {
-      if (name === "test-combo") {
-        return {
-          name: "test-combo",
-          models: [
-            { model: "provider1/model1", weight: 1 },
-            { model: "provider2/model2", weight: 1 },
-          ],
-        };
-      }
-      return null;
-    });
+    mockGetComboByName.mockImplementation(() => Promise.resolve(null));
+    mockGetComboConfig.mockImplementation(() => Promise.resolve(null));
+    mockGetProviderConnections.mockImplementation(() => Promise.resolve([]));
+    mockGetProviderNodes.mockImplementation(() => Promise.resolve([]));
   });
 
-  afterEach(() => {
-    // Restore mocks
+  it("returns null for model strings containing /", async () => {
+    expect(await getFilteredComboModelConfigs("openai/gpt-4o")).toBeNull();
   });
 
-  it("should skip models of a disabled provider in a combo", async () => {
-    // provider1 is INACTIVE, provider2 is ACTIVE
-    spyOn(db, "getProviderConnections").mockImplementation(async (filter) => {
-      if (filter?.isActive === true) {
-        return [
-          { id: "conn2", provider: "provider2", is_active: true } as any
-        ];
-      }
-      return [
-        { id: "conn1", provider: "provider1", is_active: false } as any,
-        { id: "conn2", provider: "provider2", is_active: true } as any
-      ];
-    });
+  it("returns null when combo does not exist", async () => {
+    expect(await getFilteredComboModelConfigs("no-such-combo")).toBeNull();
+  });
 
-    // Mock chatCore to see which model is tried
-    const chatCoreSpy = spyOn(chatCore, "handleChatCore").mockImplementation(async (opts) => {
-      return { success: true, response: new Response("ok"), status: 200, error: "" } as any;
-    });
+  it("filters out models from disabled providers", async () => {
+    mockGetComboByName.mockImplementation(async (n: string) =>
+      n === "my-combo" ? { id: "1", name: n, models: ["openai/a", "anthropic/b", "gemini/c"] } : null
+    );
+    mockGetComboConfig.mockImplementation(async (n: string) =>
+      n === "my-combo" ? { name: n, models: [{ model: "openai/a", weight: 2 }, { model: "anthropic/b", weight: 1 }, { model: "gemini/c", weight: 1 }] } : null
+    );
+    mockGetProviderConnections.mockImplementation(async (f: any) =>
+      f?.isActive === true ? [{ id: "c1", provider: "openai" }, { id: "c3", provider: "gemini" }] : []
+    );
 
-    // Mock auth middleware and other dependencies
-    const req = new Request("http://localhost/v1/chat/completions", {
-      method: "POST",
-      body: JSON.stringify({
-        model: "test-combo",
-        messages: [{ role: "user", content: "hi" }]
-      }),
-      headers: { "Authorization": "Bearer test-key" }
-    });
+    const result = await getFilteredComboModelConfigs("my-combo");
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(2);
+    expect(result!.map((m: any) => m.model)).toEqual(["openai/a", "gemini/c"]);
+    expect(result![0].weight).toBe(2);
+  });
 
-    // Mock checkAuth
-    const authMiddleware = require("../../lib/authMiddleware.ts");
-    spyOn(authMiddleware, "checkAuth").mockImplementation(async () => ({
-      ok: true,
-      apiKey: "test-key",
-      apiKeyId: "test-id"
-    }));
+  it("returns null when all providers disabled", async () => {
+    mockGetComboByName.mockImplementation(async (n: string) =>
+      n === "my-combo" ? { id: "1", name: n, models: ["openai/a", "anthropic/b"] } : null
+    );
+    mockGetComboConfig.mockImplementation(async (n: string) =>
+      n === "my-combo" ? { name: n, models: [{ model: "openai/a", weight: 1 }, { model: "anthropic/b", weight: 1 }] } : null
+    );
+    mockGetProviderConnections.mockImplementation(async (f: any) => f?.isActive === true ? [] : []);
 
-    // Mock getProviderCredentials
-    spyOn(authService, "getProviderCredentials").mockImplementation(async (provider) => {
-      if (provider === "provider2") {
-        return { connectionId: "conn2", connectionName: "conn2" } as any;
-      }
+    expect(await getFilteredComboModelConfigs("my-combo")).toBeNull();
+  });
+
+  it("skips nested combos with no available models", async () => {
+    mockGetComboByName.mockImplementation(async (n: string) => {
+      if (n === "outer") return { id: "1", name: n, models: ["inner", "openai/a"] };
+      if (n === "inner") return { id: "2", name: n, models: ["anthropic/b"] };
       return null;
     });
+    mockGetComboConfig.mockImplementation(async (n: string) => {
+      if (n === "outer") return { name: n, models: [{ model: "inner", weight: 1 }, { model: "openai/a", weight: 1 }] };
+      if (n === "inner") return { name: n, models: [{ model: "anthropic/b", weight: 1 }] };
+      return null;
+    });
+    // Only openai active — anthropic (used by inner combo) is disabled
+    mockGetProviderConnections.mockImplementation(async (f: any) =>
+      f?.isActive === true ? [{ id: "c1", provider: "openai" }] : []
+    );
 
-    await handleChat(req);
-
-    // Verify chatCore was called ONLY for provider2/model2, not provider1/model1
-    expect(chatCoreSpy).toHaveBeenCalledTimes(1);
-    expect(chatCoreSpy.mock.calls[0][0].body.model).toBe("provider2/model2");
+    const result = await getFilteredComboModelConfigs("outer");
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(1);
+    expect(result![0].model).toBe("openai/a");
   });
 
-  it("should return error when all providers in a combo are disabled", async () => {
-    // Both providers are INACTIVE
-    spyOn(db, "getProviderConnections").mockImplementation(async (filter) => {
-      if (filter?.isActive === true) {
-        return [];
-      }
-      return [
-        { id: "conn1", provider: "provider1", is_active: false } as any,
-        { id: "conn2", provider: "provider2", is_active: false } as any
-      ];
+  it("keeps nested combos that have available models", async () => {
+    mockGetComboByName.mockImplementation(async (n: string) => {
+      if (n === "outer") return { id: "1", name: n, models: ["inner", "openai/a"] };
+      if (n === "inner") return { id: "2", name: n, models: ["anthropic/b"] };
+      return null;
     });
-
-    // Mock chatCore
-    spyOn(chatCore, "handleChatCore").mockImplementation(async () => {
-      return { success: true, response: new Response("ok"), status: 200, error: "" } as any;
+    mockGetComboConfig.mockImplementation(async (n: string) => {
+      if (n === "outer") return { name: n, models: [{ model: "inner", weight: 3 }, { model: "openai/a", weight: 1 }] };
+      if (n === "inner") return { name: n, models: [{ model: "anthropic/b", weight: 1 }] };
+      return null;
     });
+    // Both openai and anthropic active
+    mockGetProviderConnections.mockImplementation(async (f: any) =>
+      f?.isActive === true ? [{ id: "c1", provider: "openai" }, { id: "c2", provider: "anthropic" }] : []
+    );
 
-    const req = new Request("http://localhost/v1/chat/completions", {
-      method: "POST",
-      body: JSON.stringify({
-        model: "test-combo",
-        messages: [{ role: "user", content: "hi" }]
-      }),
-      headers: { "Authorization": "Bearer test-key" }
-    });
-
-    const authMiddleware = require("../../lib/authMiddleware.ts");
-    spyOn(authMiddleware, "checkAuth").mockImplementation(async () => ({
-      ok: true,
-      apiKey: "test-key",
-      apiKeyId: "test-id"
-    }));
-
-    const response = await handleChat(req);
-    expect(response.status).toBe(400);
-    const result = await response.json();
-    expect(result.error).toBe("Invalid model format");
+    const result = await getFilteredComboModelConfigs("outer");
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(2);
+    expect(result!.map((m: any) => m.model)).toEqual(["inner", "openai/a"]);
+    expect(result![0].weight).toBe(3);
   });
 });
