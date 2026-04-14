@@ -6,6 +6,7 @@ import {
   getComboConfig,
   deleteComboConfig,
 } from "@/lib/localDb";
+import { checkComboCycle } from "@/services/model";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
@@ -92,6 +93,14 @@ export async function POST(req: Request): Promise<Response> {
     );
 
   const models = normalizeModels(rawModels);
+
+  if (await checkComboCycle(name, models)) {
+    return Response.json(
+      { error: "Cycle detected — a combo cannot include itself directly or indirectly" },
+      { status: 400, headers: CORS_HEADERS }
+    );
+  }
+
   const combo = await createCombo({ name, models });
 
   // Save combo config with weights

@@ -59,12 +59,13 @@ export default function Models() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   useEffect(() => {
-    api.models
-      .list()
-      .then((data) => setModels(data.data ?? []))
+    setLoading(true);
+    Promise.all([api.models.list(), useComboStore.getState().loadCombos()])
+      .then(([modelsData]) => {
+        setModels(modelsData.data ?? []);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-    useComboStore.getState().loadCombos();
   }, []);
 
   function getAlias(m: { id: string; owned_by?: string }) {
@@ -387,7 +388,7 @@ export default function Models() {
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setPage( page => 0);
+                    setPage((page) => 0);
                   }}
                   className="pl-9 h-8 text-sm bg-background border-input shadow-none"
                 />
@@ -505,7 +506,9 @@ export default function Models() {
                               />
                             );
                           })()}
-                          <DeleteComboButton comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""} />
+                          <DeleteComboButton
+                            comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""}
+                          />
                         </div>
                       ) : null}
                     </TableCell>

@@ -8,6 +8,7 @@ import {
   getComboConfig,
   deleteComboConfig,
 } from "@/lib/localDb";
+import { checkComboCycle } from "@/services/model";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
 
@@ -91,23 +92,43 @@ export async function PUT(req: Request): Promise<Response> {
       );
   }
 
-  const models = rawModels !== undefined ? normalizeModels(rawModels) : undefined;
+  const models = rawModels !== undefined ? normalizeModels(rawModels) : combo.models;
+
+  // Check for cycles if models or name changed
+  if (name !== undefined || rawModels !== undefined) {
+    const targetName = name ?? combo.name;
+    if (await checkComboCycle(targetName, models)) {
+      return Response.json(
+        { error: "Cycle detected — a combo cannot include itself directly or indirectly" },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+  }
+
   const updated = await updateCombo(id, {
     ...(name !== undefined && { name }),
-    ...(models !== undefined && { models }),
+    ...(rawModels !== undefined && { models }),
   });
 
-  // Update combo config if models changed
-  if (rawModels !== undefined) {
+  // Update combo config if name or models changed
+  if (name !== undefined || rawModels !== undefined) {
     const targetName = name ?? combo.name;
-    const configModels = normalizeComboConfig(rawModels);
-    if (configModels) {
-      await setComboConfig(targetName, { name: targetName, models: configModels });
-    } else {
-      // Clear stale combo_configs so GET doesn't return old data
-      await deleteComboConfig(targetName);
+    const config = await getComboConfig(combo.name);
+
+    if (rawModels !== undefined) {
+      // New models provided: normalize and save
+      const configModels = normalizeComboConfig(rawModels);
+      if (configModels) {
+        await setComboConfig(targetName, { name: targetName, models: configModels });
+      } else {
+        await deleteComboConfig(targetName);
+      }
+    } else if (name !== undefined && name !== combo.name && config) {
+      // Only name changed: migrate existing config if it exists
+      await setComboConfig(name, { ...config, name });
     }
-    // If name changed, also delete config under old name
+
+    // If name changed, delete config under old name
     if (name && name !== combo.name) {
       await deleteComboConfig(combo.name);
     }

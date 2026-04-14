@@ -116,9 +116,11 @@ export async function getComboModelConfigs(modelStr: string): Promise<ComboModel
  * Handles nested combos by recursively resolving them.
  */
 export async function getAvailableComboModelConfigs(
-  modelStr: string
+  modelStr: string,
+  visited: Set<string> = new Set()
 ): Promise<ComboModelConfig[] | null> {
-  if (modelStr.includes("/")) return null;
+  if (modelStr.includes("/") || visited.has(modelStr)) return null;
+  visited.add(modelStr);
 
   const comboModels = await getStoredComboModelConfigs(modelStr);
   if (!comboModels) {
@@ -139,7 +141,7 @@ export async function getAvailableComboModelConfigs(
 
       if (nestedCombo) {
         // Recursively get the nested combo's available models
-        const nestedModels = await getAvailableComboModelConfigs(comboModel.model);
+        const nestedModels = await getAvailableComboModelConfigs(comboModel.model, visited);
         if (nestedModels && nestedModels.length > 0) {
           // Add nested models with their weights multiplied by the outer reference weight
           for (const nested of nestedModels) {
@@ -162,4 +164,30 @@ export async function getAvailableComboModelConfigs(
   }
 
   return expandedModels.length > 0 ? expandedModels : null;
+}
+
+/**
+ * Check if a combo would form a cycle if it included the given models.
+ * Used for validation before saving/updating a combo.
+ */
+export async function checkComboCycle(
+  comboName: string,
+  models: string[],
+  visited: Set<string> = new Set()
+): Promise<boolean> {
+  if (visited.has(comboName)) return true;
+  visited.add(comboName);
+
+  for (const model of models) {
+    if (model === comboName) return true;
+    const nestedCombo = await getComboByName(model);
+    if (nestedCombo) {
+      if (await checkComboCycle(comboName, nestedCombo.models, visited)) {
+        return true;
+      }
+    }
+  }
+
+  visited.delete(comboName);
+  return false;
 }
