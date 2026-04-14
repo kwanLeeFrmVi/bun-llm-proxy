@@ -303,6 +303,50 @@ export const api = {
           requestCount: number;
         }>;
       }>(`/api/usage/leaderboard?period=${period}`),
+    modelStats: (model: string, period = "7d", page = 1, limit = 50) =>
+      request<{
+        model: string;
+        period: string;
+        summary: {
+          model: string;
+          provider: string;
+          requestCount: number;
+          failedCount: number;
+          failedRate: number;
+          ttftMin: number | null;
+          ttftAvg: number | null;
+          ttftMax: number | null;
+          tpsMin: number | null;
+          tpsAvg: number | null;
+          tpsMax: number | null;
+          latencyMin: number | null;
+          latencyAvg: number | null;
+          latencyMax: number | null;
+        };
+        rows: Array<{
+          id: string;
+          timestamp: string;
+          status: string;
+          provider: string;
+          model: string;
+          durationMs: number;
+          promptTokens: number;
+          completionTokens: number;
+          streaming: boolean;
+          ttftMs: number | null;
+          tokensPerSecond: number | null;
+        }>;
+        total: number;
+      }>(`/api/usage/model-stats?model=${encodeURIComponent(model)}&period=${period}&page=${page}&limit=${limit}`),
+    modelsLatestStats: () =>
+      request<{
+        stats: Array<{
+          model: string;
+          provider: string;
+          latestTtftMs: number | null;
+          latestTokensPerSecond: number | null;
+        }>;
+      }>("/api/usage/models-latest-stats"),
   },
 
   // ─── Console Logs ─────────────────────────────────────────────────────────
@@ -403,14 +447,14 @@ export const api = {
       const qs = key ? `?key=${encodeURIComponent(key)}` : "";
       return request<import("./proxTypes.ts").ProxStatus>(`/api/prox/status${qs}`);
     },
-    getSummary: (days?: number, key?: string) => {
+    getSummary: (days?: string | number, key?: string) => {
       const params = new URLSearchParams();
       if (days !== undefined) params.set("days", String(days));
       if (key) params.set("key", key);
       const qs = params.toString() ? `?${params}` : "";
       return request<import("./proxTypes.ts").ProxSummary>(`/api/prox/summary${qs}`);
     },
-    getChart: (days?: number, key?: string) => {
+    getChart: (days?: string | number, key?: string) => {
       const params = new URLSearchParams();
       if (days !== undefined) params.set("days", String(days));
       if (key) params.set("key", key);

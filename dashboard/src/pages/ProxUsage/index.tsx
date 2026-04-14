@@ -12,9 +12,11 @@ import { ProxRecentTable } from "./components/ProxRecentTable.tsx";
 import { ProxTimeseriesChart } from "./components/ProxTimeseriesChart.tsx";
 
 const DAYS_OPTIONS = [
-  { label: "7d", value: 7 },
-  { label: "14d", value: 14 },
-  { label: "30d", value: 30 },
+  { label: "5h", value: "5h" },
+  { label: "1d", value: "1" },
+  { label: "7d", value: "7" },
+  { label: "14d", value: "14" },
+  { label: "30d", value: "30" },
 ];
 
 export default function ProxUsage() {
@@ -30,7 +32,7 @@ export default function ProxUsage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const selectedKey = searchParams.get("key") ?? "";
-  const days = parseInt(searchParams.get("days") ?? "30", 10);
+  const days = searchParams.get("days") ?? "30";
 
   // Load keys once on mount
   useEffect(() => {
@@ -112,9 +114,9 @@ export default function ProxUsage() {
     }
   };
 
-  const handleDaysChange = (d: number) => {
+  const handleDaysChange = (d: string) => {
     setSearchParams((p) => {
-      p.set("days", String(d));
+      p.set("days", d);
       return p;
     });
   };
@@ -150,7 +152,7 @@ export default function ProxUsage() {
             </TabsList>
           </Tabs>
           {/* Days filter */}
-          <Tabs value={String(days)} onValueChange={(v) => handleDaysChange(Number(v))}>
+          <Tabs value={days} onValueChange={handleDaysChange}>
             <TabsList className="h-9 bg-[var(--surface-container-low)] rounded-lg p-1">
               {DAYS_OPTIONS.map((opt) => (
                 <TabsTrigger

@@ -152,7 +152,7 @@ export async function getStatus(apiKey: string): Promise<ProxStatus> {
   return res.json() as Promise<ProxStatus>;
 }
 
-export async function getSummary(days = 0, apiKey: string): Promise<ProxSummary> {
+export async function getSummary(days: string | number = 0, apiKey: string): Promise<ProxSummary> {
   const res = await proxFetch(apiKey, `/api/user/usage/summary?days=${days}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -161,7 +161,7 @@ export async function getSummary(days = 0, apiKey: string): Promise<ProxSummary>
   return res.json() as Promise<ProxSummary>;
 }
 
-export async function getChart(days = 30, apiKey: string): Promise<ProxChart> {
+export async function getChart(days: string | number = 30, apiKey: string): Promise<ProxChart> {
   const res = await proxFetch(apiKey, `/api/user/usage/chart?days=${days}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -344,7 +344,7 @@ export async function proxGetStatus(keyId?: string): Promise<ProxStatus> {
   return aggregateStatus(statuses);
 }
 
-export async function proxGetSummary(days = 0, keyId?: string): Promise<ProxSummary> {
+export async function proxGetSummary(days: string | number = 0, keyId?: string): Promise<ProxSummary> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);
@@ -358,7 +358,7 @@ export async function proxGetSummary(days = 0, keyId?: string): Promise<ProxSumm
   return aggregateSummary(summaries);
 }
 
-export async function proxGetChart(days = 30, keyId?: string): Promise<ProxChart> {
+export async function proxGetChart(days: string | number = 30, keyId?: string): Promise<ProxChart> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);

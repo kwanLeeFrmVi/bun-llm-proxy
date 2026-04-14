@@ -38,7 +38,7 @@ async function handleStatus(req: Request): Promise<Response> {
 // GET /api/prox/summary?days=&key= — get usage summary
 async function handleSummary(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const days = parseInt(url.searchParams.get("days") ?? "0", 10);
+  const days = url.searchParams.get("days") ?? "0";
   const keyId = url.searchParams.get("key") ?? undefined;
   try {
     const summary = await proxGetSummary(days, keyId);
@@ -52,7 +52,7 @@ async function handleSummary(req: Request): Promise<Response> {
 // GET /api/prox/chart?days=&key= — get usage chart
 async function handleChart(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const days = parseInt(url.searchParams.get("days") ?? "30", 10);
+  const days = url.searchParams.get("days") ?? "30";
   const keyId = url.searchParams.get("key") ?? undefined;
   try {
     const chart = await proxGetChart(days, keyId);
