@@ -175,13 +175,18 @@ export async function checkComboCycle(
   models: string[],
   visited: Set<string> = new Set()
 ): Promise<boolean> {
+  console.log(`[checkComboCycle] target=${targetName} models=${JSON.stringify(models)} visited=${JSON.stringify(Array.from(visited))}`);
   for (const model of models) {
-    if (model === targetName) return true;
+    if (model === targetName) {
+      console.log(`[checkComboCycle] Found direct cycle: ${model} === ${targetName}`);
+      return true;
+    }
     if (visited.has(model)) continue;
     visited.add(model);
 
     const nestedCombo = await getComboByName(model);
     if (nestedCombo) {
+      console.log(`[checkComboCycle] Checking nested combo: ${model}`);
       if (await checkComboCycle(targetName, nestedCombo.models, visited)) {
         return true;
       }
