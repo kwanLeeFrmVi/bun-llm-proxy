@@ -14,7 +14,7 @@ import { ProviderTopology } from "@/components/ProviderTopology";
 import { BreakdownChart } from "./BreakdownChart";
 import { cardStyle, fmt } from "./utils";
 
-type Period = "24h" | "7d" | "30d" | "all";
+type Period = "2h" | "5h" | "24h" | "7d" | "30d" | "all";
 
 type ViewOption = "model" | "provider" | "apikey";
 
@@ -135,7 +135,7 @@ export function OverviewTab({
             <p className="text-sm font-semibold text-[--on-surface]">Recent Requests</p>
             <p className="text-xs text-[--on-surface-variant] mt-0.5">Latest API activity</p>
           </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-[rgba(203,213,225,0.25)] max-h-[380px]">
+          <div className="flex-1 overflow-y-auto divide-y divide-[rgba(203,213,225,0.25)] max-h-95">
             {recentRows.length === 0 ? (
               <div className="p-6 text-center text-sm text-[--on-surface-variant]">
                 No recent requests

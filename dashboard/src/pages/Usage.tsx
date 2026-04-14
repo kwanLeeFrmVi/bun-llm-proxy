@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OverviewTab } from "@/components/usage/OverviewTab";
 import { DetailsTab } from "@/components/usage/DetailsTab";
 
-const PERIODS = ["24h", "7d", "30d", "all"] as const;
+const PERIODS = ["2h", "5h", "24h", "7d", "30d", "all"] as const;
 type Period = (typeof PERIODS)[number];
 
 export default function Usage() {
