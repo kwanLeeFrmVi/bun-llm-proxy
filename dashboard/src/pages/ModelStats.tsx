@@ -17,19 +17,11 @@ import { ArrowLeft } from "lucide-react";
 import { StatusBadge } from "@/components/usage/StatusBadge";
 import { cardStyle } from "@/components/usage/utils";
 
-const PERIODS = ["2h", "5h", "7d", "30d"] as const;
+const PERIODS = ["2h", "5h", "24h", "7d", "30d"] as const;
 type Period = (typeof PERIODS)[number];
 const PAGE_SIZE = 20;
 
-function SummaryCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className={cardStyle + " p-4 flex flex-col gap-1"}>
       <span className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">
@@ -89,9 +81,7 @@ export default function ModelStats() {
   }, [load]);
 
   if (!model) {
-    return (
-      <div className="p-12 text-center text-muted-foreground">No model specified.</div>
-    );
+    return <div className="p-12 text-center text-muted-foreground">No model specified.</div>;
   }
 
   const summary = data?.summary;
@@ -176,9 +166,7 @@ export default function ModelStats() {
           {/* Request Table */}
           <div className={cardStyle}>
             <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
-                Requests
-              </span>
+              <span className="text-sm font-semibold text-foreground">Requests</span>
               <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                 {total}
               </Badge>
@@ -231,10 +219,18 @@ export default function ModelStats() {
                           {fmtMs(r.durationMs)}
                         </TableCell>
                         <TableCell className="py-2.5 text-sm text-right font-mono">
-                          {r.streaming && r.ttftMs != null ? fmtMs(r.ttftMs) : <span className="text-muted-foreground/50">—</span>}
+                          {r.streaming && r.ttftMs != null ? (
+                            fmtMs(r.ttftMs)
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-2.5 text-sm text-right font-mono">
-                          {r.streaming && r.tokensPerSecond != null ? fmtTps(r.tokensPerSecond) : <span className="text-muted-foreground/50">—</span>}
+                          {r.streaming && r.tokensPerSecond != null ? (
+                            fmtTps(r.tokensPerSecond)
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-2.5 text-sm text-right pr-6 font-mono">
                           {r.promptTokens + r.completionTokens > 0 ? (
@@ -267,9 +263,7 @@ export default function ModelStats() {
         </>
       ) : (
         <div className={cardStyle + " p-12 text-center"}>
-          <p className="text-muted-foreground text-sm">
-            No data available for this model.
-          </p>
+          <p className="text-muted-foreground text-sm">No data available for this model.</p>
         </div>
       )}
     </div>
