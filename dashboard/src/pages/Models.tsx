@@ -8,6 +8,7 @@ interface LocalModelWithWeight {
   weight: number;
 }
 import { Box, Search, ArrowUpDown, Layers, Trash2, Pencil, Copy, Check } from "lucide-react";
+import { uniq } from "lodash";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ type ModelEntry = {
 
 export default function Models() {
   // Combo store for managing combo state
-  const { deleteCombo: deleteComboFromStore } = useComboStore();
+  const { combos, deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -524,17 +525,14 @@ export default function Models() {
         comboId={editingComboId}
         initialName={editingComboName}
         initialModels={editingComboModels}
-        allModels={[
-          ...models.map((m) => m.id),
-          ...useComboStore.getState().combos.map((c) => c.name),
-        ]}
-        allCombos={useComboStore.getState().combos.map((c) => c.name)}
+        allModels={uniq([...models.map((m) => m.id), ...combos.map((c) => c.name)])}
+        allCombos={combos.map((c) => c.name)}
         allModelTypes={(() => {
           const map = {} as Record<string, "combo" | "model">;
           models.forEach((m) => {
             map[m.id] = getAlias(m) === "combo" ? "combo" : "model";
           });
-          useComboStore.getState().combos.forEach((c) => {
+          combos.forEach((c) => {
             map[c.name] = "combo";
           });
           return map;

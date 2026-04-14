@@ -119,7 +119,7 @@ export async function GET(_req: Request): Promise<Response> {
       }
     }
 
-    const models: unknown[] = [];
+    const modelsMap = new Map<string, any>();
     const timestamp = Math.floor(Date.now() / 1000);
 
     for (const combo of combos) {
@@ -127,7 +127,7 @@ export async function GET(_req: Request): Promise<Response> {
       const comboModelIds = filteredComboModels?.map((m) => m.model) ?? [];
       // Only include combo if it has at least one available model
       if (comboModelIds.length > 0) {
-        models.push({
+        modelsMap.set(combo.name, {
           id: combo.name,
           object: "model",
           created: timestamp,
@@ -154,15 +154,18 @@ export async function GET(_req: Request): Promise<Response> {
           [alias, providerId]
         );
         for (const modelId of modelIds) {
-          models.push({
-            id: `${alias}/${modelId}`,
-            object: "model",
-            created: timestamp,
-            owned_by: alias,
-            permission: [],
-            root: modelId,
-            parent: null,
-          });
+          const id = `${alias}/${modelId}`;
+          if (!modelsMap.has(id)) {
+            modelsMap.set(id, {
+              id,
+              object: "model",
+              created: timestamp,
+              owned_by: alias,
+              permission: [],
+              root: modelId,
+              parent: null,
+            });
+          }
         }
       }
     } else {
@@ -214,19 +217,23 @@ export async function GET(_req: Request): Promise<Response> {
           .filter((id): id is string => typeof id === "string" && id.trim() !== "");
 
         for (const modelId of modelIds) {
-          models.push({
-            id: `${outputAlias}/${modelId}`,
-            object: "model",
-            created: timestamp,
-            owned_by: outputAlias,
-            permission: [],
-            root: modelId,
-            parent: null,
-          });
+          const id = `${outputAlias}/${modelId}`;
+          if (!modelsMap.has(id)) {
+            modelsMap.set(id, {
+              id,
+              object: "model",
+              created: timestamp,
+              owned_by: outputAlias,
+              permission: [],
+              root: modelId,
+              parent: null,
+            });
+          }
         }
       }
     }
 
+    const models = Array.from(modelsMap.values());
     return Response.json({ object: "list", data: models }, { headers: CORS_HEADERS });
   } catch (error) {
     console.log("Error fetching models:", error);
