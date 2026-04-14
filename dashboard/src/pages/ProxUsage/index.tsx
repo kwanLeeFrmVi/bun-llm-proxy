@@ -12,7 +12,6 @@ import { ProxRecentTable } from "./components/ProxRecentTable.tsx";
 import { ProxTimeseriesChart } from "./components/ProxTimeseriesChart.tsx";
 
 const DAYS_OPTIONS = [
-  { label: "5h", value: "5h" },
   { label: "1D", value: "1" },
   { label: "7d", value: "7" },
   { label: "14d", value: "14" },
