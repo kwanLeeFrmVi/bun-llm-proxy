@@ -39,6 +39,9 @@ export interface UsageRecord {
   cachedTokens: number;
   cost: number;
   durationMs: number;
+  streaming: boolean;
+  ttftMs: number | null;
+  tokensPerSecond: number | null;
 }
 
 export type TestStatus = "ok" | "error" | null;

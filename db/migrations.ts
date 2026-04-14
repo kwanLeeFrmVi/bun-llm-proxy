@@ -5,7 +5,7 @@
 
 import type { Database } from "bun:sqlite";
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export interface Migration {
   version: number;
@@ -669,5 +669,27 @@ const migrationV3: Migration = {
   },
 };
 
+/**
+ * Migration v4: Add streaming performance metrics to usage_log
+ * - streaming: boolean flag indicating if request was streaming
+ * - ttft_ms: time to first token in milliseconds (streaming only)
+ * - tokens_per_second: generation speed (streaming only)
+ * - New index on (model, timestamp) for per-model stats queries
+ */
+const migrationV4: Migration = {
+  version: 4,
+  name: "add-streaming-metrics",
+  up: (db: Database) => {
+    console.log("[Migration v4] Adding streaming performance columns to usage_log");
+
+    db.run("ALTER TABLE usage_log ADD COLUMN streaming INTEGER DEFAULT 0");
+    db.run("ALTER TABLE usage_log ADD COLUMN ttft_ms INTEGER");
+    db.run("ALTER TABLE usage_log ADD COLUMN tokens_per_second REAL");
+    db.run("CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_log(model, timestamp)");
+
+    console.log("[Migration v4] Completed: streaming metrics columns added");
+  },
+};
+
 // All migrations in order
-export const migrations: Migration[] = [migrationV2, migrationV3];
+export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4];

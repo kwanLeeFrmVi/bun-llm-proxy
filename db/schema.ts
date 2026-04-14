@@ -159,11 +159,15 @@ export const CREATE_TABLES_V2 = `
     reasoning_tokens   INTEGER DEFAULT 0,
     cached_tokens      INTEGER DEFAULT 0,
     cost               REAL DEFAULT 0,
-    duration_ms        INTEGER DEFAULT 0
+    duration_ms        INTEGER DEFAULT 0,
+    streaming          INTEGER DEFAULT 0,
+    ttft_ms            INTEGER,
+    tokens_per_second  REAL
   );
   CREATE INDEX IF NOT EXISTS idx_usage_ts       ON usage_log(timestamp);
   CREATE INDEX IF NOT EXISTS idx_usage_provider ON usage_log(provider);
   CREATE INDEX IF NOT EXISTS idx_usage_api_key  ON usage_log(api_key_id);
+  CREATE INDEX IF NOT EXISTS idx_usage_model    ON usage_log(model, timestamp);
 
   -- Schema version tracking
   CREATE TABLE IF NOT EXISTS schema_version (

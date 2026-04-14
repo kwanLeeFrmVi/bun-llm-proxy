@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api.ts";
 import { useComboStore } from "@/lib/comboStore.ts";
 import { PROVIDER_NAMES } from "@/lib/constants.ts";
@@ -7,7 +8,17 @@ interface LocalModelWithWeight {
   model: string;
   weight: number;
 }
-import { Box, Search, ArrowUpDown, Layers, Trash2, Pencil, Copy, Check } from "lucide-react";
+import {
+  Box,
+  Search,
+  ArrowUpDown,
+  Layers,
+  Trash2,
+  Pencil,
+  Copy,
+  Check,
+  BarChart3,
+} from "lucide-react";
 import { uniq } from "lodash";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +59,7 @@ type ModelEntry = {
 };
 
 export default function Models() {
+  const navigate = useNavigate();
   const { combos, deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,11 +70,25 @@ export default function Models() {
   const [sortKey, setSortKey] = useState<SortKey>("provider");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  // Latest streaming stats per model
+  const [latestStats, setLatestStats] = useState<
+    Map<string, { ttftMs: number | null; tps: number | null }>
+  >(new Map());
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([api.models.list(), useComboStore.getState().loadCombos()])
-      .then(([modelsData]) => {
+    Promise.all([
+      api.models.list(),
+      useComboStore.getState().loadCombos(),
+      api.usage.modelsLatestStats(),
+    ])
+      .then(([modelsData, , statsData]) => {
         setModels(modelsData.data ?? []);
+        const map = new Map<string, { ttftMs: number | null; tps: number | null }>();
+        for (const s of statsData.stats ?? []) {
+          map.set(s.model, { ttftMs: s.latestTtftMs, tps: s.latestTokensPerSecond });
+        }
+        setLatestStats(map);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -436,6 +462,12 @@ export default function Models() {
                 <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3">
                   Alias Models
                 </TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right">
+                  TTFT
+                </TableHead>
+                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right">
+                  Token/s
+                </TableHead>
                 <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -449,6 +481,8 @@ export default function Models() {
                   : m.id.split("/").length > 1
                     ? m.id.split("/").slice(1).join("/")
                     : m.id;
+                const statsKey = isCombo ? m.id : m.id;
+                const stat = latestStats.get(statsKey);
                 return (
                   <TableRow
                     key={m.id}
@@ -494,6 +528,20 @@ export default function Models() {
                         );
                       })()}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground py-3 text-right font-mono">
+                      {stat?.ttftMs != null ? (
+                        <span>{stat.ttftMs >= 1000 ? `${(stat.ttftMs / 1000).toFixed(1)}s` : `${stat.ttftMs}ms`}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground py-3 text-right font-mono">
+                      {stat?.tps != null ? (
+                        <span>{stat.tps.toFixed(1)}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="py-3 pr-4">
                       {isCombo && (m.combo_id || combos.find((c) => c.name === m.id)) ? (
                         <div className="flex gap-1 justify-end">
@@ -521,7 +569,24 @@ export default function Models() {
                             comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""}
                           />
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="flex justify-end">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => navigate(`/models/${encodeURIComponent(m.id)}`)}
+                              >
+                                <BarChart3 className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-[10px]">
+                              View stats
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

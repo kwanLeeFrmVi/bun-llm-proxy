@@ -218,11 +218,13 @@ async function handleSingleModelChat(
 
   const requestId = ctx.id;
   const startTime = Date.now();
+  const isStreaming = body.stream === true;
   trackPendingRequest(requestId, {
     endpoint: request?.url ? new URL(request.url).pathname : undefined,
     provider,
     model,
     apiKeyId: apiKeyId ?? undefined,
+    streaming: isStreaming,
   });
   await log.pending(ctx, provider, model);
 
@@ -298,13 +300,13 @@ async function handleSingleModelChat(
       }
     }
 
-    const isStreaming = body.stream === true;
+    const isStreamingLocal = body.stream === true;
 
     // Log format detection
     const sourceFormat = detectFormat(body);
     const targetFormat = getTargetFormat(provider);
     const isPassthrough = sourceFormat === targetFormat;
-    log.formatDetect(ctx, sourceFormat, targetFormat, isStreaming);
+    log.formatDetect(ctx, sourceFormat, targetFormat, isStreamingLocal);
     if (isPassthrough) {
       log.passthrough(ctx, sourceFormat, targetFormat, "native lossless");
     }
@@ -340,7 +342,7 @@ async function handleSingleModelChat(
         reasoning_tokens?: number;
         cached_tokens?: number;
       }) => {
-        if (!isStreaming) {
+        if (!isStreamingLocal) {
           await saveRequestUsage(requestId, { ...usage, provider, model }, Date.now() - startTime);
         }
       },
@@ -354,7 +356,7 @@ async function handleSingleModelChat(
 
       if (result.success) {
         await resetCircuitBreaker(creds.connectionId as string, model);
-        if (isStreaming) {
+        if (isStreamingLocal) {
           return wrapStreamingResponse(
             result.response!,
             requestId,
@@ -463,11 +465,17 @@ function wrapStreamingResponse(
         cached_tokens?: number;
       } | null = null;
       let ttftRecorded = false;
+      let firstChunkTime: number | null = null;
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
+          // Record TTFT on first chunk
+          if (!firstChunkTime) {
+            firstChunkTime = Date.now();
+          }
 
           // Record TTFT for combo models on first chunk
           if (comboMetadata && !ttftRecorded) {
@@ -520,12 +528,20 @@ function wrapStreamingResponse(
       } finally {
         reader.releaseLock();
         const durationMs = Date.now() - startTime;
+        const ttftMs = firstChunkTime ? firstChunkTime - startTime : undefined;
+        const completionTokens = finalUsage?.completion_tokens ?? 0;
+        const tokensPerSecond =
+          ttftMs && completionTokens > 0 && durationMs > ttftMs
+            ? (completionTokens / (durationMs - ttftMs)) * 1000
+            : undefined;
         saveRequestUsage(
           requestId,
           {
             ...(finalUsage ?? {}),
             provider,
             model,
+            ttft_ms: ttftMs,
+            tokens_per_second: tokensPerSecond,
           },
           durationMs
         ).catch(() => {});

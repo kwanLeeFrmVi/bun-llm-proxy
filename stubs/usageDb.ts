@@ -21,6 +21,8 @@ interface PendingRequest {
   connectionId?: string;
   apiKeyId?: string;
   startTime: number;
+  streaming?: boolean;
+  firstChunkTime?: number;
 }
 
 const pendingRequests = new Map<string, PendingRequest>();
@@ -65,6 +67,9 @@ export interface UsageRecord {
   cachedTokens: number;
   cost: number;
   durationMs: number;
+  streaming: boolean;
+  ttftMs: number | null;
+  tokensPerSecond: number | null;
 }
 
 export interface UsageStats {
@@ -91,6 +96,7 @@ export function trackPendingRequest(
     model?: string;
     connectionId?: string;
     apiKeyId?: string;
+    streaming?: boolean;
   }
 ): void {
   const timestamp = new Date().toISOString();
@@ -117,6 +123,7 @@ export function trackPendingRequest(
     connectionId: meta.connectionId,
     apiKeyId: meta.apiKeyId,
     startTime: Date.now(),
+    streaming: meta.streaming,
   });
 }
 
@@ -134,6 +141,8 @@ export async function saveRequestUsage(
     cost?: number;
     provider?: string;
     model?: string;
+    ttft_ms?: number;
+    tokens_per_second?: number;
   },
   durationMs: number
 ): Promise<void> {
@@ -166,6 +175,9 @@ export async function saveRequestUsage(
        cached_tokens       = ?,
        cost                = ?,
        duration_ms         = ?,
+       streaming           = ?,
+       ttft_ms             = ?,
+       tokens_per_second   = ?,
        status              = 'ok'
      WHERE id = ? AND status = 'pending'`,
     [
@@ -175,6 +187,9 @@ export async function saveRequestUsage(
       cachedTokens,
       finalCost,
       durationMs,
+      pending?.streaming ? 1 : 0,
+      usage.ttft_ms ?? null,
+      usage.tokens_per_second ?? null,
       requestId,
     ]
   );
@@ -426,12 +441,15 @@ export function getUsageDetails(opts: {
         cached_tokens: number;
         cost: number;
         duration_ms: number;
+        streaming: number;
+        ttft_ms: number | null;
+        tokens_per_second: number | null;
       },
       []
     >(
       `SELECT id, timestamp, endpoint, provider, model, connection_id, api_key_id,
               status, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens,
-              cost, duration_ms
+              cost, duration_ms, streaming, ttft_ms, tokens_per_second
        FROM usage_log ${where}
        ORDER BY timestamp DESC
        LIMIT ${limit} OFFSET ${offset}`
@@ -454,6 +472,9 @@ export function getUsageDetails(opts: {
       cachedTokens: r.cached_tokens,
       cost: r.cost,
       durationMs: r.duration_ms,
+      streaming: r.streaming === 1,
+      ttftMs: r.ttft_ms,
+      tokensPerSecond: r.tokens_per_second,
     })),
     total,
   };
@@ -524,5 +545,221 @@ export function getLeaderboard(period: string): LeaderboardEntry[] {
     reasoningTokens: r.reasoning_tokens ?? 0,
     totalCost: r.total_cost ?? 0,
     requestCount: r.request_count ?? 0,
+  }));
+}
+
+// ─── Per-model stats helpers ─────────────────────────────────────────────────
+
+export interface ModelStatsSummary {
+  model: string;
+  provider: string;
+  requestCount: number;
+  failedCount: number;
+  failedRate: number;
+  ttftMin: number | null;
+  ttftAvg: number | null;
+  ttftMax: number | null;
+  tpsMin: number | null;
+  tpsAvg: number | null;
+  tpsMax: number | null;
+  latencyMin: number | null;
+  latencyAvg: number | null;
+  latencyMax: number | null;
+}
+
+export interface ModelStatsRow {
+  id: string;
+  timestamp: string;
+  status: string;
+  provider: string;
+  model: string;
+  durationMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  streaming: boolean;
+  ttftMs: number | null;
+  tokensPerSecond: number | null;
+}
+
+export interface ModelStatsResponse {
+  model: string;
+  period: string;
+  summary: ModelStatsSummary;
+  rows: ModelStatsRow[];
+  total: number;
+}
+
+export interface ModelLatestStats {
+  model: string;
+  provider: string;
+  latestTtftMs: number | null;
+  latestTokensPerSecond: number | null;
+}
+
+/**
+ * Get per-model stats summary and request rows for a given time period.
+ */
+export function getModelStats(
+  model: string,
+  period: string,
+  opts?: { page?: number; limit?: number }
+): ModelStatsResponse {
+  const db = getRawDb();
+  const since = periodToTimestamp(period);
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.page ? (opts.page - 1) * limit : 0;
+  const escapedModel = model.replace(/'/g, "''");
+  const timeFilter = since ? `AND timestamp >= '${since}'` : "";
+
+  // Get provider for this model
+  const providerRow = db
+    .query<{ provider: string }, []>(
+      `SELECT provider FROM usage_log WHERE model = '${escapedModel}' AND provider IS NOT NULL ${timeFilter} LIMIT 1`
+    )
+    .get();
+  const provider = providerRow?.provider ?? "";
+
+  // Summary cards
+  const summary = db
+    .query<
+      {
+        total: number;
+        failed: number;
+        ttft_min: number | null;
+        ttft_avg: number | null;
+        ttft_max: number | null;
+        tps_min: number | null;
+        tps_avg: number | null;
+        tps_max: number | null;
+        lat_min: number | null;
+        lat_avg: number | null;
+        lat_max: number | null;
+      },
+      []
+    >(
+      `SELECT
+         COUNT(*) as total,
+         SUM(CASE WHEN status NOT IN ('ok', 'pending') THEN 1 ELSE 0 END) as failed,
+         MIN(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_min,
+         AVG(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_avg,
+         MAX(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_max,
+         MIN(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_min,
+         AVG(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_avg,
+         MAX(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_max,
+         MIN(duration_ms) as lat_min,
+         AVG(duration_ms) as lat_avg,
+         MAX(duration_ms) as lat_max
+       FROM usage_log
+       WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}`
+    )
+    .get();
+
+  const totalCount = db
+    .query<{ cnt: number }, []>(
+      `SELECT COUNT(*) as cnt FROM usage_log WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}`
+    )
+    .get();
+
+  // Request rows
+  const rows = db
+    .query<
+      {
+        id: string;
+        timestamp: string;
+        status: string;
+        provider: string;
+        model: string;
+        duration_ms: number;
+        prompt_tokens: number;
+        completion_tokens: number;
+        streaming: number;
+        ttft_ms: number | null;
+        tokens_per_second: number | null;
+      },
+      []
+    >(
+      `SELECT id, timestamp, status, provider, model, duration_ms,
+              prompt_tokens, completion_tokens, streaming, ttft_ms, tokens_per_second
+       FROM usage_log
+       WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}
+       ORDER BY timestamp DESC
+       LIMIT ${limit} OFFSET ${offset}`
+    )
+    .all();
+
+  return {
+    model,
+    period,
+    summary: {
+      model,
+      provider,
+      requestCount: summary?.total ?? 0,
+      failedCount: summary?.failed ?? 0,
+      failedRate: summary && summary.total > 0 ? (summary.failed / summary.total) * 100 : 0,
+      ttftMin: summary?.ttft_min ?? null,
+      ttftAvg: summary?.ttft_avg ? Math.round(summary.ttft_avg) : null,
+      ttftMax: summary?.ttft_max ?? null,
+      tpsMin: summary?.tps_min ?? null,
+      tpsAvg: summary?.tps_avg ? Math.round(summary.tps_avg * 100) / 100 : null,
+      tpsMax: summary?.tps_max ?? null,
+      latencyMin: summary?.lat_min ?? null,
+      latencyAvg: summary?.lat_avg ? Math.round(summary.lat_avg) : null,
+      latencyMax: summary?.lat_max ?? null,
+    },
+    rows: rows.map((r) => ({
+      id: r.id,
+      timestamp: r.timestamp,
+      status: r.status,
+      provider: r.provider,
+      model: r.model,
+      durationMs: r.duration_ms,
+      promptTokens: r.prompt_tokens,
+      completionTokens: r.completion_tokens,
+      streaming: r.streaming === 1,
+      ttftMs: r.ttft_ms,
+      tokensPerSecond: r.tokens_per_second,
+    })),
+    total: totalCount?.cnt ?? 0,
+  };
+}
+
+/**
+ * Get latest successful streaming stats for each model.
+ * Returns one row per distinct model with the most recent TTFT and tokens/s.
+ */
+export function getModelsLatestStats(): ModelLatestStats[] {
+  const db = getRawDb();
+
+  const rows = db
+    .query<
+      {
+        model: string;
+        provider: string;
+        latest_ttft_ms: number | null;
+        latest_tps: number | null;
+      },
+      []
+    >(
+      `SELECT
+         ul.model,
+         ul.provider,
+         ul.ttft_ms as latest_ttft_ms,
+         ul.tokens_per_second as latest_tps
+       FROM usage_log ul
+       INNER JOIN (
+         SELECT model, MAX(timestamp) as max_ts
+         FROM usage_log
+         WHERE streaming = 1 AND status = 'ok' AND ttft_ms IS NOT NULL
+         GROUP BY model
+       ) latest ON ul.model = latest.model AND ul.timestamp = latest.max_ts
+       WHERE ul.streaming = 1 AND ul.status = 'ok' AND ul.ttft_ms IS NOT NULL`
+    )
+    .all();
+
+  return rows.map((r) => ({
+    model: r.model,
+    provider: r.provider,
+    latestTtftMs: r.latest_ttft_ms,
+    latestTokensPerSecond: r.latest_tps,
   }));
 }

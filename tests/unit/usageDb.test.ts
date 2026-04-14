@@ -28,7 +28,10 @@ describe("usageDb.ts", () => {
         reasoning_tokens INTEGER,
         cached_tokens INTEGER,
         cost REAL,
-        duration_ms INTEGER
+        duration_ms INTEGER,
+        streaming INTEGER DEFAULT 0,
+        ttft_ms INTEGER,
+        tokens_per_second REAL
       )
     `);
 

@@ -12,6 +12,7 @@ import ZaiUsage from "@/pages/ZaiUsage";
 import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
+import ModelStats from "@/pages/ModelStats";
 import Users from "@/pages/Users";
 import UserDetail from "@/pages/UserDetail";
 import Leaderboard from "@/pages/Leaderboard";
@@ -96,6 +97,7 @@ function ProtectedLayout() {
             <Route path="/prox-usage" element={<ProxUsage />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/models" element={<Models />} />
+            <Route path="/models/:modelId" element={<ModelStats />} />
             <Route path="/change-password" element={<ChangePassword />} />
             {/* Catch-all: redirect to appropriate home */}
             <Route path="*" element={<Navigate to={isAdmin ? "/providers" : "/keys"} replace />} />
