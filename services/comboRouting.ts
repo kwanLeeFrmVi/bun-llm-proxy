@@ -1,5 +1,44 @@
 // Combo routing strategies - extracted for testability
 
+/**
+ * Read the error message from a failed combo leg response.
+ * Tries to extract a human-readable string from JSON error bodies.
+ * Falls back to "Model X returned status N" if the body is unreadable.
+ */
+async function readComboError(resp: Response, model: string): Promise<string> {
+  try {
+    const text = await resp.clone().text();
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        // Handle nested OpenAI shape: { error: { message } }
+        const msg = json?.error?.message ?? json?.error ?? json?.message;
+        if (msg && typeof msg === "string") return msg;
+      } catch {
+        // Not JSON — return raw text if short enough
+        if (text.length <= 300) return text;
+      }
+    }
+  } catch {
+    /* ignore read errors */
+  }
+  return `Model ${model} returned status ${resp.status}`;
+}
+
+/** Build the final all-failed 503 response with proper OpenAI error shape. */
+function allFailedResponse(lastError: string | null): Response {
+  return new Response(
+    JSON.stringify({
+      error: {
+        message: lastError ?? "All combo models failed",
+        type: "server_error",
+        code: "service_unavailable",
+      },
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  );
+}
+
 // Per-combo round-robin state: index, stickyCount
 const rrStateMap = new Map<string, { index: number; stickyCount: number }>();
 
@@ -135,7 +174,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       if (resp.ok) {
         return attachComboMetadata(resp, comboName, selectedModel);
       }
-      lastError = `Model ${selectedModel} returned status ${resp.status}`;
+      lastError = await readComboError(resp, selectedModel);
       log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} failed (${resp.status}), trying fallback`);
     } catch (e) {
       lastError = `${selectedModel}: ${e instanceof Error ? e.message : String(e)}`;
@@ -153,16 +192,13 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           log.info(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
-        lastError = `Model ${m.model} returned status ${resp.status}`;
+        lastError = await readComboError(resp, m.model);
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
       }
     }
 
-    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+    return allFailedResponse(lastError);
   }
 
   if (comboStrategy === "weight") {
@@ -199,16 +235,13 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           return attachComboMetadata(resp, comboName, m.model);
         }
         // Only capture the first failure, not subsequent ones
-        if (!lastError) lastError = `Model ${m.model} returned status ${resp.status}`;
+        if (!lastError) lastError = await readComboError(resp, m.model);
       } catch (e) {
         if (!lastError) lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
       }
     }
 
-    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+    return allFailedResponse(lastError);
   }
 
   if (comboStrategy === "speed") {
@@ -282,7 +315,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           if (i > 0) log.info(ctx ?? null, "COMBO", `Speed fallback: ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
-        lastError = `Model ${m.model} returned status ${resp.status}`;
+        lastError = await readComboError(resp, m.model);
         if (i === 0) {
           log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} failed (${resp.status}), trying fallback`);
         }
@@ -294,10 +327,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+    return allFailedResponse(lastError);
   }
 
   if (comboStrategy === "session-sticky") {
@@ -411,7 +441,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           }
           return attachComboMetadata(resp, comboName, m.model);
         }
-        lastError = `Model ${m.model} returned status ${resp.status}`;
+        lastError = await readComboError(resp, m.model);
         if (m.model === assignedModel) {
           log.warn(
             ctx ?? null,
@@ -427,10 +457,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+    return allFailedResponse(lastError);
   }
 
   // fallback (default): try each model in order
@@ -448,17 +475,14 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         log.info(ctx ?? null, "COMBO", `Fallback: model ${m.model} succeeded`);
         return attachComboMetadata(resp, comboName, m.model);
       }
-      lastError = `Model ${m.model} returned status ${resp.status}`;
+      lastError = await readComboError(resp, m.model);
     } catch (e) {
       lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
     }
     attemptNumber++;
   }
 
-  return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
-    status: 503,
-    headers: { "Content-Type": "application/json" },
-  });
+  return allFailedResponse(lastError);
 }
 
 /**
