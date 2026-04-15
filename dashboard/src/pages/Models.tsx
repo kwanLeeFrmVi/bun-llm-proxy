@@ -46,7 +46,7 @@ import {
 import { toast } from "sonner";
 import ComboFormDialog from "@/components/ComboFormDialog";
 
-type SortKey = "model" | "provider";
+type SortKey = "model" | "provider" | "ttft" | "tps";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
@@ -178,11 +178,20 @@ export default function Models() {
         case "provider":
           cmp = providerA.localeCompare(providerB) || modelNameA.localeCompare(modelNameB);
           break;
+        case "ttft":
+        case "tps": {
+          const statA = latestStats.get(isComboA ? a.id : normalizeModel(a.id));
+          const statB = latestStats.get(isComboB ? b.id : normalizeModel(b.id));
+          const valA = sortKey === "ttft" ? (statA?.ttftMs ?? Infinity) : (statA?.tps ?? -Infinity);
+          const valB = sortKey === "ttft" ? (statB?.ttftMs ?? Infinity) : (statB?.tps ?? -Infinity);
+          cmp = valA - valB;
+          break;
+        }
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return arr;
-  }, [filtered, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir, latestStats]);
 
   const total = sorted.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -485,11 +494,29 @@ export default function Models() {
                 <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3">
                   Alias Models
                 </TableHead>
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right">
-                  TTFT
+                <TableHead
+                  className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => toggleSort("ttft")}
+                >
+                  <span className="inline-flex items-center gap-1 justify-end">
+                    TTFT
+                    <ArrowUpDown className="w-3 h-3 opacity-50" />
+                    {sortKey === "ttft" && (
+                      <span className="text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>
+                    )}
+                  </span>
                 </TableHead>
-                <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right">
-                  Token/s
+                <TableHead
+                  className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => toggleSort("tps")}
+                >
+                  <span className="inline-flex items-center gap-1 justify-end">
+                    Token/s
+                    <ArrowUpDown className="w-3 h-3 opacity-50" />
+                    {sortKey === "tps" && (
+                      <span className="text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>
+                    )}
+                  </span>
                 </TableHead>
                 <TableHead className="uppercase text-xs tracking-widest font-semibold text-muted-foreground py-3 w-10"></TableHead>
               </TableRow>
