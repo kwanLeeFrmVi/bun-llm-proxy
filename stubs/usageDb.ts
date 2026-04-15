@@ -626,6 +626,68 @@ export interface ModelLatestStats {
 /**
  * Get per-model stats summary and request rows for a given time period.
  */
+/**
+ * Look up combo member models from both combo_configs and combos tables.
+ * Returns empty array if the name is not a combo.
+ */
+function getComboMembers(db: Database, comboName: string): string[] {
+  // Check combo_configs first (individual rows per member)
+  const configRows = db
+    .query<{ model: string }, [string]>(
+      `SELECT model FROM combo_configs WHERE combo_name = ?`
+    )
+    .all(comboName);
+  if (configRows.length > 0) return configRows.map((r) => r.model);
+
+  // Check combos table (JSON models field)
+  const comboRow = db
+    .query<{ models: string }, [string]>(
+      `SELECT models FROM combos WHERE name = ?`
+    )
+    .get(comboName);
+  if (comboRow) {
+    try {
+      const parsed = JSON.parse(comboRow.models);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Resolve a model name to its actual DB model names.
+ * If the model is a combo, recursively resolves sub-combos to get bare model names.
+ * If not a combo, returns the normalized model name as-is.
+ */
+function resolveModelNames(db: Database, model: string): string[] {
+  const normalized = normalizeModelForQuery(model);
+
+  // Check if this is a combo model
+  const members = getComboMembers(db, normalized);
+  if (members.length === 0) return [normalized];
+
+  // Recursively resolve sub-combos
+  const allModels = new Set<string>();
+  const queue = [...members];
+  const visited = new Set<string>();
+  while (queue.length > 0) {
+    const m = queue.shift()!;
+    if (visited.has(m)) continue;
+    visited.add(m);
+    const bare = normalizeModelForQuery(m);
+    const subMembers = getComboMembers(db, bare);
+    if (subMembers.length > 0) {
+      queue.push(...subMembers);
+    } else {
+      allModels.add(bare);
+    }
+  }
+  return [...allModels];
+}
+
 export function getModelStats(
   model: string,
   period: string,
@@ -635,13 +697,19 @@ export function getModelStats(
   const since = periodToTimestamp(period);
   const limit = opts?.limit ?? 50;
   const offset = opts?.page ? (opts.page - 1) * limit : 0;
-  const escapedModel = normalizeModelForQuery(model).replace(/'/g, "''");
   const timeFilter = since ? `AND timestamp >= '${since}'` : "";
+
+  // Resolve combo models to their actual member models
+  const resolvedModels = resolveModelNames(db, model);
+  const modelFilter =
+    resolvedModels.length === 1
+      ? `model = '${resolvedModels[0]!.replace(/'/g, "''")}'`
+      : `model IN (${resolvedModels.map((m) => `'${m.replace(/'/g, "''")}'`).join(",")})`;
 
   // Get provider for this model
   const providerRow = db
     .query<{ provider: string }, []>(
-      `SELECT provider FROM usage_log WHERE model = '${escapedModel}' AND provider IS NOT NULL ${timeFilter} LIMIT 1`
+      `SELECT provider FROM usage_log WHERE ${modelFilter} AND provider IS NOT NULL ${timeFilter} LIMIT 1`
     )
     .get();
   const provider = providerRow?.provider ?? "";
@@ -677,13 +745,13 @@ export function getModelStats(
          AVG(duration_ms) as lat_avg,
          MAX(duration_ms) as lat_max
        FROM usage_log
-       WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}`
+       WHERE ${modelFilter} AND status != 'pending' ${timeFilter}`
     )
     .get();
 
   const totalCount = db
     .query<{ cnt: number }, []>(
-      `SELECT COUNT(*) as cnt FROM usage_log WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}`
+      `SELECT COUNT(*) as cnt FROM usage_log WHERE ${modelFilter} AND status != 'pending' ${timeFilter}`
     )
     .get();
 
@@ -708,7 +776,7 @@ export function getModelStats(
       `SELECT id, timestamp, status, provider, model, duration_ms,
               prompt_tokens, completion_tokens, streaming, ttft_ms, tokens_per_second
        FROM usage_log
-       WHERE model = '${escapedModel}' AND status != 'pending' ${timeFilter}
+       WHERE ${modelFilter} AND status != 'pending' ${timeFilter}
        ORDER BY timestamp DESC
        LIMIT ${limit} OFFSET ${offset}`
     )
@@ -783,10 +851,55 @@ export function getModelsLatestStats(): ModelLatestStats[] {
     )
     .all();
 
-  return rows.map((r) => ({
+  const result: ModelLatestStats[] = rows.map((r) => ({
     model: r.model,
     provider: r.provider,
     latestTtftMs: r.latest_ttft_ms,
     latestTokensPerSecond: r.latest_tps,
   }));
+
+  // Build a lookup map from bare model name → stats
+  const statsMap = new Map<string, ModelLatestStats>();
+  for (const r of result) {
+    statsMap.set(r.model, r);
+  }
+
+  // Resolve combo models: for each combo, find the best member model stats
+  // Get all combo names from both combo_configs and combos tables
+  const allComboNames = new Set<string>();
+  const configCombos = db
+    .query<{ combo_name: string }, []>(
+      `SELECT DISTINCT combo_name FROM combo_configs`
+    )
+    .all();
+  for (const c of configCombos) allComboNames.add(c.combo_name);
+
+  const jsonCombos = db
+    .query<{ name: string }, []>(`SELECT name FROM combos`)
+    .all();
+  for (const c of jsonCombos) allComboNames.add(c.name);
+
+  for (const comboName of allComboNames) {
+    // Skip if we already have direct stats for this combo name
+    if (statsMap.has(comboName)) continue;
+
+    // Use resolveModelNames to recursively resolve all member models
+    const resolvedModels = resolveModelNames(db, comboName);
+
+    // Find the first member model that has stats
+    for (const memberModel of resolvedModels) {
+      const memberStat = statsMap.get(memberModel);
+      if (memberStat && (memberStat.latestTtftMs != null || memberStat.latestTokensPerSecond != null)) {
+        result.push({
+          model: comboName,
+          provider: "combo",
+          latestTtftMs: memberStat.latestTtftMs,
+          latestTokensPerSecond: memberStat.latestTokensPerSecond,
+        });
+        break;
+      }
+    }
+  }
+
+  return result;
 }

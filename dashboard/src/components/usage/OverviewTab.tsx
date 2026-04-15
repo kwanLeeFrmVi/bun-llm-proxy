@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import type { UsageStats, UsageRecord } from "@/lib/types.ts";
 import type { ProviderNode } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ProviderTopology } from "@/components/ProviderTopology";
 import { BreakdownChart } from "./BreakdownChart";
 import { cardStyle, fmt } from "./utils";
+
+const ProviderTopology = lazy(() =>
+  import("@/components/ProviderTopology").then((m) => ({ default: m.default }))
+);
 
 type Period = "2h" | "5h" | "24h" | "7d" | "30d" | "all";
 
@@ -122,11 +125,13 @@ export function OverviewTab({
               Aggregate usage across all active gateways
             </p>
           </div>
-          <ProviderTopology
-            providers={stats.byProvider}
-            lastProvider={recentRows[0]?.provider}
-            nodes={nodes}
-          />
+          <Suspense fallback={<div className="h-96 flex items-center justify-center text-sm text-[--on-surface-variant]">Loading topology…</div>}>
+            <ProviderTopology
+              providers={stats.byProvider}
+              lastProvider={recentRows[0]?.provider}
+              nodes={nodes}
+            />
+          </Suspense>
         </div>
 
         {/* Recent Requests */}

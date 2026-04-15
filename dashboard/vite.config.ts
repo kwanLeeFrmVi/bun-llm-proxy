@@ -11,6 +11,8 @@ export default defineConfig({
         manualChunks: {
           // Split chart.js + react-chartjs-2 into its own chunk (~200KB)
           "chart.js": ["chart.js", "react-chartjs-2"],
+          // Split @xyflow/react (~200KB) into its own chunk
+          "xyflow": ["@xyflow/react"],
           // Split lodash into its own chunk
           vendor: ["lodash"],
         },

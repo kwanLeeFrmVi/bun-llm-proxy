@@ -281,7 +281,16 @@ export interface ProviderTopologyProps {
   nodes?: ProviderNode[];
 }
 
-export function ProviderTopology({
+export default function ProviderTopology({
+  providers,
+  lastProvider,
+  errorProvider,
+  nodes,
+}: ProviderTopologyProps) {
+  return <_ProviderTopology providers={providers} lastProvider={lastProvider} errorProvider={errorProvider} nodes={nodes} />;
+}
+
+function _ProviderTopology({
   providers,
   lastProvider,
   errorProvider,

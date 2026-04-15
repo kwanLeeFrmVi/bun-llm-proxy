@@ -3,14 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
 import Login from "@/pages/Login";
-import ApiKeys from "@/pages/ApiKeys";
 import Usage from "@/pages/Usage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
-import ModelStats from "@/pages/ModelStats";
-import Users from "@/pages/Users";
 import ProviderDetail from "@/pages/ProviderDetail";
-import UserDetail from "@/pages/UserDetail";
 import ChangePassword from "@/pages/ChangePassword";
 import OAuthCallback from "@/pages/OAuthCallback";
 import { Loader } from "@/components/Loader";
@@ -21,6 +17,10 @@ const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const MavisUsage = lazy(() => import("@/pages/MavisUsage"));
 const ZaiUsage = lazy(() => import("@/pages/ZaiUsage"));
 const ProxUsage = lazy(() => import("@/pages/ProxUsage"));
+const ApiKeys = lazy(() => import("@/pages/ApiKeys"));
+const Users = lazy(() => import("@/pages/Users"));
+const UserDetail = lazy(() => import("@/pages/UserDetail"));
+const ModelStats = lazy(() => import("@/pages/ModelStats"));
 
 function ProtectedLayout() {
   const { token, role, loading } = useAuth();
@@ -86,12 +86,12 @@ function ProtectedLayout() {
               <>
                 <Route path="/providers" element={<Suspense fallback={<Loader />}><Providers /></Suspense>} />
                 <Route path="/providers/:providerId" element={<ProviderDetail />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/users/:userId" element={<UserDetail />} />
+                <Route path="/users" element={<Suspense fallback={<Loader />}><Users /></Suspense>} />
+                <Route path="/users/:userId" element={<Suspense fallback={<Loader />}><UserDetail /></Suspense>} />
               </>
             )}
             {/* Shared routes */}
-            <Route path="/keys" element={<ApiKeys />} />
+            <Route path="/keys" element={<Suspense fallback={<Loader />}><ApiKeys /></Suspense>} />
             <Route path="/usage" element={<Usage />} />
             <Route path="/leaderboard" element={<Suspense fallback={<Loader />}><Leaderboard /></Suspense>} />
             <Route path="/mavis-usage" element={<Suspense fallback={<Loader />}><MavisUsage /></Suspense>} />
@@ -99,7 +99,7 @@ function ProtectedLayout() {
             <Route path="/prox-usage" element={<Suspense fallback={<Loader />}><ProxUsage /></Suspense>} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/models" element={<Models />} />
-            <Route path="/models/:modelId" element={<ModelStats />} />
+            <Route path="/models/:modelId" element={<Suspense fallback={<Loader />}><ModelStats /></Suspense>} />
             <Route path="/change-password" element={<ChangePassword />} />
             {/* Catch-all: redirect to appropriate home */}
             <Route path="*" element={<Navigate to={isAdmin ? "/providers" : "/keys"} replace />} />
