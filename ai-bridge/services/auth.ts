@@ -1,7 +1,7 @@
 // Account fallback and cooldown logic.
 // Written from scratch in TypeScript.
 
-import { COOLDOWN_MS, BACKOFF_CONFIG, HTTP_STATUS } from "../config/runtimeConfig.ts";
+import { COOLDOWN_MS, BACKOFF_CONFIG, QUOTA_BACKOFF_CONFIG, QUOTA_EXHAUSTION_KEYWORDS, HTTP_STATUS } from "../config/runtimeConfig.ts";
 
 // ─── Quota / Rate Limit Cooldown ───────────────────────────────────────────────
 
@@ -40,12 +40,22 @@ export function checkFallbackError(
     if (lowerError.includes("improperly formed request")) {
       return { shouldFallback: true, cooldownMs: COOLDOWN_MS.paymentRequired };
     }
-    // Rate limit keywords — exponential backoff
+    // Quota exhaustion keywords — hours-long lockout
+    if (QUOTA_EXHAUSTION_KEYWORDS.some((kw) => lowerError.includes(kw))) {
+      const cooldown = Math.min(
+        QUOTA_BACKOFF_CONFIG.base * Math.pow(2, backoffLevel),
+        QUOTA_BACKOFF_CONFIG.max
+      );
+      return {
+        shouldFallback: true,
+        cooldownMs: cooldown,
+        newBackoffLevel: Math.min(backoffLevel + 1, QUOTA_BACKOFF_CONFIG.maxLevel),
+      };
+    }
+    // Transient rate limit keywords — short exponential backoff
     if (
       lowerError.includes("rate limit") ||
       lowerError.includes("too many requests") ||
-      lowerError.includes("quota exceeded") ||
-      lowerError.includes("capacity") ||
       lowerError.includes("overloaded") ||
       lowerError.includes("temporarily unavailable")
     ) {

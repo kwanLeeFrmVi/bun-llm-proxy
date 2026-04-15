@@ -58,6 +58,25 @@ export const BACKOFF_CONFIG = {
   maxLevel: 15,
 } as const;
 
+// Provider quota exhaustion: long lockouts (hours)
+// Escalation: 2h → 4h → 8h → 12h(cap)
+export const QUOTA_BACKOFF_CONFIG = {
+  base: 2 * 60 * 60 * 1000, // 2 hours
+  max: 12 * 60 * 60 * 1000, // 12 hours max
+  maxLevel: 3, // 3 escalation levels
+} as const;
+
+// Keywords that indicate quota exhaustion (not transient rate limits)
+// These trigger hours-long lockouts instead of seconds
+export const QUOTA_EXHAUSTION_KEYWORDS = [
+  "quota exceeded",
+  "capacity",
+  "exhausted",
+  "daily limit",
+  "monthly limit",
+  "usage limit",
+] as const;
+
 // Retry-before-lock: retry transient errors on the same account before locking
 export const TRANSIENT_RETRY = {
   maxAttempts: 2, // retry up to 2 times (3 total attempts)

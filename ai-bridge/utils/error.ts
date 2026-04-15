@@ -74,6 +74,7 @@ export function createErrorResult(
  */
 export function sseErrorResponse(status: number, message: string): Response {
   const msgId = `msg_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+  const errorText = `[Proxy Error ${status}] ${message}`;
   const events =
     [
       `event: message_start\ndata: ${JSON.stringify({
@@ -88,16 +89,30 @@ export function sseErrorResponse(status: number, message: string): Response {
           usage: { input_tokens: 0, output_tokens: 0 },
         },
       })}`,
+      `event: content_block_start\ndata: ${JSON.stringify({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      })}`,
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: errorText },
+      })}`,
+      `event: content_block_stop\ndata: ${JSON.stringify({
+        type: "content_block_stop",
+        index: 0,
+      })}`,
       `event: message_delta\ndata: ${JSON.stringify({
         type: "message_delta",
         delta: { stop_reason: "end_turn", stop_sequence: null },
-        usage: { input_tokens: 0, output_tokens: 0 },
+        usage: { input_tokens: 0, output_tokens: 1 },
       })}`,
       `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}`,
     ].join("\n\n") + "\n\ndata: [DONE]\n\n";
 
   return new Response(events, {
-    status,
+    status: 200,
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",

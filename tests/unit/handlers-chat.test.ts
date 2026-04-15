@@ -7,7 +7,6 @@
 
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { sseErrorResponse } from "../../ai-bridge/utils/error.ts";
-import { HTTP_STATUS } from "../../ai-bridge/config/runtimeConfig.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,9 +38,9 @@ describe("sseErrorResponse", () => {
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
   });
 
-  it("returns the given HTTP status code", () => {
+  it("returns HTTP 200 so Claude Code consumes the SSE stream", () => {
     const res = sseErrorResponse(429, "rate limited");
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(200);
   });
 
   it("includes message_start with usage containing input_tokens and output_tokens", async () => {
@@ -70,7 +69,7 @@ describe("sseErrorResponse", () => {
     const d = delta!.data as Record<string, unknown>;
     const usage = d.usage as Record<string, number>;
     expect(usage.input_tokens).toBe(0);
-    expect(usage.output_tokens).toBe(0);
+    expect(usage.output_tokens).toBe(1);
     const deltaObj = d.delta as Record<string, unknown>;
     expect(deltaObj.stop_reason).toBe("end_turn");
   });
@@ -91,18 +90,36 @@ describe("sseErrorResponse", () => {
     expect(text).toContain("data: [DONE]");
   });
 
-  it("emits events in correct order: message_start → message_delta → message_stop → [DONE]", async () => {
+  it("includes error message in content_block_delta text", async () => {
+    const res = sseErrorResponse(429, "Rate limit exceeded");
+    const text = await res.text();
+    const events = parseSSE(text);
+
+    const cbDelta = events.find((e) => e.event === "content_block_delta");
+    expect(cbDelta).toBeDefined();
+    const delta = (cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>;
+    expect(delta.type).toBe("text_delta");
+    expect(delta.text).toBe("[Proxy Error 429] Rate limit exceeded");
+  });
+
+  it("emits events in correct order: message_start → content_block_start → content_block_delta → content_block_stop → message_delta → message_stop → [DONE]", async () => {
     const res = sseErrorResponse(503, "error");
     const text = await res.text();
     const events = parseSSE(text);
 
     const eventTypes = events.map((e) => e.event || "[DONE]");
     const startIdx = eventTypes.indexOf("message_start");
+    const cbStartIdx = eventTypes.indexOf("content_block_start");
+    const cbDeltaIdx = eventTypes.indexOf("content_block_delta");
+    const cbStopIdx = eventTypes.indexOf("content_block_stop");
     const deltaIdx = eventTypes.indexOf("message_delta");
     const stopIdx = eventTypes.indexOf("message_stop");
     const doneIdx = eventTypes.indexOf("[DONE]");
 
-    expect(startIdx).toBeLessThan(deltaIdx);
+    expect(startIdx).toBeLessThan(cbStartIdx);
+    expect(cbStartIdx).toBeLessThan(cbDeltaIdx);
+    expect(cbDeltaIdx).toBeLessThan(cbStopIdx);
+    expect(cbStopIdx).toBeLessThan(deltaIdx);
     expect(deltaIdx).toBeLessThan(stopIdx);
     expect(stopIdx).toBeLessThan(doneIdx);
   });
@@ -200,11 +217,14 @@ describe("handleChat — streaming error responses", () => {
       })
     );
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
-    expect(res.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    // sseErrorResponse always returns 200 so Claude Code consumes the stream
+    expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("message_start");
     expect(text).toContain("message_delta");
     expect(text).toContain("input_tokens");
+    // Error message should be visible in content blocks
+    expect(text).toContain("Proxy Error");
   });
 
   it("returns JSON error when stream=false and model is missing", async () => {
