@@ -17,26 +17,20 @@ const LEVEL_COLORS: Record<string, string> = {
 const cardStyle =
   "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
-function getWebSocketBaseUrl(token: string): string {
+function getSseUrl(): string {
+  // SSE uses standard HTTP — works through Vite proxy (dev) and Cloudflare (prod)
   if (import.meta.env.DEV) {
-    // Dev: Vite doesn't proxy /ws, so connect directly to Bun server
-    return `ws://localhost:20129/ws/console-logs?token=${encodeURIComponent(token)}`;
+    // Dev: Vite proxies /api to Bun, so relative URL works
+    return "/api/console-logs/stream";
   }
-  // Production: use VITE_API_URL as-is if set, otherwise same origin
-  const base = import.meta.env.VITE_API_URL ?? "";
-  // VITE_API_URL may be a full URL like "https://api.example.com" or just empty
-  if (base) {
-    return `${base.replace(/^http/, "ws")}/ws/console-logs?token=${encodeURIComponent(token)}`;
-  }
-  const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-  return `${proto}${window.location.host}/ws/console-logs?token=${encodeURIComponent(token)}`;
+  // Production: same origin (Bun serves both API and dashboard)
+  return "/api/console-logs/stream";
 }
 
 export default function Logs() {
   const [logs, setLogs] = useState<ConsoleLogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const atBottomRef = useRef(true);
 
   const scrollToBottom = useCallback(() => {
@@ -44,16 +38,12 @@ export default function Logs() {
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [autoScroll]);
 
-  // Stable token ref so reconnect doesn't re-run on token change
-  const tokenRef = useRef<string | null>(null);
-
-  // Load initial buffer via REST, then maintain WebSocket for live updates
+  // Connect to SSE stream for live log updates
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
-    tokenRef.current = token;
 
-    // Fetch current buffer
+    // Fetch current buffer first
     fetch("/api/console-logs", {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -61,17 +51,20 @@ export default function Logs() {
       .then((data: ConsoleLogEntry[]) => setLogs(data))
       .catch(() => {});
 
-    let ws: WebSocket;
+    // Open SSE connection for live stream
+    let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let destroyed = false;
     let reconnectAttempt = 0;
 
     function connect() {
-      if (destroyed || !tokenRef.current) return;
-      ws = new WebSocket(getWebSocketBaseUrl(tokenRef.current));
-      wsRef.current = ws;
+      if (destroyed) return;
 
-      ws.onmessage = (e) => {
+      // EventSource doesn't support custom headers, so pass token as query param
+      const url = `${getSseUrl()}?token=${encodeURIComponent(token!)}`;
+      es = new EventSource(url);
+
+      es.onmessage = (e) => {
         try {
           const entry: ConsoleLogEntry = JSON.parse(e.data);
           if ("type" in entry && (entry as { type?: string }).type === "clear") {
@@ -84,20 +77,16 @@ export default function Logs() {
         }
       };
 
-      ws.onclose = () => {
-        wsRef.current = null;
-        reconnectAttempt++;
+      es.onerror = () => {
+        es?.close();
+        es = null;
         if (!destroyed) {
-          // Exponential backoff: 1s, 2s, 4s, 8s, max 15s, reset on successful connect
+          reconnectAttempt++;
           const delay = Math.min(15_000, 1_000 * 2 ** Math.min(reconnectAttempt - 1, 4));
           reconnectTimer = setTimeout(() => {
             if (!destroyed) connect();
           }, delay);
         }
-      };
-
-      ws.onerror = () => {
-        ws.close();
       };
     }
 
@@ -106,14 +95,9 @@ export default function Logs() {
     return () => {
       destroyed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
-      wsRef.current = null;
+      es?.close();
     };
   }, []);
-
-  function handleClear() {
-    wsRef.current?.send("clear");
-  }
 
   useEffect(() => {
     scrollToBottom();
@@ -124,6 +108,19 @@ export default function Logs() {
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     atBottomRef.current = scrollHeight - scrollTop - clientHeight < 40;
     setAutoScroll(atBottomRef.current);
+  }
+
+  async function handleClear() {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+    try {
+      await fetch("/api/console-logs", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   return (

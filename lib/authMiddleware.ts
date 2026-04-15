@@ -58,7 +58,13 @@ export type AdminAuthResult =
  */
 export async function checkAdminAuth(request: Request): Promise<AdminAuthResult> {
   const authHeader = request.headers.get("Authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  let token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+
+  // Fallback: accept token from query parameter (needed for EventSource which can't set headers)
+  if (!token) {
+    const url = new URL(request.url);
+    token = url.searchParams.get("token");
+  }
 
   if (!token) {
     return { ok: false, response: Response.json({ error: "Unauthorized" }, { status: 401 }) };
