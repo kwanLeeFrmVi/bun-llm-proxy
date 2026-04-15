@@ -100,6 +100,46 @@ describe("openai → claude (Request)", () => {
     expect(tools[0].input_schema).toBeDefined();
   });
 
+  it("maps tool_calls[].function.arguments (string) → tool_use[].input (object)", () => {
+    const body = {
+      model: "claude-sonnet-4",
+      messages: [
+        { role: "user", content: "what is the weather?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_abc",
+              type: "function",
+              function: {
+                name: "get_weather",
+                arguments: '{"city":"NYC","units":"metric"}',
+              },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_abc", content: '{"temp":22}' },
+      ],
+    };
+    const result = decode(
+      Request("openai", "claude", "claude-sonnet-4-20250514", encode(body), false)
+    ) as Record<string, unknown>;
+    const msgs = result.messages as Array<Record<string, unknown>>;
+    // The assistant message should have tool_use with input as a parsed object
+    const assistantMsg = msgs.find((m) => m.role === "assistant");
+    expect(assistantMsg).toBeDefined();
+    const content = assistantMsg!.content as Array<Record<string, unknown>>;
+    const toolUse = content.find((c) => c.type === "tool_use");
+    expect(toolUse).toBeDefined();
+    expect(toolUse!.id).toBe("call_abc");
+    expect(toolUse!.name).toBe("get_weather");
+    // Critical: input must be a parsed object, NOT a JSON string
+    expect(typeof toolUse!.input).toBe("object");
+    expect((toolUse!.input as Record<string, unknown>).city).toBe("NYC");
+    expect((toolUse!.input as Record<string, unknown>).units).toBe("metric");
+  });
+
   it("maps reasoning_effort to thinking budget", () => {
     const body = {
       model: "claude-sonnet-4",
@@ -225,6 +265,53 @@ describe("claude → openai (Request)", () => {
     expect((tools[0] as Record<string, unknown>).function).toBeDefined();
     const fn = (tools[0] as Record<string, unknown>).function as Record<string, unknown>;
     expect(fn.name).toBe("search");
+  });
+
+  it("maps tool_use[].input (object) → tool_calls[].function.arguments (string)", () => {
+    const body = {
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: "what is the weather?" },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_abc",
+              name: "get_weather",
+              input: { city: "NYC", units: "metric" },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_abc", content: '{"temp":22}' },
+          ],
+        },
+      ],
+    };
+    const result = decode(Request("claude", "openai", "gpt-4o", encode(body), false)) as Record<
+      string,
+      unknown
+    >;
+    const msgs = result.messages as Array<Record<string, unknown>>;
+    const assistantMsg = msgs.find((m) => m.role === "assistant");
+    expect(assistantMsg).toBeDefined();
+    // The claude→openai translator wraps tool_use blocks inside the content array;
+    // the nested object contains the tool_calls.
+    const content = assistantMsg!.content as Array<Record<string, unknown>>;
+    const nested = content.find((c) => Array.isArray(c.tool_calls));
+    expect(nested).toBeDefined();
+    const toolCalls = nested!.tool_calls as Array<Record<string, unknown>>;
+    expect(toolCalls.length).toBe(1);
+    const fn = toolCalls[0].function as Record<string, unknown>;
+    expect(fn.name).toBe("get_weather");
+    // Critical: arguments must be a JSON string, NOT an object
+    expect(typeof fn.arguments).toBe("string");
+    const parsed = JSON.parse(fn.arguments as string);
+    expect(parsed.city).toBe("NYC");
+    expect(parsed.units).toBe("metric");
   });
 
   it("maps thinking budget → reasoning_effort", () => {

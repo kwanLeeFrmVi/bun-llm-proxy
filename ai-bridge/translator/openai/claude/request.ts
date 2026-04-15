@@ -214,20 +214,24 @@ function convertOpenAIMessageContent(
     for (const tc of toolCalls) {
       const fn = tc.function as Record<string, unknown> | undefined;
       const args = fn?.arguments;
-      let inputStr: string;
+      let parsedInput: unknown;
       if (typeof args === "string") {
-        inputStr = args;
+        try {
+          parsedInput = JSON.parse(args);
+        } catch {
+          parsedInput = {};
+        }
       } else if (typeof args === "object" && args !== null) {
-        inputStr = JSON.stringify(args);
+        parsedInput = args;
       } else {
-        inputStr = "{}";
+        parsedInput = {};
       }
 
       parts.push({
         type: "tool_use",
         id: (tc.id as string | undefined) ?? "",
         name: fn?.name ?? "",
-        input: inputStr,
+        input: parsedInput,
       });
     }
   }
