@@ -175,10 +175,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         return attachComboMetadata(resp, comboName, selectedModel);
       }
       lastError = await readComboError(resp, selectedModel);
-      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} failed (${resp.status}), trying fallback`);
+      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} failed (${resp.status}): ${lastError}`);
     } catch (e) {
       lastError = `${selectedModel}: ${e instanceof Error ? e.message : String(e)}`;
-      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} threw, trying fallback`);
+      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} threw: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // Fallback: try remaining models in order
@@ -193,8 +193,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           return attachComboMetadata(resp, comboName, m.model);
         }
         lastError = await readComboError(resp, m.model);
+        log.warn(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} failed (${resp.status}): ${lastError}`);
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+        log.warn(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -234,10 +236,14 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           log.info(ctx ?? null, "COMBO", `Weight: model ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
-        // Only capture the first failure, not subsequent ones
-        if (!lastError) lastError = await readComboError(resp, m.model);
+        // Always log every failure; only keep the first error message for the final response
+        const errMsg = await readComboError(resp, m.model);
+        log.warn(ctx ?? null, "COMBO", `Weight: ${m.model} failed (${resp.status}): ${errMsg}`);
+        if (!lastError) lastError = errMsg;
       } catch (e) {
-        if (!lastError) lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+        const errMsg = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+        log.warn(ctx ?? null, "COMBO", `Weight: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+        if (!lastError) lastError = errMsg;
       }
     }
 
@@ -316,14 +322,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           return attachComboMetadata(resp, comboName, m.model);
         }
         lastError = await readComboError(resp, m.model);
-        if (i === 0) {
-          log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} failed (${resp.status}), trying fallback`);
-        }
+        log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} failed (${resp.status}): ${lastError}`);
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        if (i === 0) {
-          log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} threw, trying fallback`);
-        }
+        log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -442,18 +444,14 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           return attachComboMetadata(resp, comboName, m.model);
         }
         lastError = await readComboError(resp, m.model);
-        if (m.model === assignedModel) {
-          log.warn(
-            ctx ?? null,
-            "COMBO",
-            `Session-sticky: ${assignedModel} failed (${resp.status}), trying fallback`
-          );
-        }
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Session-sticky: ${m.model} failed (${resp.status}): ${lastError}`
+        );
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        if (m.model === assignedModel) {
-          log.warn(ctx ?? null, "COMBO", `Session-sticky: ${assignedModel} threw, trying fallback`);
-        }
+        log.warn(ctx ?? null, "COMBO", `Session-sticky: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -476,8 +474,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         return attachComboMetadata(resp, comboName, m.model);
       }
       lastError = await readComboError(resp, m.model);
+      log.warn(ctx ?? null, "COMBO", `Fallback: ${m.model} failed (${resp.status}): ${lastError}`);
     } catch (e) {
       lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+      log.warn(ctx ?? null, "COMBO", `Fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
     }
     attemptNumber++;
   }

@@ -180,8 +180,6 @@ async function handleSingleModelChat(
         `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`
       );
       const chatSessionId = request?.headers?.get("x-claude-code-session-id") ?? null;
-      log.info(ctx ?? null, "[debug]", "header:", request?.headers);
-      
       return handleComboModelWithDB({
         ctx,
         body,
@@ -222,7 +220,7 @@ async function handleSingleModelChat(
     log.info(ctx, "ROUTING", `Provider: ${provider}, Model: ${model}`);
   }
 
-  const requestId = ctx.id;
+  const requestId = `${ctx.id}-${crypto.randomUUID().slice(0, 8)}`;
   const startTime = Date.now();
   const isStreaming = body.stream === true;
   trackPendingRequest(requestId, {
