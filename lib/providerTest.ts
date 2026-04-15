@@ -310,6 +310,40 @@ async function testOllamaLocal(): Promise<boolean> {
   return res.ok;
 }
 
+async function testVertexPartner(
+  accessToken: string,
+  projectId: string
+): Promise<{ valid: boolean; error: string | null }> {
+  try {
+    const res = await fetch(
+      `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/endpoints/openapi/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          model: "gemini-3.1-flash-lite-preview",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "test" }],
+        }),
+      }
+    );
+
+    if (res.ok) return { valid: true, error: null };
+
+    const errorData = (await res.json().catch(() => ({}))) as any;
+    const errorMessage = errorData.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+    return { valid: false, error: errorMessage };
+  } catch (err) {
+    return {
+      valid: false,
+      error: err instanceof Error ? err.message : "Vertex connection failed",
+    };
+  }
+}
+
 async function testOpenAICompatible(
   apiKey: string,
   baseUrl: string
@@ -416,6 +450,7 @@ async function testAnthropicCompatible(
 async function testApiKeyConnection(connection: ConnectionForTest): Promise<TestResult> {
   const { provider, apiKey } = connection;
   const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
+  const hasToken = connection.accessToken || psd?.accessToken;
   let baseUrl = (psd?.baseUrl ?? connection.baseUrl ?? "") as string;
 
   // For compatible providers, if baseUrl is not in connection, look up the provider node
@@ -429,7 +464,7 @@ async function testApiKeyConnection(connection: ConnectionForTest): Promise<Test
     }
   }
 
-  if (!apiKey) {
+  if (!apiKey && !(provider === "vertex-partner" && hasToken)) {
     return {
       valid: false,
       error: "No API key provided",
@@ -445,132 +480,150 @@ async function testApiKeyConnection(connection: ConnectionForTest): Promise<Test
   try {
     switch (provider) {
       case "openai":
-        valid = await testOpenAI(apiKey);
+        valid = await testOpenAI(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "anthropic":
-        valid = await testAnthropic(apiKey);
+        valid = await testAnthropic(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "gemini":
-        valid = await testGemini(apiKey);
+        valid = await testGemini(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "openrouter":
-        valid = await testOpenRouter(apiKey);
+        valid = await testOpenRouter(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "deepseek":
-        valid = await testDeepSeek(apiKey);
+        valid = await testDeepSeek(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "groq":
-        valid = await testGroq(apiKey);
+        valid = await testGroq(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "mistral":
-        valid = await testMistral(apiKey);
+        valid = await testMistral(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "xai":
-        valid = await testXAI(apiKey);
+        valid = await testXAI(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "nvidia":
-        valid = await testNVIDIA(apiKey);
+        valid = await testNVIDIA(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "perplexity":
-        valid = await testPerplexity(apiKey);
+        valid = await testPerplexity(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "together":
-        valid = await testTogether(apiKey);
+        valid = await testTogether(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "fireworks":
-        valid = await testFireworks(apiKey);
+        valid = await testFireworks(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "cerebras":
-        valid = await testCerebras(apiKey);
+        valid = await testCerebras(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "cohere":
-        valid = await testCohere(apiKey);
+        valid = await testCohere(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "nebius":
-        valid = await testNebius(apiKey);
+        valid = await testNebius(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "siliconflow":
-        valid = await testSiliconFlow(apiKey);
+        valid = await testSiliconFlow(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "hyperbolic":
-        valid = await testHyperbolic(apiKey);
+        valid = await testHyperbolic(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "glm":
-        valid = await testGLM(apiKey);
+        valid = await testGLM(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "glm-cn":
-        valid = await testGLMCN(apiKey);
+        valid = await testGLMCN(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "kimi":
-        valid = await testKimi(apiKey);
+        valid = await testKimi(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "minimax":
-        valid = await testMiniMax(apiKey);
+        valid = await testMiniMax(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "deepseek-cn":
-        valid = await testClaudeCN(apiKey);
+        valid = await testClaudeCN(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "alicode":
-        valid = await testAliCode(apiKey);
+        valid = await testAliCode(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "alicode-intl":
-        valid = await testAliCodeIntl(apiKey);
+        valid = await testAliCodeIntl(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "deepgram":
-        valid = await testDeepgram(apiKey);
+        valid = await testDeepgram(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "assemblyai":
-        valid = await testAssemblyAI(apiKey);
+        valid = await testAssemblyAI(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "nanobanana":
-        valid = await testNanoBanana(apiKey);
+        valid = await testNanoBanana(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "chutes":
-        valid = await testChutes(apiKey);
+        valid = await testChutes(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "ollama":
-        valid = await testOllama(apiKey);
+        valid = await testOllama(apiKey!);
         error = valid ? null : "Invalid API key";
         break;
       case "ollama-local":
         valid = await testOllamaLocal();
         error = valid ? null : "Ollama not running on localhost:11434";
         break;
+      case "vertex-partner":
+        const accessToken = (connection.accessToken ||
+          (connection.providerSpecificData as Record<string, unknown>)?.accessToken) as
+          | string
+          | undefined;
+        const projectId = (connection.projectId ||
+          (connection.providerSpecificData as Record<string, unknown>)?.projectId) as
+          | string
+          | undefined;
+        if (!accessToken || !projectId) {
+          valid = false;
+          error = "Missing access token or project ID";
+        } else {
+          const result = await testVertexPartner(accessToken, projectId);
+          valid = result.valid;
+          error = result.error;
+        }
+        break;
       default:
         if (isOpenAICompatibleProvider(provider)) {
-          const result = await testOpenAICompatible(apiKey, baseUrl as string);
+          const result = await testOpenAICompatible(apiKey!, baseUrl as string);
           valid = result.valid;
           error = result.error;
         } else if (isAnthropicCompatibleProvider(provider)) {
-          const result = await testAnthropicCompatible(apiKey, baseUrl as string);
+          const result = await testAnthropicCompatible(apiKey!, baseUrl as string);
           valid = result.valid;
           error = result.error;
         } else {
@@ -617,10 +670,11 @@ export async function testProviderConnection(id: string): Promise<TestResult> {
   // Check if connection has credentials to test
   const hasApiKey = connection.authType === "apikey" || connection.apiKey;
   const psd = connection.providerSpecificData as Record<string, unknown> | undefined;
+  const isVertexPartner = connection.provider === "vertex-partner";
   const hasOAuthToken = connection.accessToken || psd?.accessToken;
 
-  if (hasApiKey) {
-    // API key providers
+  if (hasApiKey || (isVertexPartner && hasOAuthToken)) {
+    // API key providers or vertex-partner with token
     result = await testApiKeyConnection(connection);
   } else if (hasOAuthToken) {
     // OAuth providers - check if token exists and is not expired
