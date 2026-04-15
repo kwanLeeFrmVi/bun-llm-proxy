@@ -142,6 +142,21 @@ function handleWsConsoleLogMessage(ws: ServerWebSocket<Request>, msg: string) {
 const { buildRoutes } = await import("./lib/routeRegistry.ts");
 const routes = buildRoutes();
 
+// We need a reference to server for WebSocket upgrade, so we use a mutable holder
+let serverRef: ReturnType<typeof Bun.serve>;
+
+// Register the WebSocket upgrade route directly in the routes config
+// This ensures it's matched by Bun's router before the SPA catch-all in fetch
+routes["/ws/console-logs"] = {
+  GET: (req: Request) => {
+    console.log("[WS] /ws/console-logs route hit! headers:", req.headers.get("sec-websocket-key"));
+    const upgraded = serverRef.upgrade(req, { data: req });
+    console.log("[WS] upgrade result:", upgraded);
+    if (upgraded) return undefined as unknown as Response;
+    return new Response("WebSocket upgrade failed", { status: 500 });
+  },
+};
+
 const server = Bun.serve({
   port: PORT,
   reusePort: isLinux, // SO_REUSEPORT: Linux only, enables multi-process clustering
@@ -165,8 +180,9 @@ const server = Bun.serve({
     if (req.method === "OPTIONS") return corsResponse();
     const url = new URL(req.url);
 
-    // Upgrade WebSocket connections for /ws/* paths
+    // Fallback WS upgrade for any /ws/* paths not matched by routes
     if (url.pathname.startsWith("/ws/")) {
+      console.log("[WS] fetch fallback hit for:", url.pathname);
       const upgraded = server.upgrade(req, { data: req });
       if (upgraded) return undefined;
       return new Response("WebSocket upgrade failed", { status: 500 });
@@ -175,6 +191,8 @@ const server = Bun.serve({
     return handleHttpRequest(url, req);
   },
 });
+
+serverRef = server;
 
 async function handleHttpRequest(url: URL, req: Request): Promise<Response> {
   // Serve dashboard built assets (CSS, JS, images)
