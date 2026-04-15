@@ -1,14 +1,9 @@
 /**
  * TrollLLM Service — server-side proxy for trollllm.xyz API.
  *
- * TrollLLM uses the user's own session JWT for auth (unlike Pro-X which uses
- * stored API keys). The frontend passes the TrollLLM token via the
- * X-TrollLLM-Token header, which we forward to the upstream.
- *
- * The X-TrollLLM-Token header is trusted because:
- * 1. The request has already been authenticated by checkAuth/checkAdminAuth
- *    using the user's session token in our DB.
- * 2. We only read the header, never store it server-side.
+ * The TrollLLM session token is read from the TROLL_USAGE_TOKEN env var
+ * and shared across all dashboard users. It is forwarded as a Bearer token
+ * to the TrollLLM upstream on every request.
  */
 
 import type { TrollBilling, TrollUsageStatus, TrollSummary, TrollLogs, TrollMe, TrollPromo } from "dashboard/src/lib/trollTypes.ts";

@@ -475,14 +475,6 @@ export const api = {
 
   // ─── TrollLLM (trollllm.xyz) ────────────────────────────────────────────────
   troll: {
-    getTokenStatus: () =>
-      request<{ configured: boolean; masked?: string }>("/api/troll/token"),
-    saveToken: (token: string) =>
-      request<{ success: boolean; masked: string; username?: string; warning?: string }>(
-        "/api/troll/token",
-        { method: "PUT", body: JSON.stringify({ token }) }
-      ),
-    deleteToken: () => request<{ success: boolean }>("/api/troll/token", { method: "DELETE" }),
     getBilling: () => request<import("./trollTypes.ts").TrollBilling>("/api/troll/billing"),
     getStatus: () => request<import("./trollTypes.ts").TrollUsageStatus>("/api/troll/status"),
     getSummary: (period: string) =>

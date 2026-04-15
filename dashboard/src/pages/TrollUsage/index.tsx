@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, AlertCircle, Key } from "lucide-react";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import type { TrollBilling, TrollUsageStatus, TrollSummary, TrollLogs, TrollMe } from "@/lib/trollTypes.ts";
 import { BudgetCard } from "@/components/BudgetCard.tsx";
 import { QuotaCardGrid } from "@/components/usage/QuotaCardGrid.tsx";
@@ -22,100 +22,6 @@ const ENDPOINTS = [
   { label: "OPENAI COMPATIBLE", url: "https://chat.trollllm.xyz/v1" },
   { label: "ANTHROPIC COMPATIBLE", url: "https://chat.trollllm.xyz" },
 ];
-
-// ─── Token Setup Banner ────────────────────────────────────────────────────────
-
-function TokenSetupBanner({ onConfigure }: { onConfigure: () => void }) {
-  return (
-    <div className="flex items-center gap-4 rounded-xl bg-[var(--surface-container-low)] p-6 border border-[rgba(249,115,22,0.4)]">
-      <div className="flex items-center justify-center rounded-full bg-orange-500/15 w-12 h-12 shrink-0">
-        <Key className="w-6 h-6 text-orange-500" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold text-[var(--on-surface)]">TrollLLM Token Required</p>
-        <p className="mt-0.5 text-[11px] text-[var(--on-surface-variant)]">
-          Paste your TrollLLM session token to access the dashboard. The token is stored securely on the server and never exposed to the client.
-        </p>
-      </div>
-      <button
-        onClick={onConfigure}
-        className="shrink-0 px-4 py-2 rounded-lg bg-orange-500 text-white text-[12px] font-semibold hover:bg-orange-600 transition-colors"
-      >
-        Configure Token
-      </button>
-    </div>
-  );
-}
-
-// ─── Token Modal ────────────────────────────────────────────────────────────────
-
-function TokenModal({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (token: string) => Promise<void>;
-}) {
-  const [token, setToken] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (!open) return null;
-
-  const handleSave = async () => {
-    if (!token.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await onSave(token.trim());
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save token");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-md rounded-xl bg-card border border-[rgba(203,213,225,0.6)] shadow-2xl p-6">
-        <h2 className="text-[16px] font-semibold text-[var(--on-surface)]">Configure TrollLLM Token</h2>
-        <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
-          Get your session token from{" "}
-          <span className="font-mono text-[var(--on-surface)]">trollllm.xyz</span> — open DevTools
-          (F12) → Application → Cookies → copy the <span className="font-mono">session</span> cookie value,
-          or the Bearer token from the Authorization header.
-        </p>
-        <textarea
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="eyJhbGciOiJIUzI1NiIs..."
-          className="mt-4 w-full px-3 py-2.5 rounded-lg bg-[var(--surface-container-low)] border border-[rgba(203,213,225,0.5)] text-[12px] font-mono text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)] focus:outline-none focus:border-blue-500 resize-none h-24"
-        />
-        {error && (
-          <p className="mt-2 text-[11px] text-red-500">{error}</p>
-        )}
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-[rgba(203,213,225,0.6)] text-[12px] text-[var(--on-surface)] hover:bg-[var(--surface-container)] transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !token.trim()}
-            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-[12px] font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? "Saving..." : "Save Token"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Credit Cards ──────────────────────────────────────────────────────────────
 
@@ -169,8 +75,6 @@ function PlanBadge({ tier, expiresAt }: { tier: string; expiresAt: string }) {
 
 export default function TrollUsage() {
   const [period, setPeriod] = useState("1h");
-  const [tokenConfigured, setTokenConfigured] = useState<boolean | null>(null);
-  const [showTokenModal, setShowTokenModal] = useState(false);
 
   const [billing, setBilling] = useState<TrollBilling | null>(null);
   const [status, setStatus] = useState<TrollUsageStatus | null>(null);
@@ -182,17 +86,6 @@ export default function TrollUsage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  // Check token status on mount
-  useEffect(() => {
-    api.troll.getTokenStatus().then((res) => {
-      setTokenConfigured(res.configured);
-      if (!res.configured) setLoading(false);
-    }).catch(() => {
-      setTokenConfigured(false);
-      setLoading(false);
-    });
-  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -219,31 +112,19 @@ export default function TrollUsage() {
   }, [period]);
 
   useEffect(() => {
-    if (tokenConfigured === false) return;
     load();
-  }, [load, tokenConfigured]);
+  }, [load]);
 
   // Auto-refresh every 60s
   useEffect(() => {
-    if (tokenConfigured === false) return;
     const id = setInterval(() => load(), 60_000);
     return () => clearInterval(id);
-  }, [load, tokenConfigured]);
+  }, [load]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  };
-
-  const handleSaveToken = async (token: string) => {
-    const result = await api.troll.saveToken(token);
-    if (result.success) {
-      setTokenConfigured(true);
-      setShowTokenModal(false);
-      setLoading(true);
-      load();
-    }
   };
 
   const handleDiscordSave = async (discordId: string) => {
@@ -335,11 +216,6 @@ export default function TrollUsage() {
         </p>
       )}
 
-      {/* Token not configured */}
-      {tokenConfigured === false && !showTokenModal && (
-        <TokenSetupBanner onConfigure={() => setShowTokenModal(true)} />
-      )}
-
       {/* Error */}
       {error && (
         <div className="flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(239,68,68,0.4)]">
@@ -352,17 +228,17 @@ export default function TrollUsage() {
       )}
 
       {/* Loading */}
-      {!tokenConfigured && !billing && (loading || !tokenConfigured) && (
+      {!billing && loading && (
         <div className="px-12 py-12 text-center">
           <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
           <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">
-            {tokenConfigured === null ? "Checking configuration..." : "Loading from trollllm.xyz"}
+            Loading from trollllm.xyz...
           </p>
         </div>
       )}
 
       {/* Content */}
-      {tokenConfigured && billing && !loading && (
+      {billing && !loading && (
         <>
           {/* Top row: Credits, Bonus, Daily Budget, RPM */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -434,13 +310,6 @@ export default function TrollUsage() {
           )}
         </>
       )}
-
-      {/* Token Modal */}
-      <TokenModal
-        open={showTokenModal}
-        onClose={() => setShowTokenModal(false)}
-        onSave={handleSaveToken}
-      />
     </div>
   );
 }
