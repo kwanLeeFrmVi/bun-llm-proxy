@@ -8,13 +8,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split chart.js + react-chartjs-2 into its own chunk (~200KB)
-          "chart.js": ["chart.js", "react-chartjs-2"],
-          // Split @xyflow/react (~200KB) into its own chunk
-          "xyflow": ["@xyflow/react"],
-          // Split lodash into its own chunk
-          vendor: ["lodash"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("react-router-dom")) return "react-router";
+          if (id.includes("sonner")) return "sonner";
+          if (id.includes("cmdk")) return "cmdk";
+          if (id.includes("chart.js") || id.includes("react-chartjs-2")) return "chart.js";
+          if (id.includes("@xyflow")) return "xyflow";
+          if (id.includes("lodash")) return "vendor";
         },
       },
     },

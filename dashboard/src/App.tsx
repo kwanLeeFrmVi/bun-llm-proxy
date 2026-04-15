@@ -2,14 +2,16 @@ import { useState, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
-import Login from "@/pages/Login";
-import Usage from "@/pages/Usage";
-import Logs from "@/pages/Logs";
-import Models from "@/pages/Models";
-import ProviderDetail from "@/pages/ProviderDetail";
-import ChangePassword from "@/pages/ChangePassword";
-import OAuthCallback from "@/pages/OAuthCallback";
 import { Loader } from "@/components/Loader";
+import Login from "@/pages/Login";
+
+// Lazy-load all routes to keep the initial bundle small
+const Usage = lazy(() => import("@/pages/Usage"));
+const Logs = lazy(() => import("@/pages/Logs"));
+const Models = lazy(() => import("@/pages/Models"));
+const ProviderDetail = lazy(() => import("@/pages/ProviderDetail"));
+const ChangePassword = lazy(() => import("@/pages/ChangePassword"));
+const OAuthCallback = lazy(() => import("@/pages/OAuthCallback"));
 
 // Lazy-load heavy secondary routes to reduce initial bundle
 const Providers = lazy(() => import("@/pages/Providers"));
@@ -85,24 +87,129 @@ function ProtectedLayout() {
             {/* Admin-only routes */}
             {isAdmin && (
               <>
-                <Route path="/providers" element={<Suspense fallback={<Loader />}><Providers /></Suspense>} />
-                <Route path="/providers/:providerId" element={<ProviderDetail />} />
-                <Route path="/users" element={<Suspense fallback={<Loader />}><Users /></Suspense>} />
-                <Route path="/users/:userId" element={<Suspense fallback={<Loader />}><UserDetail /></Suspense>} />
+                <Route
+                  path="/providers"
+                  element={
+                    <Suspense fallback={<Loader />}>
+                      <Providers />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/providers/:providerId"
+                  element={
+                    <Suspense fallback={<Loader />}>
+                      <ProviderDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/users"
+                  element={
+                    <Suspense fallback={<Loader />}>
+                      <Users />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/users/:userId"
+                  element={
+                    <Suspense fallback={<Loader />}>
+                      <UserDetail />
+                    </Suspense>
+                  }
+                />
               </>
             )}
             {/* Shared routes */}
-            <Route path="/keys" element={<Suspense fallback={<Loader />}><ApiKeys /></Suspense>} />
-            <Route path="/usage" element={<Usage />} />
-            <Route path="/leaderboard" element={<Suspense fallback={<Loader />}><Leaderboard /></Suspense>} />
-            <Route path="/mavis-usage" element={<Suspense fallback={<Loader />}><MavisUsage /></Suspense>} />
-            <Route path="/zai-usage" element={<Suspense fallback={<Loader />}><ZaiUsage /></Suspense>} />
-            <Route path="/prox-usage" element={<Suspense fallback={<Loader />}><ProxUsage /></Suspense>} />
-            <Route path="/troll-usage" element={<Suspense fallback={<Loader />}><TrollUsage /></Suspense>} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/models" element={<Models />} />
-            <Route path="/models/:modelId" element={<Suspense fallback={<Loader />}><ModelStats /></Suspense>} />
-            <Route path="/change-password" element={<ChangePassword />} />
+            <Route
+              path="/keys"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ApiKeys />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <Usage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <Leaderboard />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/mavis-usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <MavisUsage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/zai-usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ZaiUsage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/prox-usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ProxUsage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/troll-usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <TrollUsage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/logs"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <Logs />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/models"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <Models />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/models/:modelId"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ModelStats />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/change-password"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ChangePassword />
+                </Suspense>
+              }
+            />
             {/* Catch-all: redirect to appropriate home */}
             <Route path="*" element={<Navigate to={isAdmin ? "/providers" : "/keys"} replace />} />
           </Routes>
@@ -116,8 +223,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/oauth/callback" element={<OAuthCallback />} />
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<Loader />}>
+              <Login />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/oauth/callback"
+          element={
+            <Suspense fallback={<Loader />}>
+              <OAuthCallback />
+            </Suspense>
+          }
+        />
         <Route path="/*" element={<ProtectedLayout />} />
       </Routes>
     </BrowserRouter>
