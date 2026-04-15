@@ -43,8 +43,8 @@ const STRATEGIES = [
   },
 ] as const;
 
-// Strategies that use a sticky limit setting
-const STICKY_STRATEGIES = new Set(["round-robin", "speed", "session-sticky"]);
+// Strategies that use a sticky limit setting (not session-sticky — that sticks for 24h by design)
+const STICKY_STRATEGIES = new Set(["round-robin", "speed"]);
 
 export default function ComboFormDialog({
   isOpen,
@@ -54,7 +54,7 @@ export default function ComboFormDialog({
   initialStrategy,
   initialStickyLimit,
   allModels,
-  allCombos,
+  // allCombos,
   allModelTypes,
   onSave,
   onClose,
@@ -66,9 +66,14 @@ export default function ComboFormDialog({
   initialStrategy?: string;
   initialStickyLimit?: number;
   allModels: string[];
-  allCombos?: string[]; // List of combo names for nested support
+  // allCombos?: string[]; // List of combo names for nested support
   allModelTypes?: Record<string, "combo" | "model">; // Mark which models are combos
-  onSave: (name: string, models: ModelWithWeight[], strategy: string, stickyLimit?: number) => Promise<void>;
+  onSave: (
+    name: string,
+    models: ModelWithWeight[],
+    strategy: string,
+    stickyLimit?: number
+  ) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
@@ -237,7 +242,9 @@ export default function ComboFormDialog({
                 max={999}
                 step={1}
                 value={stickyLimit}
-                onChange={(e) => setStickyLimit(Math.max(1, Math.round(parseInt(e.target.value) || 1)))}
+                onChange={(e) =>
+                  setStickyLimit(Math.max(1, Math.round(parseInt(e.target.value) || 1)))
+                }
                 className="w-24"
               />
             </div>

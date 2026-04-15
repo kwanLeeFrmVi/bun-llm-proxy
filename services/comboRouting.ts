@@ -293,29 +293,13 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       log.warn(
         ctx ?? null,
         "COMBO",
-        `Session-sticky: no x-claude-code-session-id header — falling back to round-robin`
+        `Session-sticky: no x-claude-code-session-id header — falling back to simple round-robin`
       );
-      // Fall back to round-robin logic inline (no recursion to avoid state duplication)
-      const rrState = rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
-      const rrStickyLimit =
-        ((settings.comboStrategies as Record<string, Record<string, unknown>> | undefined)?.[
-          comboName
-        ]?.stickyRoundRobinLimit as number | undefined) ??
-        (settings.stickyRoundRobinLimit as number | undefined) ??
-        3;
-
-      let selectedIndex: number;
-      if (rrState.stickyCount < rrStickyLimit) {
-        rrState.stickyCount++;
-        rrStateMap.set(comboName, rrState);
-        selectedIndex = rrState.index % models.length;
-      } else {
-        rrState.index = (rrState.index + 1) % models.length;
-        rrState.stickyCount = 1;
-        rrStateMap.set(comboName, rrState);
-        selectedIndex = rrState.index;
-      }
-      assignedModel = models[selectedIndex]!.model;
+      // No session to stick to — just pick next model round-robin (no sticky limit)
+      const counter = sessionAssignCounter.get(comboName) ?? 0;
+      const modelIndex = counter % models.length;
+      sessionAssignCounter.set(comboName, counter + 1);
+      assignedModel = models[modelIndex]!.model;
     } else {
       // Resolve or assign session
       const comboSessions = sessionStickyMap.get(comboName) ?? new Map();

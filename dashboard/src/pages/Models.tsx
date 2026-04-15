@@ -297,7 +297,9 @@ export default function Models() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => openEditCombo(comboId, comboName, comboModels, comboStrategy, comboStickyLimit)}
+            onClick={() =>
+              openEditCombo(comboId, comboName, comboModels, comboStrategy, comboStickyLimit)
+            }
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
@@ -330,7 +332,12 @@ export default function Models() {
   }
 
   const handleComboSaved = useCallback(
-    async (name: string, comboModels: LocalModelWithWeight[], strategy?: string, stickyLimit?: number) => {
+    async (
+      name: string,
+      comboModels: LocalModelWithWeight[],
+      strategy?: string,
+      stickyLimit?: number
+    ) => {
       try {
         const store = useComboStore.getState();
         if (editingComboId) {
@@ -652,7 +659,7 @@ export default function Models() {
         initialStrategy={editingComboStrategy}
         initialStickyLimit={editingComboStickyLimit}
         allModels={uniq([...models.map((m) => m.id), ...combos.map((c) => c.name)])}
-        allCombos={combos.map((c) => c.name)}
+        // allCombos={combos.map((c) => c.name)}
         allModelTypes={(() => {
           const map = {} as Record<string, "combo" | "model">;
           models.forEach((m) => {
