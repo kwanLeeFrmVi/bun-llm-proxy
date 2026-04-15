@@ -524,6 +524,13 @@ function wrapStreamingResponse(
         const durationMs = Date.now() - startTime;
         const errMsg = err instanceof Error ? err.message : String(err);
         log.stream(ctx, "ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
+        // Inject an SSE error event so the client sees what went wrong
+        try {
+          const errorPayload = JSON.stringify({
+            error: { message: `Stream error: ${errMsg}`, type: "proxy_error" },
+          });
+          controller.enqueue(new TextEncoder().encode(`data: ${errorPayload}\n\n`));
+        } catch { /* ignore encoding errors */ }
         controller.close();
       } finally {
         reader.releaseLock();

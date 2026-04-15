@@ -8,17 +8,11 @@ import {
   baseModelName,
   getORModelCache,
 } from "services/pricingSync.ts";
-
-// Import lazily so that mock.module in tests can intercept the binding
 import type { Database } from "bun:sqlite";
+import { getRawDb } from "db/connection.ts";
 
-// Use a dynamic import so that mock.module() in tests can intercept the
-// module and return the test database before this code executes.
-const getDb = (): Database => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { getRawDb } = require("db/connection.ts");
-  return getRawDb();
-};
+// Wrapper that allows tests to override via setDb() / resetConnection()
+const getDb = (): Database => getRawDb();
 
 // ─── In-memory state ───────────────────────────────────────────────────────────
 
