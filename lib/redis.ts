@@ -103,10 +103,12 @@ export async function withLock<T>(
   }
 }
 
-// ─── Session-Sticky helpers ────────────────────────────────────────────────────
+// ─── Combo Routing helpers ────────────────────────────────────────────────────
 
 const SESSION_PREFIX = "session:";
 const SESSION_COUNTER_PREFIX = "session-counter:";
+const RR_PREFIX = "rr:";
+const SPEED_PREFIX = "speed:";
 
 /**
  * Get the model assigned to a session for a given combo.
@@ -167,6 +169,192 @@ export async function incrementSessionCounter(comboName: string): Promise<number
   } catch (err) {
     log.debug("REDIS", `incrementSessionCounter error for ${comboName}: ${(err as Error).message}`);
     return -1;
+  }
+}
+
+/**
+ * Get round-robin state for a combo.
+ * Returns null if Redis is unavailable or no state exists.
+ */
+export async function getRRState(
+  comboName: string
+): Promise<{ index: number; stickyCount: number } | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const raw = await client.get(`${RR_PREFIX}${comboName}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as { index: number; stickyCount: number };
+  } catch (err) {
+    log.debug("REDIS", `getRRState error for ${comboName}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Set round-robin state for a combo.
+ * TTL of 48 hours so stale state doesn't linger.
+ */
+export async function setRRState(
+  comboName: string,
+  state: { index: number; stickyCount: number }
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    await client.set(`${RR_PREFIX}${comboName}`, JSON.stringify(state), "EX", String(48 * 3600));
+  } catch (err) {
+    log.debug("REDIS", `setRRState error for ${comboName}: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Get speed strategy state for a combo.
+ * Returns null if Redis is unavailable or no state exists.
+ */
+export async function getSpeedState(
+  comboName: string
+): Promise<{ model: string; count: number } | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const raw = await client.get(`${SPEED_PREFIX}${comboName}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as { model: string; count: number };
+  } catch (err) {
+    log.debug("REDIS", `getSpeedState error for ${comboName}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Set speed strategy state for a combo.
+ * TTL of 48 hours so stale state doesn't linger.
+ */
+export async function setSpeedState(
+  comboName: string,
+  state: { model: string; count: number }
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    await client.set(`${SPEED_PREFIX}${comboName}`, JSON.stringify(state), "EX", String(48 * 3600));
+  } catch (err) {
+    log.debug("REDIS", `setSpeedState error for ${comboName}: ${(err as Error).message}`);
+  }
+}
+
+// ─── Vertex Token Cache helpers ──────────────────────────────────────────────
+
+const VERTEX_TOKEN_PREFIX = "vertex-token:";
+
+/**
+ * Get cached Vertex AI OAuth token for a service account email.
+ * Returns null if Redis is unavailable or no cached token exists.
+ */
+export async function getVertexToken(
+  clientEmail: string
+): Promise<{ token: string; expiresAt: number } | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const raw = await client.get(`${VERTEX_TOKEN_PREFIX}${clientEmail}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as { token: string; expiresAt: number };
+  } catch (err) {
+    log.debug("REDIS", `getVertexToken error for ${clientEmail}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Cache a Vertex AI OAuth token. TTL is set to the token's remaining lifetime
+ * minus a 5-minute buffer, with a minimum of 60 seconds.
+ */
+export async function setVertexToken(
+  clientEmail: string,
+  token: string,
+  expiresAt: number
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const ttlSec = Math.max(60, Math.floor((expiresAt - Date.now()) / 1000) - 300);
+    await client.set(
+      `${VERTEX_TOKEN_PREFIX}${clientEmail}`,
+      JSON.stringify({ token, expiresAt }),
+      "EX",
+      String(ttlSec)
+    );
+  } catch (err) {
+    log.debug("REDIS", `setVertexToken error for ${clientEmail}: ${(err as Error).message}`);
+  }
+}
+
+// ─── Claude Header Cache helpers ──────────────────────────────────────────────
+
+const CLAUDE_HEADER_PREFIX = "claude-headers:";
+
+/**
+ * Get cached Claude headers for a given cache key (session ID or user-agent hash).
+ * Returns null if Redis is unavailable or no cached headers exist.
+ */
+export async function getCachedClaudeHeadersRedis(
+  cacheKey: string
+): Promise<{ headers: Record<string, string>; timestamp: number; lastAccess: number } | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const raw = await client.get(`${CLAUDE_HEADER_PREFIX}${cacheKey}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as { headers: Record<string, string>; timestamp: number; lastAccess: number };
+  } catch (err) {
+    log.debug("REDIS", `getCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Cache Claude headers for a given cache key. TTL defaults to 24 hours.
+ */
+export async function setCachedClaudeHeadersRedis(
+  cacheKey: string,
+  headers: Record<string, string>,
+  ttlSeconds = 86400
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const now = Date.now();
+    await client.set(
+      `${CLAUDE_HEADER_PREFIX}${cacheKey}`,
+      JSON.stringify({ headers, timestamp: now, lastAccess: now }),
+      "EX",
+      String(ttlSeconds)
+    );
+  } catch (err) {
+    log.debug("REDIS", `setCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Update the lastAccess timestamp for a cached Claude header entry.
+ */
+export async function touchCachedClaudeHeadersRedis(cacheKey: string): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const existing = await getCachedClaudeHeadersRedis(cacheKey);
+    if (existing) {
+      await client.set(
+        `${CLAUDE_HEADER_PREFIX}${cacheKey}`,
+        JSON.stringify({ ...existing, lastAccess: Date.now() }),
+        "EX",
+        String(86400) // reset TTL on access
+      );
+    }
+  } catch (err) {
+    log.debug("REDIS", `touchCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
   }
 }
 

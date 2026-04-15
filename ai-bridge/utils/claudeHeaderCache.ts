@@ -22,6 +22,12 @@
 //   x-stainless-os, x-stainless-timeout, x-claude-code-session-id,
 //   package-version, runtime-version, os, arch
 
+import {
+  getCachedClaudeHeadersRedis,
+  setCachedClaudeHeadersRedis,
+  touchCachedClaudeHeadersRedis,
+} from "../../lib/redis.ts";
+
 const EXCLUDED_CLAUDE_CACHE_HEADERS = new Set([
   "authorization",
   "proxy-authorization",
@@ -177,6 +183,8 @@ export function cacheClaudeHeaders(headers: Record<string, string>): void {
     if (existing && (now - existing.timestamp) < CACHE_TTL_MS) {
       existing.lastAccess = now;
       existing.accessCount++;
+      // Touch in Redis as well (fire-and-forget)
+      touchCachedClaudeHeadersRedis(cacheKey).catch(() => {});
       return;
     }
 
@@ -188,6 +196,9 @@ export function cacheClaudeHeaders(headers: Record<string, string>): void {
     };
 
     headerCache.set(cacheKey, entry);
+
+    // Also store in Redis for distributed access (fire-and-forget)
+    setCachedClaudeHeadersRedis(cacheKey, captured).catch(() => {});
 
     // Start cleanup timer on first cache entry
     if (headerCache.size === 1) {

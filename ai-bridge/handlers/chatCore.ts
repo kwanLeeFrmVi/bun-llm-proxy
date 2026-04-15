@@ -291,6 +291,14 @@ async function handleStreamingResponse(
   // Possible close reasons: "normal" | "downstream_canceled" | "upstream_error" | "unknown"
   let closeReason: string = "unknown";
 
+  // ── anthropic-compatible-* SSE shape validation ──────────────────────────────
+  // When the source and target format are both "claude" (identity passthrough),
+  // verify the first real SSE data event is actually Claude-format.
+  // If the upstream is returning OpenAI-format events instead, we log a clear
+  // warning immediately rather than letting the client see garbage silently.
+  const isClaudeIdentityPassthrough = sourceFormat === "claude" && targetFormat === "claude";
+  let firstSseDataValidated = false; // fire once on the first parseable data: line
+
   log.debug(
     opts.ctx ?? null,
     "STREAM",
@@ -400,6 +408,47 @@ async function handleStreamingResponse(
             const eventText = sseBuffer.slice(0, eventEnd + 2);
             sseBuffer = sseBuffer.slice(eventEnd + 2);
             eventCount++;
+
+            // ── anthropic-compatible-* SSE shape validation (fires once) ────────
+            // For claude→claude identity passthrough, validate the first real data
+            // event is Claude-format (has "type" field). If the upstream returns
+            // OpenAI-format events instead, emit a clear warning immediately.
+            if (isClaudeIdentityPassthrough && !firstSseDataValidated) {
+              const dataMatch = eventText.match(/^data:\s*(.+)$/m);
+              if (dataMatch && dataMatch[1] !== "[DONE]") {
+                firstSseDataValidated = true;
+                try {
+                  const parsed = JSON.parse(dataMatch[1]!);
+                  if (parsed !== null && typeof parsed === "object") {
+                    const isClaudeShape =
+                      "type" in parsed &&
+                      typeof (parsed as Record<string, unknown>).type === "string";
+                    const isOpenAIShape = "choices" in parsed || "object" in parsed;
+                    if (!isClaudeShape || isOpenAIShape) {
+                      log.warn(
+                        opts.ctx ?? null,
+                        "STREAM",
+                        `anthropic-compatible passthrough: upstream returned unexpected SSE shape ` +
+                          `(isClaudeShape=${isClaudeShape}, isOpenAIShape=${isOpenAIShape}, ` +
+                          `provider=${opts.modelInfo.provider}). ` +
+                          `First event type=${String((parsed as Record<string, unknown>).type ?? "missing")}. ` +
+                          `This may cause Claude Code to crash or see garbled output.`
+                      );
+                    } else {
+                      log.debug(
+                        opts.ctx ?? null,
+                        "STREAM",
+                        `anthropic-compatible passthrough: first SSE event shape OK ` +
+                          `(type=${(parsed as Record<string, unknown>).type}, ` +
+                          `provider=${opts.modelInfo.provider})`
+                      );
+                    }
+                  }
+                } catch {
+                  // Non-JSON first event — may be a comment or keep-alive; not necessarily wrong
+                }
+              }
+            }
 
             // Track whether we saw a valid message_delta with usage for fallback emission
             if (eventText.includes("message_delta")) {

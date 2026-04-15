@@ -19,7 +19,7 @@ const MAX_SESSIONS_PER_COMBO = 1000;
 const COMBO_METADATA = Symbol.for("comboMetadata");
 
 import type { RequestContext } from "../lib/requestContext.ts";
-import { getSessionModel, setSessionModel, incrementSessionCounter } from "../lib/redis.ts";
+import { getSessionModel, setSessionModel, incrementSessionCounter, getRRState, setRRState as setRRStateRedis, getSpeedState, setSpeedState as setSpeedStateRedis } from "../lib/redis.ts";
 
 export interface ComboMetadata {
   comboName: string;
@@ -97,27 +97,33 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       (settings.stickyRoundRobinLimit as number | undefined) ??
       3;
 
-    const rrState = rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
+    // Try Redis first for round-robin state
+    const redisRRState = await getRRState(comboName);
+    const rrState = redisRRState ?? rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
     let selectedIndex: number;
     if (rrState.stickyCount < stickyLimit) {
       rrState.stickyCount++;
-      rrStateMap.set(comboName, rrState);
       selectedIndex = rrState.index % models.length;
+      // Persist to both Redis and in-memory
+      await setRRStateRedis(comboName, rrState);
+      rrStateMap.set(comboName, rrState);
       log.info(
         ctx ?? null,
         "COMBO",
-        `Round-robin: using ${models[selectedIndex]!.model} (index ${rrState.index}, sticky ${rrState.stickyCount}/${stickyLimit})`
+        `Round-robin: using ${models[selectedIndex]!.model} (index ${rrState.index}, sticky ${rrState.stickyCount}/${stickyLimit}${redisRRState ? ", Redis" : ""})`
       );
     } else {
       // advance to next model
       rrState.index = (rrState.index + 1) % models.length;
       rrState.stickyCount = 1;
+      // Persist to both Redis and in-memory
+      await setRRStateRedis(comboName, rrState);
       rrStateMap.set(comboName, rrState);
       selectedIndex = rrState.index;
       log.info(
         ctx ?? null,
         "COMBO",
-        `Round-robin: advanced to ${models[selectedIndex]!.model} (index ${rrState.index}, sticky 1/${stickyLimit})`
+        `Round-robin: advanced to ${models[selectedIndex]!.model} (index ${rrState.index}, sticky 1/${stickyLimit}${redisRRState ? ", Redis" : ""})`
       );
     }
 
@@ -223,14 +229,18 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     // Determine which model to try first
     let orderedModels: Array<{ model: string; avgMs: number | null }>;
 
-    const state = speedStateMap.get(comboName);
+    // Try Redis first for speed state
+    const redisSpeedState = await getSpeedState(comboName);
+    const state = redisSpeedState ?? speedStateMap.get(comboName);
     if (state && state.count < stickyLimit) {
       state.count++;
+      // Persist to both Redis and in-memory
+      await setSpeedStateRedis(comboName, state);
       speedStateMap.set(comboName, state);
       log.info(
         ctx ?? null,
         "COMBO",
-        `Speed: using ${state.model} (sticky ${state.count}/${stickyLimit})`
+        `Speed: using ${state.model} (sticky ${state.count}/${stickyLimit}${redisSpeedState ? ", Redis" : ""})`
       );
       // Put sticky model first, rest in original order
       orderedModels = [
@@ -248,7 +258,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       );
       orderedModels.sort((a, b) => (a.avgMs ?? Infinity) - (b.avgMs ?? Infinity));
       const fastest = orderedModels[0]!;
-      speedStateMap.set(comboName, { model: fastest.model, count: 1 });
+      const newState = { model: fastest.model, count: 1 };
+      // Persist to both Redis and in-memory
+      await setSpeedStateRedis(comboName, newState);
+      speedStateMap.set(comboName, newState);
       log.info(
         ctx ?? null,
         "COMBO",

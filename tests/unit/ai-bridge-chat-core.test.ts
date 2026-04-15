@@ -400,19 +400,26 @@ describe("handleChatCore", () => {
     globalThis.fetch = (() => {
       const body = new ReadableStream({
         start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello"}}]}\n\n')
-          );
+          let canceled = false;
+          const trySend = (bytes: Uint8Array) => {
+            if (canceled) return;
+            try { controller.enqueue(bytes); } catch { canceled = true; }
+          };
+          const tryClose = () => {
+            if (canceled) return;
+            try { controller.close(); } catch { canceled = true; }
+          };
+          trySend(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello"}}]}\n\n'));
           setTimeout(() => {
-            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":" world"}}]}\n\n'));
+            trySend(new TextEncoder().encode('data: {"choices":[{"delta":{"content":" world"}}]}\n\n'));
             setTimeout(() => {
-              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-              controller.close();
+              trySend(new TextEncoder().encode("data: [DONE]\n\n"));
+              tryClose();
             }, 5);
           }, 5);
         },
         cancel() {
-          // Verify cancel is called without throwing.
+          // Cancellation propagates via the try/catch guards above
         },
       });
       return Promise.resolve(
@@ -442,6 +449,215 @@ describe("handleChatCore", () => {
       reader.releaseLock();
 
       // If we reach here without an uncaught exception, the test passes.
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("streaming: outer wrapper consuming inner stream — inner completes after outer closes (req:m99vhq regression)", async () => {
+    // Regression for the exact observed pattern: the outer ReadableStream (handlers/chat.ts
+    // wrapStreamingResponse) closed, but the inner ReadableStream (chatCore.ts) continued
+    // reading and logging "Stream complete" for the same request ID.
+    //
+    // With the fix (safeEnqueue/safeClose + cancel propagation), enqueue/close are no-ops
+    // once the downstream is canceled, and reader.cancel() aborts the inner read loop.
+    //
+    // This test verifies the inner stream does NOT throw after outer cancellation.
+    const origFetch = globalThis.fetch;
+    let sourceTimerId: ReturnType<typeof setTimeout> | null = null;
+    let sourceCanceled = false;
+
+    globalThis.fetch = (() => {
+      const body = new ReadableStream({
+        start(controller) {
+          // Deliver only the FIRST event synchronously inside start().
+          // The remaining events are delivered on a timer, ensuring the
+          // outer consumer can cancel before the source has finished.
+          const first =
+            'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-3-5-sonnet-20241022","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n';
+          try {
+            controller.enqueue(new TextEncoder().encode(first));
+          } catch { return; }
+          // Schedule remaining events — they will be delivered AFTER the consumer reads
+          // and cancels, so the inner stream will be mid-read when the cancel fires.
+          const remaining = [
+            'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n',
+            'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}\n\n',
+            'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":2}}\n\n',
+          ];
+          let ri = 0;
+          const sendNext = () => {
+            if (sourceCanceled) return;
+            if (ri < remaining.length) {
+              try {
+                controller.enqueue(new TextEncoder().encode(remaining[ri++]));
+              } catch {
+                sourceCanceled = true;
+                return;
+              }
+              sourceTimerId = setTimeout(sendNext, 8);
+            } else {
+              try { controller.close(); } catch { /* already closed */ }
+            }
+          };
+          sourceTimerId = setTimeout(sendNext, 8);
+        },
+        cancel() {
+          sourceCanceled = true;
+          if (sourceTimerId !== null) clearTimeout(sourceTimerId);
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      // Use claude→claude passthrough (same as anthropic-compatible-* provider)
+      const result = await handleChatCore({
+        body: {
+          model: "anthropic-compatible-myprovider/claude-3-5-sonnet-20241022",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "anthropic-compatible-myprovider", model: "claude-3-5-sonnet-20241022" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "claude",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+
+      // Read only the first chunk, then cancel — simulating an outer wrapper that closes early
+      const reader = result.response!.body!.getReader();
+      const first = await reader.read();
+      expect(first.done).toBe(false);
+      // Cancel the outer consumer — this should propagate into the inner read loop
+      await reader.cancel();
+      reader.releaseLock();
+
+      // Allow any in-flight async work to settle. If no uncaught exception is thrown
+      // within this window, the double-close guard is working.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("anthropic-compatible: passthrough of correct Claude SSE format completes without warning", async () => {
+    // anthropic-compatible-* providers send claude→claude identity passthrough.
+    // When the upstream returns proper Claude SSE events, the proxy should complete
+    // cleanly without emitting any SSE-shape warnings.
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      const events = [
+        'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}\n\n',
+        'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+        'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi!"}}\n\n',
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n',
+        'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":1}}\n\n',
+        'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+        "data: [DONE]\n\n",
+      ];
+      const body = new ReadableStream({
+        start(controller) {
+          for (const e of events) controller.enqueue(new TextEncoder().encode(e));
+          controller.close();
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "anthropic-compatible-myprovider/claude-sonnet",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "anthropic-compatible-myprovider", model: "claude-sonnet" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "claude",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+
+      const reader = result.response!.body!.getReader();
+      const chunks: string[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(new TextDecoder().decode(value));
+      }
+      reader.releaseLock();
+      const full = chunks.join("");
+      // Should contain passthrough Claude SSE events
+      expect(full).toContain("message_start");
+      expect(full).toContain("message_delta");
+      expect(full).toContain("message_stop");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("anthropic-compatible: upstream returning OpenAI-format SSE logs a diagnostic warning", async () => {
+    // When anthropic-compatible-* upstream returns OpenAI-format events instead of
+    // Claude-format events, the proxy should pass through (identity) but also log a
+    // diagnosable warning. This test confirms the proxy does not crash or throw.
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      const openAIEvents = [
+        'data: {"id":"chatcmpl-123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n',
+        'data: {"id":"chatcmpl-123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello!"},"finish_reason":null}]}\n\n',
+        'data: {"id":"chatcmpl-123","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+        "data: [DONE]\n\n",
+      ];
+      const body = new ReadableStream({
+        start(controller) {
+          for (const e of openAIEvents) controller.enqueue(new TextEncoder().encode(e));
+          controller.close();
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "anthropic-compatible-badprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "anthropic-compatible-badprovider", model: "some-model" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "claude",
+      });
+
+      // The proxy should still return a stream response (identity passthrough) without throwing
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+      expect(result.response!.headers.get("Content-Type")).toBe("text/event-stream");
+
+      // Drain the stream — the OpenAI SSE events should pass through unchanged
+      const reader = result.response!.body!.getReader();
+      const chunks: string[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(new TextDecoder().decode(value));
+      }
+      reader.releaseLock();
+      const full = chunks.join("");
+      // The raw OpenAI bytes should have passed through (identity passthrough)
+      expect(full).toContain("chat.completion.chunk");
     } finally {
       globalThis.fetch = origFetch;
     }

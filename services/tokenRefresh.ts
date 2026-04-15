@@ -3,7 +3,7 @@
 import * as log from "../lib/logger.ts";
 import { updateProviderConnection, getProviderConnections } from "../db/index.ts";
 import { OAUTH_CONFIGS } from "../lib/oauthConfig.ts";
-import { withLock } from "../lib/redis.ts";
+import { withLock, getVertexToken, setVertexToken } from "../lib/redis.ts";
 
 // ─── Project ID cache (in-memory, mirrors open-sse behavior) ───────────────────
 
@@ -479,10 +479,17 @@ export async function refreshVertexToken(
   saJson: Record<string, unknown>
 ): Promise<TokenResult | null> {
   const cacheKey = saJson.client_email as string;
-  const cached = vertexTokenCache.get(cacheKey);
+
+  // Try Redis cache first, then in-memory
+  const redisCached = await getVertexToken(cacheKey);
+  const cached = redisCached ?? vertexTokenCache.get(cacheKey);
 
   // Return cached token if still valid (5-min buffer)
   if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) {
+    // Backfill Redis if it was an in-memory hit
+    if (!redisCached && cached) {
+      await setVertexToken(cacheKey, cached.token, cached.expiresAt);
+    }
     return { accessToken: cached.token, expiresAt: cached.expiresAt };
   }
 
@@ -542,8 +549,9 @@ export async function refreshVertexToken(
 
     const expiresAt = Date.now() + expiresIn * 1000;
 
-    // Cache the token
+    // Cache the token in both Redis and in-memory
     vertexTokenCache.set(cacheKey, { token: accessToken, expiresAt });
+    await setVertexToken(cacheKey, accessToken, expiresAt);
     log.info("TOKEN_REFRESH", `Vertex token minted for ${clientEmail}`);
 
     return {
@@ -730,9 +738,10 @@ export async function checkAndRefreshToken(
     if (apiKey) {
       const saJson = parseVertexSaJson(apiKey);
       if (saJson) {
-        // Check if we have a cached token and it's still valid
+        // Check if we have a cached token and it's still valid (Redis first, then in-memory)
         const clientEmail = saJson.client_email as string;
-        const cached = vertexTokenCache.get(clientEmail);
+        const redisCached = await getVertexToken(clientEmail);
+        const cached = redisCached ?? vertexTokenCache.get(clientEmail);
         const now = Date.now();
         const needsRefresh = !cached || cached.expiresAt - now < TOKEN_EXPIRY_BUFFER_MS;
 
@@ -747,10 +756,13 @@ export async function checkAndRefreshToken(
             // Update in-memory cache with expiresAt from refreshVertexToken
             const newExpiresAt =
               vertexResult.expiresAt ?? now + (vertexResult.expiresIn ?? 3600) * 1000;
+            const expiresAt = typeof newExpiresAt === "number" ? newExpiresAt : now + 3600 * 1000;
             vertexTokenCache.set(clientEmail, {
               token: vertexResult.accessToken,
-              expiresAt: typeof newExpiresAt === "number" ? newExpiresAt : now + 3600 * 1000,
+              expiresAt,
             });
+            // Also update Redis cache
+            await setVertexToken(clientEmail, vertexResult.accessToken, expiresAt);
 
             creds.accessToken = vertexResult.accessToken;
             if (vertexResult.providerSpecificData?.projectId) {
@@ -758,7 +770,10 @@ export async function checkAndRefreshToken(
             }
           }
         } else if (cached?.token) {
-          // Use cached token
+          // Use cached token — backfill Redis if it was an in-memory hit
+          if (!redisCached) {
+            await setVertexToken(clientEmail, cached.token, cached.expiresAt);
+          }
           creds.accessToken = cached.token;
           // Ensure projectId is set (needed for Vertex URL construction)
           if (!creds.projectId && saJson.project_id) {
