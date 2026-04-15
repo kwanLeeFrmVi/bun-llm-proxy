@@ -61,12 +61,13 @@ export async function GET(req: Request): Promise<Response> {
     };
   });
 
-  // Get strategy from settings
+  // Get strategy and sticky limit from settings
   const settings = await getSettings();
   const comboStrategies = (settings.comboStrategies as Record<string, any>) || {};
   const strategy = comboStrategies[combo.name]?.fallbackStrategy;
+  const stickyLimit = comboStrategies[combo.name]?.stickyRoundRobinLimit;
 
-  return Response.json({ ...combo, models, strategy }, { headers: CORS_HEADERS });
+  return Response.json({ ...combo, models, strategy, stickyLimit: stickyLimit ?? 3 }, { headers: CORS_HEADERS });
 }
 
 export async function PUT(req: Request): Promise<Response> {
@@ -87,6 +88,7 @@ export async function PUT(req: Request): Promise<Response> {
   const name = body.name as string | undefined;
   const rawModels = body.models as ComboModelsInput | undefined;
   const strategy = body.strategy as string | undefined;
+  const stickyLimit = body.stickyLimit as number | undefined;
 
   if (name !== undefined) {
     if (!NAME_REGEX.test(name))
@@ -144,16 +146,17 @@ export async function PUT(req: Request): Promise<Response> {
     }
   }
 
-  // Update strategy in settings if provided
-  if (strategy !== undefined || (name !== undefined && name !== combo.name)) {
+  // Update strategy and sticky limit in settings if provided
+  if (strategy !== undefined || stickyLimit !== undefined || (name !== undefined && name !== combo.name)) {
     const settings = await getSettings();
     const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
     const targetName = name ?? combo.name;
 
-    if (strategy !== undefined) {
+    if (strategy !== undefined || stickyLimit !== undefined) {
       comboStrategies[targetName] = {
         ...comboStrategies[targetName],
-        fallbackStrategy: strategy,
+        ...(strategy !== undefined && { fallbackStrategy: strategy }),
+        ...(stickyLimit !== undefined && { stickyRoundRobinLimit: stickyLimit }),
       };
     } else if (name !== undefined && name !== combo.name && comboStrategies[combo.name]) {
       // Migrate strategy if only name changed
@@ -185,8 +188,18 @@ export async function PUT(req: Request): Promise<Response> {
   const finalSettings = await getSettings();
   const finalComboStrategies = (finalSettings.comboStrategies as Record<string, any>) || {};
   const finalStrategy = finalComboStrategies[finalCombo.name]?.fallbackStrategy;
+  const finalStickyLimit = finalComboStrategies[finalCombo.name]?.stickyRoundRobinLimit;
 
-  return Response.json({ ...finalCombo, models: finalModels, strategy: finalStrategy }, { headers: CORS_HEADERS });
+  // Return the stored strategy (not the request body value) to avoid overwriting it
+  // when the user edits other fields without touching the strategy dropdown
+  const existingStrategy = finalComboStrategies[combo.name]?.fallbackStrategy;
+  const existingStickyLimit = finalComboStrategies[combo.name]?.stickyRoundRobinLimit;
+  return Response.json({
+    ...finalCombo,
+    models: finalModels,
+    strategy: finalStrategy ?? existingStrategy,
+    stickyLimit: finalStickyLimit ?? existingStickyLimit ?? 3,
+  }, { headers: CORS_HEADERS });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

@@ -11,6 +11,7 @@ export interface Combo {
   name: string;
   models: ComboModel[];
   strategy?: string;
+  stickyLimit?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -29,8 +30,8 @@ interface ComboStore {
 
   // Actions
   loadCombos: () => Promise<void>;
-  createCombo: (name: string, models: ComboModel[], strategy?: string) => Promise<void>;
-  updateCombo: (id: string, name: string, models: ComboModel[], strategy?: string) => Promise<void>;
+  createCombo: (name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => Promise<void>;
+  updateCombo: (id: string, name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => Promise<void>;
   deleteCombo: (id: string) => Promise<void>;
   reset: () => void;
 }
@@ -64,10 +65,10 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  createCombo: async (name: string, models: ComboModel[], strategy?: string) => {
+  createCombo: async (name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => {
     set({ error: null });
     try {
-      const newCombo = await api.combos.create({ name, models, strategy });
+      const newCombo = await api.combos.create({ name, models, strategy, stickyLimit });
       set((state) => ({ combos: [...state.combos, newCombo] }));
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "Failed to create combo" });
@@ -75,10 +76,10 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  updateCombo: async (id: string, name: string, models: ComboModel[], strategy?: string) => {
+  updateCombo: async (id: string, name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => {
     set({ error: null });
     try {
-      const updatedCombo = await api.combos.update(id, { name, models, strategy });
+      const updatedCombo = await api.combos.update(id, { name, models, strategy, stickyLimit });
       set((state) => ({
         combos: state.combos.map((c) => (c.id === id ? updatedCombo : c)),
       }));

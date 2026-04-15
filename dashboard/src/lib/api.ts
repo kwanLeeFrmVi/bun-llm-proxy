@@ -403,12 +403,14 @@ export const api = {
       name: string;
       models?: Array<{ model: string; weight: number }>;
       strategy?: string;
+      stickyLimit?: number;
     }) =>
       request<{
         id: string;
         name: string;
         models: { model: string; weight: number }[];
         strategy?: string;
+        stickyLimit?: number;
       }>("/api/combos", { method: "POST", body: JSON.stringify(data) }),
     update: (
       id: string,
@@ -416,6 +418,7 @@ export const api = {
         name?: string;
         models?: Array<{ model: string; weight: number }>;
         strategy?: string;
+        stickyLimit?: number;
       }
     ) =>
       request<{
@@ -423,6 +426,7 @@ export const api = {
         name: string;
         models: { model: string; weight: number }[];
         strategy?: string;
+        stickyLimit?: number;
       }>(`/api/combos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: string) => request(`/api/combos/${id}`, { method: "DELETE" }),
   },

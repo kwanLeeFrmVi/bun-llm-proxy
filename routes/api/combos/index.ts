@@ -64,11 +64,13 @@ export async function GET(req: Request): Promise<Response> {
       });
 
       const strategy = comboStrategies[combo.name]?.fallbackStrategy;
+      const stickyLimit = comboStrategies[combo.name]?.stickyRoundRobinLimit;
 
       return {
         ...combo,
         models,
         strategy,
+        stickyLimit: stickyLimit ?? 3,
       };
     })
   );
@@ -90,6 +92,7 @@ export async function POST(req: Request): Promise<Response> {
   const name = body.name as string | undefined;
   const rawModels = body.models as ComboModelsInput | undefined;
   const strategy = body.strategy as string | undefined;
+  const stickyLimit = body.stickyLimit as number | undefined;
 
   if (!name || !NAME_REGEX.test(name))
     return Response.json(
@@ -124,20 +127,32 @@ export async function POST(req: Request): Promise<Response> {
     await deleteComboConfig(name);
   }
 
-  // Update strategy in settings if provided
-  if (strategy !== undefined) {
+  // Update strategy and sticky limit in settings if provided
+  if (strategy !== undefined || stickyLimit !== undefined) {
     const settings = await getSettings();
     const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
     comboStrategies[name] = {
       ...comboStrategies[name],
-      fallbackStrategy: strategy,
+      ...(strategy !== undefined && { fallbackStrategy: strategy }),
+      ...(stickyLimit !== undefined && { stickyRoundRobinLimit: stickyLimit }),
     };
     await updateSetting("comboStrategies", comboStrategies);
   }
 
   // Return combo with models (including weights)
+  // Also return the strategy we just saved so the client has it for the store
+  const settings = await getSettings();
+  const storedStrategy = (settings.comboStrategies as Record<string, any>)?.[name]
+    ?.fallbackStrategy;
+  const storedStickyLimit = (settings.comboStrategies as Record<string, any>)?.[name]
+    ?.stickyRoundRobinLimit;
   return Response.json(
-    { ...combo, models: configModels ?? models.map((m) => ({ model: m, weight: 1 })), strategy: strategy || "fallback" },
+    {
+      ...combo,
+      models: configModels ?? models.map((m) => ({ model: m, weight: 1 })),
+      strategy: strategy ?? storedStrategy ?? "fallback",
+      stickyLimit: stickyLimit ?? storedStickyLimit ?? 3,
+    },
     { status: 201, headers: CORS_HEADERS }
   );
 }

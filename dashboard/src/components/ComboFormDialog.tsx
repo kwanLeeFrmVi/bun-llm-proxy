@@ -43,12 +43,16 @@ const STRATEGIES = [
   },
 ] as const;
 
+// Strategies that use a sticky limit setting
+const STICKY_STRATEGIES = new Set(["round-robin", "speed", "session-sticky"]);
+
 export default function ComboFormDialog({
   isOpen,
   comboId,
   initialName,
   initialModels,
   initialStrategy,
+  initialStickyLimit,
   allModels,
   allCombos,
   allModelTypes,
@@ -60,15 +64,17 @@ export default function ComboFormDialog({
   initialName: string;
   initialModels: ModelWithWeight[];
   initialStrategy?: string;
+  initialStickyLimit?: number;
   allModels: string[];
   allCombos?: string[]; // List of combo names for nested support
   allModelTypes?: Record<string, "combo" | "model">; // Mark which models are combos
-  onSave: (name: string, models: ModelWithWeight[], strategy: string) => Promise<void>;
+  onSave: (name: string, models: ModelWithWeight[], strategy: string, stickyLimit?: number) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<ModelWithWeight[]>([]);
   const [strategy, setStrategy] = useState<(typeof STRATEGIES)[number]["value"]>("fallback");
+  const [stickyLimit, setStickyLimit] = useState<number>(3);
   const [modelSearch, setModelSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -79,10 +85,11 @@ export default function ComboFormDialog({
       setName(initialName);
       setSelected([...initialModels]);
       setStrategy((initialStrategy as any) || "fallback");
+      setStickyLimit(initialStickyLimit ?? 3);
       setModelSearch("");
       setNameError("");
     }
-  }, [isOpen, initialName, initialModels, initialStrategy]);
+  }, [isOpen, initialName, initialModels, initialStrategy, initialStickyLimit]);
 
   const validateName = (v: string) => {
     if (!v.trim()) {
@@ -132,7 +139,12 @@ export default function ComboFormDialog({
   const handleSave = async () => {
     if (!validateName(name)) return;
     setSaving(true);
-    await onSave(name.trim(), selected, strategy);
+    await onSave(
+      name.trim(),
+      selected,
+      strategy,
+      STICKY_STRATEGIES.has(strategy) ? stickyLimit : undefined
+    );
     setSaving(false);
   };
 
@@ -208,6 +220,28 @@ export default function ComboFormDialog({
               ))}
             </select>
           </div>
+
+          {/* Sticky limit — shown for strategies that use it */}
+          {STICKY_STRATEGIES.has(strategy) && (
+            <div className="space-y-1.5">
+              <Label htmlFor="sticky-limit">
+                Sticky Limit{" "}
+                <span className="text-muted-foreground font-normal">
+                  (consecutive requests before rotating)
+                </span>
+              </Label>
+              <Input
+                id="sticky-limit"
+                type="number"
+                min={1}
+                max={999}
+                step={1}
+                value={stickyLimit}
+                onChange={(e) => setStickyLimit(Math.max(1, Math.round(parseInt(e.target.value) || 1)))}
+                className="w-24"
+              />
+            </div>
+          )}
 
           {/* Selected models (ordered list with weights) */}
           <div className="space-y-1.5">
