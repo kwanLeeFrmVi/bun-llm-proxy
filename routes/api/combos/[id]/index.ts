@@ -64,7 +64,7 @@ export async function GET(req: Request): Promise<Response> {
   // Get strategy from settings
   const settings = await getSettings();
   const comboStrategies = (settings.comboStrategies as Record<string, any>) || {};
-  const strategy = comboStrategies[combo.name]?.fallbackStrategy || "fallback";
+  const strategy = comboStrategies[combo.name]?.fallbackStrategy;
 
   return Response.json({ ...combo, models, strategy }, { headers: CORS_HEADERS });
 }
@@ -184,7 +184,7 @@ export async function PUT(req: Request): Promise<Response> {
 
   const finalSettings = await getSettings();
   const finalComboStrategies = (finalSettings.comboStrategies as Record<string, any>) || {};
-  const finalStrategy = finalComboStrategies[finalCombo.name]?.fallbackStrategy || "fallback";
+  const finalStrategy = finalComboStrategies[finalCombo.name]?.fallbackStrategy;
 
   return Response.json({ ...finalCombo, models: finalModels, strategy: finalStrategy }, { headers: CORS_HEADERS });
 }

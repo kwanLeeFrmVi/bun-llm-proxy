@@ -36,6 +36,11 @@ const STRATEGIES = [
   { value: "round-robin", label: "Round Robin", description: "Rotate through models" },
   { value: "weight", label: "Weight", description: "Random selection by weight" },
   { value: "speed", label: "Speed", description: "Pick fastest by TTFT" },
+  {
+    value: "session-sticky",
+    label: "Session Sticky",
+    description: "Pin session to provider, enable prompt caching",
+  },
 ] as const;
 
 export default function ComboFormDialog({

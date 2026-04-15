@@ -63,7 +63,7 @@ export async function GET(req: Request): Promise<Response> {
         };
       });
 
-      const strategy = comboStrategies[combo.name]?.fallbackStrategy || "fallback";
+      const strategy = comboStrategies[combo.name]?.fallbackStrategy;
 
       return {
         ...combo,
