@@ -6,6 +6,15 @@ const rrStateMap = new Map<string, { index: number; stickyCount: number }>();
 // Per-combo speed state: model, count
 const speedStateMap = new Map<string, { model: string; count: number }>();
 
+// Per-combo session-sticky state: comboName → Map<sessionId, { model, assignedAt }>
+const sessionStickyMap = new Map<string, Map<string, { model: string; assignedAt: number }>>();
+// Round-robin counter for assigning new sessions to models
+const sessionAssignCounter = new Map<string, number>();
+
+// Session-sticky constants
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_SESSIONS_PER_COMBO = 1000;
+
 // Symbol to attach combo metadata to Response (private, non-enumerable)
 const COMBO_METADATA = Symbol.for("comboMetadata");
 
@@ -36,6 +45,7 @@ export interface ComboOptions {
   comboName: string;
   comboStrategy: string;
   settings: Record<string, unknown>;
+  sessionId?: string | null; // x-claude-code-session-id header
   getAverageTTFT?: (
     comboName: string,
     model: string,
@@ -62,6 +72,7 @@ export function getComboMetadata(resp: Response): ComboMetadata | undefined {
  * - round-robin: rotate through models with sticky limit
  * - weight: weighted random selection, fallback sequentially on failure
  * - speed: pick fastest by avg TTFT, stick for N requests, re-evaluate on expiry
+ * - session-sticky: pin each session (by x-claude-code-session-id) to one model
  */
 export async function handleComboModel(opts: ComboOptions): Promise<Response> {
   const {
@@ -73,6 +84,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     comboStrategy,
     settings,
     getAverageTTFT,
+    sessionId,
     ctx,
   } = opts;
 
@@ -82,7 +94,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         comboName
       ]?.stickyRoundRobinLimit as number | undefined) ??
       (settings.stickyRoundRobinLimit as number | undefined) ??
-      1;
+      3;
 
     const rrState = rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
     let selectedIndex: number;
@@ -274,6 +286,125 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     });
   }
 
+  if (comboStrategy === "session-sticky") {
+    let assignedModel: string;
+
+    if (!sessionId) {
+      log.warn(
+        ctx ?? null,
+        "COMBO",
+        `Session-sticky: no x-claude-code-session-id header — falling back to round-robin`
+      );
+      // Fall back to round-robin logic inline (no recursion to avoid state duplication)
+      const rrState = rrStateMap.get(comboName) ?? { index: 0, stickyCount: 0 };
+      const rrStickyLimit =
+        ((settings.comboStrategies as Record<string, Record<string, unknown>> | undefined)?.[
+          comboName
+        ]?.stickyRoundRobinLimit as number | undefined) ??
+        (settings.stickyRoundRobinLimit as number | undefined) ??
+        3;
+
+      let selectedIndex: number;
+      if (rrState.stickyCount < rrStickyLimit) {
+        rrState.stickyCount++;
+        rrStateMap.set(comboName, rrState);
+        selectedIndex = rrState.index % models.length;
+      } else {
+        rrState.index = (rrState.index + 1) % models.length;
+        rrState.stickyCount = 1;
+        rrStateMap.set(comboName, rrState);
+        selectedIndex = rrState.index;
+      }
+      assignedModel = models[selectedIndex]!.model;
+    } else {
+      // Resolve or assign session
+      const comboSessions = sessionStickyMap.get(comboName) ?? new Map();
+      const sessionEntry = comboSessions.get(sessionId);
+      const now = Date.now();
+
+      if (sessionEntry && now - sessionEntry.assignedAt < SESSION_TTL_MS) {
+        assignedModel = sessionEntry.model;
+        log.info(
+          ctx ?? null,
+          "COMBO",
+          `Session-sticky: session ${sessionId} → ${assignedModel} (sticky, assigned ${Math.round((now - sessionEntry.assignedAt) / 86400000)}h ago)`
+        );
+      } else {
+        // Assign new session round-robin
+        const counter = (sessionAssignCounter.get(comboName) ?? 0);
+        const modelIndex = counter % models.length;
+        sessionAssignCounter.set(comboName, counter + 1);
+        assignedModel = models[modelIndex]!.model;
+
+        // LRU eviction: if at capacity, remove oldest entry
+        if (comboSessions.size >= MAX_SESSIONS_PER_COMBO) {
+          let oldestSessionId: string | null = null;
+          let oldestTime = Infinity;
+          for (const [sid, entry] of comboSessions) {
+            if (entry.assignedAt < oldestTime) {
+              oldestTime = entry.assignedAt;
+              oldestSessionId = sid;
+            }
+          }
+          if (oldestSessionId) comboSessions.delete(oldestSessionId);
+        }
+
+        comboSessions.set(sessionId, { model: assignedModel, assignedAt: now });
+        sessionStickyMap.set(comboName, comboSessions);
+
+        log.info(
+          ctx ?? null,
+          "COMBO",
+          `Session-sticky: session ${sessionId} → ${assignedModel} (new assignment, evicted ${comboSessions.size >= MAX_SESSIONS_PER_COMBO ? "LRU entry, " : ""}total sessions: ${comboSessions.size})`
+        );
+      }
+    }
+
+    // Try assigned model first; fallback to remaining models in order
+    const assignedIndex = models.findIndex((m) => m.model === assignedModel);
+    const orderedModels = assignedIndex >= 0
+      ? [
+          models[assignedIndex]!,
+          ...models.slice(0, assignedIndex),
+          ...models.slice(assignedIndex + 1),
+        ]
+      : models;
+
+    let lastError: string | null = null;
+    for (const m of orderedModels) {
+      if (m.model !== assignedModel) {
+        log.info(ctx ?? null, "COMBO", `Session-sticky fallback: trying ${m.model}`);
+      }
+      try {
+        const resp = await handleSingleModel(body, m.model);
+        if (resp.ok) {
+          if (m.model !== assignedModel) {
+            log.info(ctx ?? null, "COMBO", `Session-sticky fallback: ${m.model} succeeded`);
+          }
+          return attachComboMetadata(resp, comboName, m.model);
+        }
+        lastError = `Model ${m.model} returned status ${resp.status}`;
+        if (m.model === assignedModel) {
+          log.warn(
+            ctx ?? null,
+            "COMBO",
+            `Session-sticky: ${assignedModel} failed (${resp.status}), trying fallback`
+          );
+        }
+      } catch (e) {
+        lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+        if (m.model === assignedModel) {
+          log.warn(ctx ?? null, "COMBO", `Session-sticky: ${assignedModel} threw, trying fallback`);
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ error: lastError ?? "All combo models failed" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // fallback (default): try each model in order
   let lastError: string | null = null;
   let attemptNumber = 1;
@@ -308,6 +439,8 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
 export function resetComboState(comboName: string): void {
   rrStateMap.delete(comboName);
   speedStateMap.delete(comboName);
+  sessionStickyMap.delete(comboName);
+  sessionAssignCounter.delete(comboName);
 }
 
 /**
@@ -316,4 +449,6 @@ export function resetComboState(comboName: string): void {
 export function resetAllComboState(): void {
   rrStateMap.clear();
   speedStateMap.clear();
+  sessionStickyMap.clear();
+  sessionAssignCounter.clear();
 }

@@ -119,6 +119,7 @@ export async function handleChat(
       "ROUTING",
       `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`
     );
+    const sessionId = request.headers.get("x-claude-code-session-id");
     return handleComboModelWithDB({
       ctx,
       body,
@@ -142,6 +143,7 @@ export async function handleChat(
       comboStrategy,
       settings,
       log,
+      sessionId,
     });
   }
 
@@ -177,6 +179,7 @@ async function handleSingleModelChat(
         "ROUTING",
         `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`
       );
+      const chatSessionId = request?.headers?.get("x-claude-code-session-id") ?? null;
       return handleComboModelWithDB({
         ctx,
         body,
@@ -200,6 +203,7 @@ async function handleSingleModelChat(
         comboStrategy,
         settings: chatSettings,
         log,
+        sessionId: chatSessionId,
       });
     }
     log.warn(ctx, "CHAT", "Invalid model format", { model: modelStr });

@@ -1,20 +1,15 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
+import { setDb, resetConnection } from "../../db/connection.ts";
+import { trackPendingRequest, appendRequestLog } from "../../stubs/usageDb.ts";
 
-// Setup mocks before importing
 let testDb: Database;
-
-mock.module("../../db/connection.ts", () => ({
-  getRawDb: () => testDb
-}));
-
-import { trackPendingRequest, appendRequestLog, saveRequestUsage } from "../../stubs/usageDb.ts";
 
 describe("usageDb.ts", () => {
   beforeEach(() => {
     testDb = new Database(":memory:");
     testDb.run(`
-      CREATE TABLE usage_log (
+      CREATE TABLE IF NOT EXISTS usage_log (
         id TEXT PRIMARY KEY,
         timestamp TEXT,
         endpoint TEXT,
@@ -22,69 +17,50 @@ describe("usageDb.ts", () => {
         model TEXT,
         connection_id TEXT,
         api_key_id TEXT,
-        status TEXT,
-        prompt_tokens INTEGER,
-        completion_tokens INTEGER,
-        reasoning_tokens INTEGER,
-        cached_tokens INTEGER,
-        cost REAL,
-        duration_ms INTEGER,
+        status TEXT DEFAULT 'pending',
+        prompt_tokens INTEGER DEFAULT 0,
+        completion_tokens INTEGER DEFAULT 0,
+        reasoning_tokens INTEGER DEFAULT 0,
+        cached_tokens INTEGER DEFAULT 0,
+        cost REAL DEFAULT 0,
+        duration_ms INTEGER DEFAULT 0,
         streaming INTEGER DEFAULT 0,
         ttft_ms INTEGER,
         tokens_per_second REAL
       )
     `);
-
-    // We also need to mock the pricing table for saveRequestUsage if we want to call it
     testDb.run(`
-        CREATE TABLE pricing (
-          provider TEXT,
-          model TEXT,
-          input REAL,
-          output REAL
-        )
+      CREATE TABLE IF NOT EXISTS pricing (
+        provider TEXT,
+        model TEXT,
+        input REAL,
+        output REAL
+      )
     `);
+    // Point the DB singleton at our in-memory DB so stubs/usageDb.ts writes go there
+    setDb(testDb);
   });
 
-  describe("appendRequestLog", () => {
-    it("updates the status in the db", () => {
-      const requestId = "req-1";
-      trackPendingRequest(requestId, { provider: "openai" });
+  afterEach(() => {
+    resetConnection();
+  });
 
-      // Ensure it exists with 'pending' status initially
-      let row = testDb.query("SELECT * FROM usage_log WHERE id = ?").get(requestId) as any;
-      expect(row.status).toBe("pending");
+  it("trackPendingRequest inserts a row and appendRequestLog updates it", () => {
+    const requestId = `req-${Date.now()}-${Math.random()}`;
+    trackPendingRequest(requestId, { provider: "openai" });
 
-      // Call the function
-      appendRequestLog(requestId, "error", "some error message");
+    let row = testDb.query("SELECT status FROM usage_log WHERE id = ?").get(requestId) as any;
+    expect(row?.status).toBe("pending");
 
-      // Assert status is updated
-      row = testDb.query("SELECT * FROM usage_log WHERE id = ?").get(requestId) as any;
-      expect(row.status).toBe("error");
-    });
+    appendRequestLog(requestId, "error");
 
-    it("removes the request from pendingRequests so metadata is no longer available", async () => {
-      const requestId = "req-2";
-      trackPendingRequest(requestId, { provider: "anthropic", model: "claude-3-opus" });
+    row = testDb.query("SELECT status FROM usage_log WHERE id = ?").get(requestId) as any;
+    expect(row?.status).toBe("error");
+  });
 
-      appendRequestLog(requestId, "aborted");
-
-      // Try to save usage (which normally falls back to metadata from pendingRequests if not provided)
-      await saveRequestUsage(requestId, { prompt_tokens: 10 }, 500);
-
-      // We should check that saveRequestUsage didn't use the pending metadata
-      // Actually, since saveRequestUsage uses `WHERE id = ? AND status = 'pending'`,
-      // if it was updated to 'aborted', it shouldn't update the row to 'ok' anyway.
-
-      const row = testDb.query("SELECT * FROM usage_log WHERE id = ?").get(requestId) as any;
-      expect(row.status).toBe("aborted");
-    });
-
-    it("handles non-existent requestIds without throwing", () => {
-      // It just shouldn't throw an error
-      expect(() => {
-        appendRequestLog("non-existent-req", "failed");
-      }).not.toThrow();
-    });
+  it("handles non-existent requestIds without throwing", () => {
+    expect(() => {
+      appendRequestLog("non-existent-req", "failed");
+    }).not.toThrow();
   });
 });

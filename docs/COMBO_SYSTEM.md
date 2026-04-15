@@ -5,9 +5,10 @@
 The Combo System enables routing chat requests across multiple AI models using configurable strategies. It allows you to:
 
 - **Group multiple models** into a single virtual model
-- **Route requests intelligently** using different strategies (fallback, round-robin, weight, speed)
+- **Route requests intelligently** using different strategies (fallback, round-robin, weight, speed, session-sticky)
 - **Handle failures gracefully** with automatic failover
 - **Optimize for latency** with TTFT (Time-To-First-Token) tracking
+- **Pin sessions to providers** for cache efficiency via session-sticky routing
 
 ## Core Concepts
 
@@ -215,6 +216,55 @@ Selects the fastest model based on average Time-To-First-Token.
 - Routing: `@/services/comboRouting.ts:131-166`
 - TTFT recording: `@/handlers/chat.ts:355-359`
 
+---
+
+### 5. Session-Sticky Round-Robin
+
+Pins each Claude Code session to a single provider using the `x-claude-code-session-id` header, enabling provider-side prompt caching.
+
+**Behavior:**
+
+- Extracts `x-claude-code-session-id` from the request header
+- Assigns new sessions to models round-robin (first session → model-a, second → model-b, etc.)
+- Sticks each session to its assigned model for 24 hours (TTL)
+- On transient failure: falls back to remaining models but **does not reassign** the session — the assignment stays stable across retries
+- Sessions beyond 24h are treated as new and reassigned round-robin
+- Memory bound: each combo caps at 1000 sessions (LRU eviction by assignment time)
+- If no `x-claude-code-session-id` header is present, falls back to round-robin behavior
+
+**Use case:** LLM providers cache prompt prefixes server-side. By pinning a session to one provider, the provider sees repeated requests from the same conversation and can reuse its cache — reducing cost and latency. Ideal for Claude Code users with multiple terminals or sessions.
+
+**Configuration:**
+
+```json
+{
+  "comboStrategy": "session-sticky"
+}
+```
+
+**Per-combo override:**
+
+```json
+{
+  "comboStrategies": {
+    "my-combo": {
+      "strategy": "session-sticky"
+    }
+  }
+}
+```
+
+**Session ID header:** `x-claude-code-session-id` — sent by Claude Code on every request.
+
+**State:**
+
+- `sessionStickyMap`: `comboName → Map<sessionId, { model, assignedAt }>`
+- `sessionAssignCounter`: `comboName → number` (round-robin counter for new assignments)
+- TTL: 24 hours (`SESSION_TTL_MS = 24 * 60 * 60 * 1000`)
+- Capacity: 1000 sessions per combo (LRU eviction)
+
+**Implementation:** `@/services/comboRouting.ts` — `session-sticky` strategy block
+
 ## API Endpoints
 
 ### Dashboard API
@@ -333,6 +383,7 @@ POST /v1/chat/completions (with combo model)
     ├── round-robin: rotate with sticky limit
     ├── weight: random selection by weight
     ├── speed: pick lowest avg TTFT
+    ├── session-sticky: pin session to model, fallback on failure
     └── fallback: sequential try
 ```
 
@@ -379,6 +430,11 @@ const rrStateMap = new Map<string, { index: number; stickyCount: number }>();
 
 // Speed strategy state: comboName → { model, count }
 const speedStateMap = new Map<string, { model: string; count: number }>();
+
+// Session-sticky state: comboName → Map<sessionId, { model, assignedAt }>
+const sessionStickyMap = new Map<string, Map<string, { model: string; assignedAt: number }>>();
+const sessionAssignCounter = new Map<string, number>();
+// TTL: 24h, Max sessions per combo: 1000 (LRU eviction)
 ```
 
 ### Metadata Attachment

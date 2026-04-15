@@ -11,8 +11,18 @@ import {
 import type { Database } from "bun:sqlite";
 import { getRawDb } from "db/connection.ts";
 
-// Wrapper that allows tests to override via setDb() / resetConnection()
-const getDb = (): Database => getRawDb();
+// Module-level DB getter — allows tests to inject an in-memory DB
+let _getDb: (() => Database) | null = null;
+
+export function setUsageDb(getter: () => Database): void {
+  _getDb = getter;
+}
+
+export function resetUsageDb(): void {
+  _getDb = null;
+}
+
+const getDb = (): Database => (_getDb ?? getRawDb)();
 
 // ─── In-memory state ───────────────────────────────────────────────────────────
 

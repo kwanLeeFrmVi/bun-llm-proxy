@@ -8,27 +8,52 @@
 // - LRU eviction: Least recently used entries are evicted when limit is reached
 // - Periodic cleanup: Expired entries are removed every CLEANUP_INTERVAL_MS (default 5 minutes)
 
-const CLAUDE_IDENTITY_HEADERS = [
-  "user-agent",
-  "anthropic-beta",
-  "anthropic-version",
-  "anthropic-dangerous-direct-browser-access",
-  "x-app",
-  "x-stainless-helper-method",
-  "x-stainless-retry-count",
-  "x-stainless-runtime-version",
-  "x-stainless-package-version",
-  "x-stainless-runtime",
-  "x-stainless-lang",
-  "x-stainless-arch",
-  "x-stainless-os",
-  "x-stainless-timeout",
-  "x-claude-code-session-id",
-  "package-version",
-  "runtime-version",
-  "os",
-  "arch",
-];
+// NOTE: We use a blacklist approach (cache all except excluded headers).
+// The following are the "Claude Code identity headers" we typically want to capture.
+// We intentionally cache MORE than this list by default — any custom headers
+// from the client are preserved unless explicitly excluded below.
+//
+// Typical headers we care about:
+//   user-agent, anthropic-beta, anthropic-version,
+//   anthropic-dangerous-direct-browser-access, x-app,
+//   x-stainless-helper-method, x-stainless-retry-count,
+//   x-stainless-runtime-version, x-stainless-package-version,
+//   x-stainless-runtime, x-stainless-lang, x-stainless-arch,
+//   x-stainless-os, x-stainless-timeout, x-claude-code-session-id,
+//   package-version, runtime-version, os, arch
+
+const EXCLUDED_CLAUDE_CACHE_HEADERS = new Set([
+  "authorization",
+  "proxy-authorization",
+  "x-api-key",
+  "cookie",
+  "set-cookie",
+  "host",
+  "connection",
+  "content-length",
+  "transfer-encoding",
+  "accept-encoding",
+  "forwarded",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-port",
+  "x-forwarded-proto",
+  "x-forwarded-server",
+  "x-real-ip",
+  "true-client-ip",
+  "cf-connecting-ip",
+  "cf-ipcountry",
+  "cf-ray",
+  "cf-visitor",
+  "fly-client-ip",
+  "via",
+  "te",
+  "trailer",
+  "upgrade",
+  "keep-alive",
+]);
+
+const EXCLUDED_CLAUDE_CACHE_HEADER_PREFIXES = ["sec-", "proxy-"];
 
 // Cache configuration
 const CACHE_TTL_MS = 60 * 60 * 1000 * 24; // 24 hours
@@ -52,6 +77,25 @@ function isClaudeCodeClient(headers: Record<string, string>): boolean {
   const ua = (headers["user-agent"] || "").toLowerCase();
   const xApp = (headers["x-app"] || "").toLowerCase();
   return ua.includes("claude-cli") || ua.includes("claude-code") || xApp === "cli";
+}
+
+function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
+  const normalized: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined || value === null) continue;
+    normalized[key.toLowerCase()] = value;
+  }
+
+  return normalized;
+}
+
+function shouldExcludeCachedHeader(key: string): boolean {
+  if (EXCLUDED_CLAUDE_CACHE_HEADERS.has(key)) {
+    return true;
+  }
+
+  return EXCLUDED_CLAUDE_CACHE_HEADER_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function generateCacheKey(headers: Record<string, string>): string {
@@ -113,17 +157,18 @@ function startCleanupTimer(): void {
 
 export function cacheClaudeHeaders(headers: Record<string, string>): void {
   if (!headers || typeof headers !== "object") return;
-  if (!isClaudeCodeClient(headers)) return;
+  const normalizedHeaders = normalizeHeaders(headers);
+  if (!isClaudeCodeClient(normalizedHeaders)) return;
 
   const captured: Record<string, string> = {};
-  for (const key of CLAUDE_IDENTITY_HEADERS) {
-    if (headers[key] !== undefined && headers[key] !== null) {
-      captured[key] = headers[key];
+  for (const [key, value] of Object.entries(normalizedHeaders)) {
+    if (!shouldExcludeCachedHeader(key)) {
+      captured[key] = value;
     }
   }
 
   if (Object.keys(captured).length > 0) {
-    const cacheKey = generateCacheKey(headers);
+    const cacheKey = generateCacheKey(normalizedHeaders);
     const now = Date.now();
 
     // Skip overwrite if a valid (non-expired) entry already exists for this key.
@@ -150,7 +195,7 @@ export function cacheClaudeHeaders(headers: Record<string, string>): void {
     }
 
     console.log(
-      `[ClaudeHeaders] Cached ${Object.keys(captured).length} identity headers from Claude Code client (key: ${cacheKey}, total: ${headerCache.size}/${MAX_CACHE_SIZE})`
+      `[ClaudeHeaders] Cached ${Object.keys(captured).length} headers from Claude Code client (key: ${cacheKey}, total: ${headerCache.size}/${MAX_CACHE_SIZE})`
     );
   }
 }

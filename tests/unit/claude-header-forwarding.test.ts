@@ -43,8 +43,8 @@ describe("claudeHeaderCache", () => {
       "x-stainless-retry-count": "0",
       "x-stainless-timeout": "600",
       "anthropic-dangerous-direct-browser-access": "true",
-      // Non-identity header — should NOT be captured
-      "content-type": "application/json",
+      "x-custom-client-header": "enabled",
+      authorization: "Bearer incoming-token",
     });
 
     const cached = cacheModule.getCachedClaudeHeaders();
@@ -53,8 +53,8 @@ describe("claudeHeaderCache", () => {
     expect(cached!["anthropic-beta"]).toBe("claude-code-20250219,oauth-2025-04-20");
     expect(cached!["x-app"]).toBe("cli");
     expect(cached!["x-stainless-os"]).toBe("MacOS");
-    // Non-identity header must not leak in
-    expect(cached!["content-type"]).toBeUndefined();
+    expect(cached!["x-custom-client-header"]).toBe("enabled");
+    expect(cached!["authorization"]).toBeUndefined();
   });
 
   it("caches headers when user-agent contains 'claude-cli'", () => {
@@ -111,6 +111,24 @@ describe("claudeHeaderCache", () => {
     cacheModule.cacheClaudeHeaders(undefined as any);
     cacheModule.cacheClaudeHeaders("string" as any);
     expect(cacheModule.getCachedClaudeHeaders()).toBeNull();
+  });
+
+  it("normalizes header names and excludes blacklisted headers", () => {
+    cacheModule.cacheClaudeHeaders({
+      "User-Agent": "claude-code/2.1.63",
+      "X-App": "cli",
+      "X-Custom-Feature": "on",
+      Cookie: "session=abc",
+      "Sec-Fetch-Mode": "cors",
+    });
+
+    const cached = cacheModule.getCachedClaudeHeaders();
+    expect(cached).not.toBeNull();
+    expect(cached!["user-agent"]).toBe("claude-code/2.1.63");
+    expect(cached!["x-app"]).toBe("cli");
+    expect(cached!["x-custom-feature"]).toBe("on");
+    expect(cached!["cookie"]).toBeUndefined();
+    expect(cached!["sec-fetch-mode"]).toBeUndefined();
   });
 
   it("only stores keys that are actually present in the headers object", () => {

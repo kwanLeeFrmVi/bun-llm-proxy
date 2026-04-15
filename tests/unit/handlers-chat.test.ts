@@ -124,8 +124,7 @@ const mockGetProviderCredentials = mock(() => Promise.resolve(null));
 const mockCheckAndRefreshToken = mock((_p: string, c: Record<string, unknown>) =>
   Promise.resolve(c)
 );
-const mockTrackPendingRequest = mock(() => {});
-const mockAppendRequestLog = mock(() => {});
+
 const mockMarkAccountUnavailable = mock(() => Promise.resolve({ shouldFallback: false }));
 const mockClearAccountError = mock(() => Promise.resolve());
 const mockUpdateProviderCredentials = mock(() => Promise.resolve(true));
@@ -153,11 +152,6 @@ mock.module("../../services/tokenRefresh.ts", () => ({
   checkAndRefreshToken: mockCheckAndRefreshToken,
   updateProviderCredentials: mockUpdateProviderCredentials,
   getProjectIdForConnection: mockGetProjectIdForConnection,
-}));
-mock.module("../../stubs/usageDb.ts", () => ({
-  trackPendingRequest: mockTrackPendingRequest,
-  saveRequestUsage: mock(() => Promise.resolve()),
-  appendRequestLog: mockAppendRequestLog,
 }));
 mock.module("../../lib/circuitBreaker.ts", () => ({
   incrementCircuitBreaker: mockIncrementCircuitBreaker,

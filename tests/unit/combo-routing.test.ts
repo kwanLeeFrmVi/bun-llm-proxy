@@ -143,7 +143,7 @@ describe("Combo Routing Strategies", () => {
         log: { info: () => {}, warn: () => {} },
         comboName: "test-combo",
         comboStrategy: "round-robin",
-        settings: {},
+        settings: { stickyRoundRobinLimit: 1 },
       });
 
       // Second request
@@ -154,7 +154,7 @@ describe("Combo Routing Strategies", () => {
         log: { info: () => {}, warn: () => {} },
         comboName: "test-combo",
         comboStrategy: "round-robin",
-        settings: {},
+        settings: { stickyRoundRobinLimit: 1 },
       });
 
       // Third request
@@ -165,7 +165,7 @@ describe("Combo Routing Strategies", () => {
         log: { info: () => {}, warn: () => {} },
         comboName: "test-combo",
         comboStrategy: "round-robin",
-        settings: {},
+        settings: { stickyRoundRobinLimit: 1 },
       });
 
       // Fourth request - should wrap around
@@ -176,7 +176,7 @@ describe("Combo Routing Strategies", () => {
         log: { info: () => {}, warn: () => {} },
         comboName: "test-combo",
         comboStrategy: "round-robin",
-        settings: {},
+        settings: { stickyRoundRobinLimit: 1 },
       });
 
       expect(callOrder).toEqual(["model-a", "model-b", "model-c", "model-a"]);
@@ -210,6 +210,88 @@ describe("Combo Routing Strategies", () => {
       }
 
       expect(callOrder).toEqual(["model-a", "model-a", "model-a", "model-b"]);
+    });
+
+    it("should fallback to next model when selected model fails", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+        { model: "model-c", weight: 1 },
+      ];
+
+      let callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        if (model === "model-a") {
+          return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
+        }
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "round-robin",
+        settings: {},
+      });
+
+      expect(callOrder[0]).toBe("model-a");
+      expect(callOrder.length).toBeGreaterThan(1);
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it("should return 503 when all models fail in round-robin", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const mockHandleSingle = async (_body: unknown, _model: string) => {
+        return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "round-robin",
+        settings: {},
+      });
+
+      expect(result.status).toBe(503);
+    });
+
+    it("should fallback when selected model throws an exception", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      let callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        if (model === "model-a") throw new Error("connection refused");
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "round-robin",
+        settings: {},
+      });
+
+      expect(callOrder).toEqual(["model-a", "model-b"]);
+      expect(result.ok).toBe(true);
     });
   });
 
@@ -380,6 +462,346 @@ describe("Combo Routing Strategies", () => {
 
       // Should pick first model when no data
       expect(selectedModel).toBe("model-a");
+    });
+
+    it("should fallback to next fastest model when fastest fails", async () => {
+      const models = [
+        { model: "fast-model", weight: 1 },
+        { model: "slow-model", weight: 1 },
+      ];
+
+      // Record latency samples
+      for (let i = 0; i < 10; i++) {
+        await mockRecordComboTTFT("test-combo", "fast-model", 100);
+        await mockRecordComboTTFT("test-combo", "slow-model", 500);
+      }
+
+      let callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        if (model === "fast-model") {
+          return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
+        }
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "speed",
+        settings: {},
+        getAverageTTFT: mockGetAverageTTFT,
+      });
+
+      expect(callOrder).toEqual(["fast-model", "slow-model"]);
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it("should return 503 when all models fail in speed strategy", async () => {
+      const models = [
+        { model: "fast-model", weight: 1 },
+        { model: "slow-model", weight: 1 },
+      ];
+
+      for (let i = 0; i < 5; i++) {
+        await mockRecordComboTTFT("test-combo", "fast-model", 100);
+        await mockRecordComboTTFT("test-combo", "slow-model", 500);
+      }
+
+      const mockHandleSingle = async (_body: unknown, _model: string) => {
+        return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "speed",
+        settings: {},
+        getAverageTTFT: mockGetAverageTTFT,
+      });
+
+      expect(result.status).toBe(503);
+    });
+
+    it("should fallback when fastest model throws an exception", async () => {
+      const models = [
+        { model: "fast-model", weight: 1 },
+        { model: "slow-model", weight: 1 },
+      ];
+
+      for (let i = 0; i < 5; i++) {
+        await mockRecordComboTTFT("test-combo", "fast-model", 100);
+        await mockRecordComboTTFT("test-combo", "slow-model", 500);
+      }
+
+      let callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        if (model === "fast-model") throw new Error("connection refused");
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "speed",
+        settings: {},
+        getAverageTTFT: mockGetAverageTTFT,
+      });
+
+      expect(callOrder).toEqual(["fast-model", "slow-model"]);
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("session-sticky strategy", () => {
+    it("should stick the same session to the same model", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      let assignedModel: string | null = null;
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        assignedModel = model;
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      for (let i = 0; i < 3; i++) {
+        await handleComboModel({
+          body: {},
+          models,
+          handleSingleModel: mockHandleSingle,
+          log: { info: () => {}, warn: () => {} },
+          comboName: "test-combo",
+          comboStrategy: "session-sticky",
+          settings: {},
+          sessionId: "sess-1",
+        });
+      }
+
+      // All 3 requests should have been assigned to the same model
+      expect(assignedModel).toBe("model-a"); // first model assigned to first session
+    });
+
+    it("should assign different sessions to different models round-robin", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const assignments: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        assignments.push(model);
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-2",
+      });
+
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-3",
+      });
+
+      // Two models, 3 sessions: first two get a/b, third wraps back to a
+      expect(assignments).toEqual(["model-a", "model-b", "model-a"]);
+    });
+
+    it("should fallback to remaining models when assigned model fails", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        if (model === "model-a") {
+          return new Response(JSON.stringify({ error: "server error" }), { status: 500 });
+        }
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      // Session sess-1 was assigned to model-a (first session), but it fails
+      expect(callOrder[0]).toBe("model-a");
+      // Fallback should try model-b
+      expect(callOrder).toContain("model-b");
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+    });
+
+    it("should NOT reassign session when assigned model fails — sticks to same model on retry", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      // First call: sess-1 assigned to model-a, succeeds
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      // Second call: sess-1 should still be stuck to model-a
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      // Both calls should go to model-a (not model-b)
+      expect(callOrder[0]).toBe("model-a");
+      expect(callOrder[1]).toBe("model-a");
+    });
+
+    it("should return 503 when all models fail", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const mockHandleSingle = async (_body: unknown, _model: string) => {
+        return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      expect(result.status).toBe(503);
+    });
+
+    it("should fall back to round-robin when no sessionId is provided", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const callOrder: string[] = [];
+      const mockHandleSingle = async (_body: unknown, model: string) => {
+        callOrder.push(model);
+        return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+      };
+
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: { stickyRoundRobinLimit: 1 },
+        sessionId: null, // no session ID
+      });
+
+      await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: { stickyRoundRobinLimit: 1 },
+        sessionId: null,
+      });
+
+      // Without session ID, it falls back to round-robin with sticky limit 1
+      expect(callOrder).toEqual(["model-a", "model-b"]);
+    });
+
+    it("should return 503 when all models throw exceptions", async () => {
+      const models = [
+        { model: "model-a", weight: 1 },
+        { model: "model-b", weight: 1 },
+      ];
+
+      const mockHandleSingle = async (_body: unknown, _model: string) => {
+        throw new Error("connection refused");
+      };
+
+      const result = await handleComboModel({
+        body: {},
+        models,
+        handleSingleModel: mockHandleSingle,
+        log: { info: () => {}, warn: () => {} },
+        comboName: "test-combo",
+        comboStrategy: "session-sticky",
+        settings: {},
+        sessionId: "sess-1",
+      });
+
+      expect(result.status).toBe(503);
     });
   });
 });
