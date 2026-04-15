@@ -830,32 +830,28 @@ export function getModelsLatestStats(): ModelLatestStats[] {
       {
         model: string;
         provider: string;
-        latest_ttft_ms: number | null;
-        latest_tps: number | null;
+        avg_ttft_ms: number | null;
+        avg_tps: number | null;
       },
       []
     >(
       `SELECT
-         ul.model,
-         ul.provider,
-         ul.ttft_ms as latest_ttft_ms,
-         ul.tokens_per_second as latest_tps
-       FROM usage_log ul
-       INNER JOIN (
-         SELECT model, MAX(timestamp) as max_ts
-         FROM usage_log
-         WHERE streaming = 1 AND status = 'ok' AND ttft_ms IS NOT NULL
-         GROUP BY model
-       ) latest ON ul.model = latest.model AND ul.timestamp = latest.max_ts
-       WHERE ul.streaming = 1 AND ul.status = 'ok' AND ul.ttft_ms IS NOT NULL`
+         model,
+         provider,
+         AVG(ttft_ms) as avg_ttft_ms,
+         AVG(tokens_per_second) as avg_tps
+       FROM usage_log
+       WHERE streaming = 1 AND status = 'ok' AND ttft_ms IS NOT NULL
+       GROUP BY model, provider`
     )
     .all();
 
   const result: ModelLatestStats[] = rows.map((r) => ({
     model: r.model,
     provider: r.provider,
-    latestTtftMs: r.latest_ttft_ms,
-    latestTokensPerSecond: r.latest_tps,
+    latestTtftMs: r.avg_ttft_ms != null ? Math.round(r.avg_ttft_ms) : null,
+    latestTokensPerSecond:
+      r.avg_tps != null ? Math.round(r.avg_tps * 100) / 100 : null,
   }));
 
   // Build a lookup map from bare model name → stats
@@ -864,7 +860,7 @@ export function getModelsLatestStats(): ModelLatestStats[] {
     statsMap.set(r.model, r);
   }
 
-  // Resolve combo models: for each combo, find the best member model stats
+  // Resolve combo models: for each combo, compute avg stats across all member models
   // Get all combo names from both combo_configs and combos tables
   const allComboNames = new Set<string>();
   const configCombos = db
@@ -886,18 +882,31 @@ export function getModelsLatestStats(): ModelLatestStats[] {
     // Use resolveModelNames to recursively resolve all member models
     const resolvedModels = resolveModelNames(db, comboName);
 
-    // Find the first member model that has stats
+    // Compute average TTFT and TPS across all member models that have stats
+    const ttftValues: number[] = [];
+    const tpsValues: number[] = [];
     for (const memberModel of resolvedModels) {
       const memberStat = statsMap.get(memberModel);
-      if (memberStat && (memberStat.latestTtftMs != null || memberStat.latestTokensPerSecond != null)) {
-        result.push({
-          model: comboName,
-          provider: "combo",
-          latestTtftMs: memberStat.latestTtftMs,
-          latestTokensPerSecond: memberStat.latestTokensPerSecond,
-        });
-        break;
-      }
+      if (memberStat?.latestTtftMs != null) ttftValues.push(memberStat.latestTtftMs);
+      if (memberStat?.latestTokensPerSecond != null)
+        tpsValues.push(memberStat.latestTokensPerSecond);
+    }
+
+    if (ttftValues.length > 0 || tpsValues.length > 0) {
+      const avgTtft =
+        ttftValues.length > 0
+          ? Math.round(ttftValues.reduce((a, b) => a + b, 0) / ttftValues.length)
+          : null;
+      const avgTps =
+        tpsValues.length > 0
+          ? Math.round((tpsValues.reduce((a, b) => a + b, 0) / tpsValues.length) * 100) / 100
+          : null;
+      result.push({
+        model: comboName,
+        provider: "combo",
+        latestTtftMs: avgTtft,
+        latestTokensPerSecond: avgTps,
+      });
     }
   }
 
