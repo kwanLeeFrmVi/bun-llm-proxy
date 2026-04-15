@@ -64,6 +64,51 @@ export const FREE_PROVIDERS: Record<string, ProviderMeta> = {
   },
 };
 
+export const OAUTH_PROVIDERS: Record<string, ProviderMeta> = {
+  codex: {
+    color: "#3B82F6",
+    textIcon: "CX",
+    name: "OpenAI Codex",
+    website: "https://openai.com",
+    deprecated: true,
+    deprecationNotice: "OpenAI Codex now requires paid subscription.",
+  },
+  antigravity: {
+    color: "#F59E0B",
+    textIcon: "AG",
+    name: "Antigravity",
+    website: "https://antigravity.dev",
+    deprecated: true,
+    deprecationNotice: "Antigravity is designed exclusively for Antigravity IDE. Using it with other tools may result in account restrictions.",
+  },
+  github: {
+    color: "#333333",
+    textIcon: "GH",
+    name: "GitHub Copilot",
+    website: "https://github.com/features/copilot",
+  },
+  cursor: {
+    color: "#00D4AA",
+    textIcon: "CU",
+    name: "Cursor IDE",
+    website: "https://cursor.com",
+    deprecated: true,
+    deprecationNotice: "Cursor OAuth is closed beta for new accounts.",
+  },
+  "kimi-coding": {
+    color: "#1E3A8A",
+    textIcon: "KC",
+    name: "Kimi Coding",
+    website: "https://kimi.com",
+  },
+  kilocode: {
+    color: "#FF6B35",
+    textIcon: "KC",
+    name: "Kilo Code",
+    website: "https://kilocode.ai",
+  },
+};
+
 export const FREE_TIER_PROVIDERS: Record<string, ProviderMeta> = {
   openrouter: {
     color: "#F97316",
@@ -108,6 +153,11 @@ export const FREE_TIER_PROVIDERS: Record<string, ProviderMeta> = {
 };
 
 export const APIKEY_PROVIDERS: Record<string, ProviderMeta> = {
+  deepgram: { color: "#13EF93", textIcon: "DG", name: "Deepgram", website: "https://deepgram.com" },
+  assemblyai: { color: "#0062FF", textIcon: "AA", name: "AssemblyAI", website: "https://assemblyai.com" },
+  nanobanana: { color: "#FFD700", textIcon: "NB", name: "NanoBanana", website: "https://nanobananaapi.ai" },
+  chutes: { color: "#6366F1", textIcon: "CH", name: "Chutes AI", website: "https://chutes.ai" },
+  "ollama-local": { color: "#8b5cf6", textIcon: "OL", name: "Ollama Local", website: "https://ollama.com" },
   glm: {
     color: "#2563EB",
     textIcon: "GL",
@@ -206,26 +256,6 @@ export const APIKEY_PROVIDERS: Record<string, ProviderMeta> = {
     name: "Hyperbolic",
     website: "https://hyperbolic.xyz",
   },
-  deepgram: { color: "#13EF93", textIcon: "DG", name: "Deepgram", website: "https://deepgram.com" },
-  assemblyai: {
-    color: "#0062FF",
-    textIcon: "AA",
-    name: "AssemblyAI",
-    website: "https://assemblyai.com",
-  },
-  nanobanana: {
-    color: "#FFD700",
-    textIcon: "NB",
-    name: "NanoBanana",
-    website: "https://nanobananaapi.ai",
-  },
-  chutes: { color: "#6366F1", textIcon: "CH", name: "Chutes AI", website: "https://chutes.ai" },
-  "ollama-local": {
-    color: "#8b5cf6",
-    textIcon: "OL",
-    name: "Ollama Local",
-    website: "https://ollama.com",
-  },
   "vertex-partner": {
     color: "#34A853",
     textIcon: "VP",
@@ -237,6 +267,7 @@ export const APIKEY_PROVIDERS: Record<string, ProviderMeta> = {
 
 export const ALL_PROVIDERS: Record<string, ProviderMeta> = {
   ...FREE_PROVIDERS,
+  ...OAUTH_PROVIDERS,
   ...FREE_TIER_PROVIDERS,
   ...APIKEY_PROVIDERS,
 };
@@ -273,7 +304,7 @@ export function getProviderConfig(providerId: string): ProviderMeta {
 }
 
 export function isOAuthProvider(providerId: string): boolean {
-  return providerId in FREE_PROVIDERS;
+  return providerId in FREE_PROVIDERS || providerId in OAUTH_PROVIDERS;
 }
 
 export const PROVIDER_ID_TO_ALIAS: Record<string, string> = {

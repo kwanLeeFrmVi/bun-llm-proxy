@@ -202,11 +202,29 @@ export default function ProvidersPage() {
 
       {/* OAuth & Free Tier */}
       <ProviderSection
-        title="OAuth Providers"
+        title="Free Providers"
         testAllLoading={testAllLoading}
         onTestAll={handleTestAll}
       >
         {Object.entries(catalog?.free ?? {}).map(([id, meta]) => (
+          <ProviderCard
+            key={id}
+            providerId={id}
+            catalog={meta}
+            stats={getStats(id)}
+            onToggle={(active) => handleToggleProvider(id, active)}
+            onRefresh={fetchData}
+          />
+        ))}
+      </ProviderSection>
+
+      {/* OAuth Providers */}
+      <ProviderSection
+        title="OAuth Providers"
+        testAllLoading={testAllLoading}
+        onTestAll={handleTestAll}
+      >
+        {Object.entries(catalog?.oauth ?? {}).map(([id, meta]) => (
           <ProviderCard
             key={id}
             providerId={id}

@@ -2,7 +2,7 @@ import { getProviderConnections, createProviderConnection } from "@/lib/localDb"
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
-import { FREE_PROVIDERS, FREE_TIER_PROVIDERS, APIKEY_PROVIDERS } from "lib/providerCatalog.ts";
+import { FREE_PROVIDERS, FREE_TIER_PROVIDERS, OAUTH_PROVIDERS, APIKEY_PROVIDERS } from "lib/providerCatalog.ts";
 import {
   asObjectRecord,
   isAnthropicCompatibleProvider,
@@ -13,6 +13,7 @@ import {
 
 const KNOWN_PROVIDER_IDS = new Set([
   ...Object.keys(FREE_PROVIDERS),
+  ...Object.keys(OAUTH_PROVIDERS),
   ...Object.keys(FREE_TIER_PROVIDERS),
   ...Object.keys(APIKEY_PROVIDERS),
 ]);
@@ -33,6 +34,7 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json(
       {
         free: FREE_PROVIDERS,
+        oauth: OAUTH_PROVIDERS,
         freeTier: FREE_TIER_PROVIDERS,
         apiKey: APIKEY_PROVIDERS,
       },

@@ -45,6 +45,7 @@ export interface ProviderCatalog {
 
 export interface CatalogResponse {
   free: Record<string, ProviderCatalog>;
+  oauth?: Record<string, ProviderCatalog>;
   freeTier: Record<string, ProviderCatalog>;
   apiKey: Record<string, ProviderCatalog>;
 }
