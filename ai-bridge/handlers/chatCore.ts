@@ -480,8 +480,10 @@ async function handleStreamingResponse(
         controller.close();
       } catch (streamErr) {
         // Flush stop events so the client gets at least a partial signal
-        // (message_delta + message_stop) before the error, preventing crashes
+        // (message_delta + message_stop) before closing, preventing crashes
         // on missing input_tokens when the upstream connection drops mid-stream.
+        // NOTE: use controller.close() instead of controller.error() — error()
+        // closes the controller immediately and discards all enqueued chunks.
         if (state !== undefined) {
           try {
             const doneChunks = translateChunk(
@@ -499,7 +501,13 @@ async function handleStreamingResponse(
             /* ignore flush errors */
           }
         }
-        controller.error(streamErr);
+        const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+        log.debug(
+          opts.ctx ?? null,
+          "STREAM",
+          `Stream error — closing cleanly: ${errMsg}`
+        );
+        controller.close();
       } finally {
         reader.releaseLock();
       }

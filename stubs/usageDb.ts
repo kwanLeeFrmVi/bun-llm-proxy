@@ -8,7 +8,17 @@ import {
   baseModelName,
   getORModelCache,
 } from "services/pricingSync.ts";
-import { getRawDb } from "db/connection.ts";
+
+// Import lazily so that mock.module in tests can intercept the binding
+import type { Database } from "bun:sqlite";
+
+// Use a dynamic import so that mock.module() in tests can intercept the
+// module and return the test database before this code executes.
+const getDb = (): Database => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getRawDb } = require("db/connection.ts");
+  return getRawDb();
+};
 
 // ─── In-memory state ───────────────────────────────────────────────────────────
 
@@ -100,7 +110,7 @@ export function trackPendingRequest(
   }
 ): void {
   const timestamp = new Date().toISOString();
-  const db = getRawDb();
+  const db = getDb();
   db.run(
     `INSERT INTO usage_log (id, timestamp, endpoint, provider, model, connection_id, api_key_id, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
@@ -166,7 +176,7 @@ export async function saveRequestUsage(
     );
   }
 
-  const db = getRawDb();
+  const db = getDb();
   db.run(
     `UPDATE usage_log SET
        prompt_tokens      = ?,
@@ -213,7 +223,7 @@ export async function saveRequestUsage(
  * Update request status (used for errors).
  */
 export function appendRequestLog(requestId: string, status: string, _errorMsg?: string): void {
-  const db = getRawDb();
+  const db = getDb();
   db.run(`UPDATE usage_log SET status = ? WHERE id = ?`, [status, requestId]);
   pendingRequests.delete(requestId);
 }
@@ -308,7 +318,7 @@ async function calculateCost(
   completionTokens: number
 ): Promise<number> {
   try {
-    const db = getRawDb();
+    const db = getDb();
     const rows = db
       .query<
         { provider: string; model: string; input: number; output: number },
@@ -336,7 +346,7 @@ async function calculateCost(
 // ─── Stats query helpers (used by routes/api/usage/index.ts) ───────────────────
 
 export function getUsageStats(period: string): UsageStats {
-  const db = getRawDb();
+  const db = getDb();
   const since = periodToTimestamp(period);
   const baseWhere = since ? `WHERE timestamp >= '${since.replace(/'/g, "''")}'` : "WHERE 1=1";
 
@@ -398,7 +408,7 @@ export function getUsageDetails(opts: {
   endDate?: string;
   period?: string;
 }): { rows: UsageRecord[]; total: number } {
-  const db = getRawDb();
+  const db = getDb();
   const { page, limit = 50, provider, model, apiKeyId, startDate, endDate, period } = opts;
   const offset = opts.offset ?? (page != null ? (page - 1) * limit : 0);
 
@@ -498,7 +508,7 @@ export interface LeaderboardEntry {
  * Uses LEFT JOIN to include API keys without associated users (shown as "System").
  */
 export function getLeaderboard(period: string): LeaderboardEntry[] {
-  const db = getRawDb();
+  const db = getDb();
   const since = periodToTimestamp(period);
   const baseFilter = since ? `timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
 
@@ -604,7 +614,7 @@ export function getModelStats(
   period: string,
   opts?: { page?: number; limit?: number }
 ): ModelStatsResponse {
-  const db = getRawDb();
+  const db = getDb();
   const since = periodToTimestamp(period);
   const limit = opts?.limit ?? 50;
   const offset = opts?.page ? (opts.page - 1) * limit : 0;
@@ -728,7 +738,7 @@ export function getModelStats(
  * Returns one row per distinct model with the most recent TTFT and tokens/s.
  */
 export function getModelsLatestStats(): ModelLatestStats[] {
-  const db = getRawDb();
+  const db = getDb();
 
   const rows = db
     .query<

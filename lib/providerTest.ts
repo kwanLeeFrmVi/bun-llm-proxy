@@ -2,6 +2,7 @@ import {
   getProviderConnectionById,
   updateProviderConnection,
   getProviderNodeById,
+  getProviderEnabledModels,
 } from "@/lib/localDb";
 import {
   isOpenAICompatibleProvider,
@@ -346,7 +347,8 @@ async function testVertexPartner(
 
 async function testOpenAICompatible(
   apiKey: string,
-  baseUrl: string
+  baseUrl: string,
+  models: string[] = []
 ): Promise<{ valid: boolean; error: string | null }> {
   if (!baseUrl) return { valid: false, error: "Missing base URL" };
   try {
@@ -359,6 +361,7 @@ async function testOpenAICompatible(
 
     // If /models fails, try /chat/completions with a minimal request
     if (!res.ok) {
+      const modelToTry = models.length > 0 ? models[0] : "gpt-3.5-turbo";
       res = await fetch(`${url}/chat/completions`, {
         method: "POST",
         headers: {
@@ -366,7 +369,7 @@ async function testOpenAICompatible(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: modelToTry,
           max_tokens: 1,
           messages: [{ role: "user", content: "test" }],
         }),
@@ -380,7 +383,26 @@ async function testOpenAICompatible(
       });
     }
 
-    return { valid: res.ok, error: res.ok ? null : "Invalid API key or base URL" };
+    if (res.ok) return { valid: true, error: null };
+
+    // Try to get error message from response
+    let errorMessage = "Invalid API key or base URL";
+    try {
+      const errorData = (await res.json().catch(() => ({}))) as any;
+      if (errorData?.error?.message) {
+        errorMessage = errorData.error.message;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (res.status === 404) {
+        errorMessage = `Not Found: ${res.url}`;
+      } else {
+        errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return { valid: false, error: errorMessage };
   } catch (err) {
     return {
       valid: false,
@@ -391,7 +413,8 @@ async function testOpenAICompatible(
 
 async function testAnthropicCompatible(
   apiKey: string,
-  baseUrl: string
+  baseUrl: string,
+  models: string[] = []
 ): Promise<{ valid: boolean; error: string | null }> {
   if (!baseUrl) return { valid: false, error: "Missing base URL" };
   try {
@@ -409,6 +432,7 @@ async function testAnthropicCompatible(
 
     // If /models fails, try /messages with a minimal request
     if (!res.ok) {
+      const modelToTry = models.length > 0 ? models[0] : "claude-3-haiku-20240307";
       res = await fetch(`${url}/messages`, {
         method: "POST",
         headers: {
@@ -418,7 +442,7 @@ async function testAnthropicCompatible(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "claude-3-haiku-20240307",
+          model: modelToTry,
           max_tokens: 1,
           messages: [{ role: "user", content: "test" }],
         }),
@@ -436,7 +460,26 @@ async function testAnthropicCompatible(
       });
     }
 
-    return { valid: res.ok, error: res.ok ? null : "Invalid API key or base URL" };
+    if (res.ok) return { valid: true, error: null };
+
+    // Try to get error message from response
+    let errorMessage = "Invalid API key or base URL";
+    try {
+      const errorData = (await res.json().catch(() => ({}))) as any;
+      if (errorData?.error?.message) {
+        errorMessage = errorData.error.message;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (res.status === 404) {
+        errorMessage = `Not Found: ${res.url}`;
+      } else {
+        errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return { valid: false, error: errorMessage };
   } catch (err) {
     return {
       valid: false,
@@ -619,11 +662,13 @@ async function testApiKeyConnection(connection: ConnectionForTest): Promise<Test
         break;
       default:
         if (isOpenAICompatibleProvider(provider)) {
-          const result = await testOpenAICompatible(apiKey!, baseUrl as string);
+          const enabledModels = await getProviderEnabledModels(provider);
+          const result = await testOpenAICompatible(apiKey!, baseUrl as string, enabledModels);
           valid = result.valid;
           error = result.error;
         } else if (isAnthropicCompatibleProvider(provider)) {
-          const result = await testAnthropicCompatible(apiKey!, baseUrl as string);
+          const enabledModels = await getProviderEnabledModels(provider);
+          const result = await testAnthropicCompatible(apiKey!, baseUrl as string, enabledModels);
           valid = result.valid;
           error = result.error;
         } else {

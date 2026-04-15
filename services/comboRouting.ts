@@ -145,9 +145,10 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           log.info(ctx ?? null, "COMBO", `Weight: model ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
-        lastError = `Model ${m.model} returned status ${resp.status}`;
+        // Only capture the first failure, not subsequent ones
+        if (!lastError) lastError = `Model ${m.model} returned status ${resp.status}`;
       } catch (e) {
-        lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
+        if (!lastError) lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
       }
     }
 
