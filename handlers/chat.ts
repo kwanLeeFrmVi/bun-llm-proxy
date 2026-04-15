@@ -458,6 +458,18 @@ function wrapStreamingResponse(
 
   const comboMetadata = getComboMetadata(response);
 
+  // ── Diagnostic tracking ──────────────────────────────────────────────────────
+  // Mirrors chatCore.ts inner-stream tracking so both sides of the wrapped stream
+  // are instrumented and can be correlated via the shared request ID.
+  let downstreamCanceled = false; // set true when ReadableStream's cancel() fires
+  let downstreamChunkCount = 0;
+  let firstDownstreamChunkMs: number | null = null;
+  // Possible close reasons: "normal" | "downstream_canceled" | "inner_stream_error"
+  type CloseReason = "normal" | "downstream_canceled" | "inner_stream_error";
+
+  // AbortController lets the cancel() callback interrupt the read loop synchronously.
+  const abortController = new AbortController();
+
   const originalBody = response.body;
   const stream = new ReadableStream({
     async start(controller) {
@@ -484,13 +496,15 @@ function wrapStreamingResponse(
 
       try {
         while (true) {
-          const { done, value } = await reader.read();
+          // Use `as any` to pass the AbortSignal — Bun's types omit the optional
+          // ReadableStreamReadOptions parameter but the runtime supports it.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { done, value } = await (reader as any).read({ signal: abortController.signal });
           if (done) break;
 
-          // Record TTFT on first chunk
-          if (!firstChunkTime) {
-            firstChunkTime = Date.now();
-          }
+          if (!firstChunkTime) firstChunkTime = Date.now();
+          if (!firstDownstreamChunkMs) firstDownstreamChunkMs = Date.now() - startTime;
+          downstreamChunkCount++;
 
           // Record TTFT for combo models on first chunk
           if (comboMetadata && !ttftRecorded) {
@@ -533,19 +547,31 @@ function wrapStreamingResponse(
           safeEnqueue(value);
         }
         const durationMs = Date.now() - startTime;
-        log.stream(ctx, "COMPLETE", { provider, model, usage: finalUsage });
+        log.stream(ctx, "OUTER_COMPLETE", {
+          provider,
+          model,
+          usage: finalUsage,
+          closeReason: "normal" as CloseReason,
+          downstreamChunkCount,
+          firstDownstreamChunkMs,
+          durationMs,
+        });
         safeClose();
       } catch (err) {
-        // Propagate downstream cancellation to the inner reader so upstream
-        // (chatCore) stops being pulled promptly rather than continuing in the background.
-        try {
-          reader.cancel();
-        } catch {
-          /* ignore — reader may already be done */
-        }
         const durationMs = Date.now() - startTime;
         const errMsg = err instanceof Error ? err.message : String(err);
-        log.stream(ctx, "ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
+        const reason: CloseReason = downstreamCanceled
+          ? "downstream_canceled"
+          : "inner_stream_error";
+        log.stream(ctx, "OUTER_ERROR", {
+          provider,
+          model,
+          error: errMsg,
+          closeReason: reason,
+          downstreamChunkCount,
+          firstDownstreamChunkMs,
+          durationMs,
+        });
         // Only inject error event if downstream is still writable (not already canceled)
         if (!controllerClosed) {
           try {
@@ -578,6 +604,10 @@ function wrapStreamingResponse(
         ).catch(() => {});
         RequestContext.delete(ctx.id);
       }
+    },
+    cancel() {
+      downstreamCanceled = true;
+      abortController.abort();
     },
   });
 

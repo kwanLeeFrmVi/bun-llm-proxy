@@ -103,6 +103,73 @@ export async function withLock<T>(
   }
 }
 
+// ─── Session-Sticky helpers ────────────────────────────────────────────────────
+
+const SESSION_PREFIX = "session:";
+const SESSION_COUNTER_PREFIX = "session-counter:";
+
+/**
+ * Get the model assigned to a session for a given combo.
+ * Returns null if no assignment exists or if Redis is unavailable.
+ */
+export async function getSessionModel(
+  comboName: string,
+  sessionId: string
+): Promise<{ model: string; assignedAt: number } | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const raw = await client.get(`${SESSION_PREFIX}${comboName}:${sessionId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as { model: string; assignedAt: number };
+  } catch (err) {
+    log.debug("REDIS", `getSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Set the model assigned to a session for a given combo.
+ * TTL defaults to 24 hours (86400 seconds).
+ */
+export async function setSessionModel(
+  comboName: string,
+  sessionId: string,
+  model: string,
+  ttlSeconds = 86400
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const value = JSON.stringify({ model, assignedAt: Date.now() });
+    await client.set(`${SESSION_PREFIX}${comboName}:${sessionId}`, value, "EX", String(ttlSeconds));
+  } catch (err) {
+    log.debug("REDIS", `setSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Atomically increment and return the session assignment counter for a combo.
+ * Used for round-robin assignment of new sessions across models.
+ * Returns -1 if Redis is unavailable.
+ */
+export async function incrementSessionCounter(comboName: string): Promise<number> {
+  const client = getRedis();
+  if (!client) return -1;
+  try {
+    const key = `${SESSION_COUNTER_PREFIX}${comboName}`;
+    const val = await client.incr(key);
+    // Set a 48h TTL on the counter so it doesn't linger forever
+    if (val === 1) {
+      await client.expire(key, String(48 * 3600));
+    }
+    return val - 1; // return 0-based index
+  } catch (err) {
+    log.debug("REDIS", `incrementSessionCounter error for ${comboName}: ${(err as Error).message}`);
+    return -1;
+  }
+}
+
 // ─── Cache helpers ──────────────────────────────────────────────────────────────
 
 const CACHE_PREFIX = "cache:";

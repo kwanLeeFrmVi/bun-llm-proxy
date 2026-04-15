@@ -280,6 +280,17 @@ async function handleStreamingResponse(
   let chunkCount = 0;
   let eventCount = 0;
 
+  // ── Diagnostic tracking ──────────────────────────────────────────────────────
+  // These fields help distinguish normal completion from premature close so the
+  // next incident can be diagnosed from logs alone without needing to reproduce.
+  const streamStartMs = Date.now();
+  let firstUpstreamChunkMs: number | null = null; // when first TCP chunk arrived from upstream
+  let firstTranslatedChunkMs: number | null = null; // when first translated chunk was enqueued
+  let translatedChunkCount = 0; // how many translated chunks were successfully enqueued
+  let downstreamCanceled = false; // set true when ReadableStream's cancel() fires
+  // Possible close reasons: "normal" | "downstream_canceled" | "upstream_error" | "unknown"
+  let closeReason: string = "unknown";
+
   log.debug(
     opts.ctx ?? null,
     "STREAM",
@@ -291,7 +302,12 @@ async function handleStreamingResponse(
       const reader = upstream.body!.getReader();
       let controllerClosed = false;
       const safeEnqueue = (chunk: Uint8Array) => {
-        if (!controllerClosed) controller.enqueue(chunk);
+        if (!controllerClosed) {
+          const now = Date.now();
+          if (firstTranslatedChunkMs === null) firstTranslatedChunkMs = now;
+          translatedChunkCount++;
+          controller.enqueue(chunk);
+        }
       };
       const safeClose = () => {
         if (!controllerClosed) {
@@ -304,6 +320,8 @@ async function handleStreamingResponse(
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
+          if (firstUpstreamChunkMs === null) firstUpstreamChunkMs = Date.now();
 
           const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
           chunkCount++;
@@ -481,10 +499,16 @@ async function handleStreamingResponse(
           );
         }
 
-        log.debug(
+        closeReason = "normal";
+        const totalMs = Date.now() - streamStartMs;
+        log.info(
           opts.ctx ?? null,
           "STREAM",
-          `Stream complete: ${chunkCount} chunks, ${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}`
+          `INNER complete: ${chunkCount} upstreamChunks, ${translatedChunkCount} translatedChunks, ` +
+            `${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}, ` +
+            `firstUpstreamChunkAfterMs=${firstUpstreamChunkMs != null ? firstUpstreamChunkMs - streamStartMs : "?"}, ` +
+            `firstTranslatedAfterMs=${firstTranslatedChunkMs != null ? firstTranslatedChunkMs - streamStartMs : "?"}, ` +
+            `closeReason=${closeReason}, totalMs=${totalMs}`
         );
 
         safeClose();
@@ -520,17 +544,42 @@ async function handleStreamingResponse(
           }
         }
         const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
-        log.warn(
-          opts.ctx ?? null,
-          "STREAM",
-          `Stream error — closing cleanly: ${errMsg}`
-        );
+        const totalMs = Date.now() - streamStartMs;
+        if (downstreamCanceled) {
+          closeReason = "downstream_canceled";
+          log.warn(
+            opts.ctx ?? null,
+            "STREAM",
+            `INNER close (downstream_canceled): upstreamChunks=${chunkCount}, ` +
+              `translatedChunks=${translatedChunkCount}, err=${errMsg}, totalMs=${totalMs}`
+          );
+        } else {
+          closeReason = "upstream_error";
+          log.warn(
+            opts.ctx ?? null,
+            "STREAM",
+            `INNER close (upstream_error): upstreamChunks=${chunkCount}, ` +
+              `translatedChunks=${translatedChunkCount}, err=${errMsg}, totalMs=${totalMs}`
+          );
+        }
         safeClose();
       } finally {
+        // Always log the final state so we can see what happened even if the
+        // reason was set above (finally always runs after catch or try).
+        if (closeReason === "unknown") {
+          const totalMs = Date.now() - streamStartMs;
+          log.warn(
+            opts.ctx ?? null,
+            "STREAM",
+            `INNER close (unknown): upstreamChunks=${chunkCount}, ` +
+              `translatedChunks=${translatedChunkCount}, totalMs=${totalMs}`
+          );
+        }
         reader.releaseLock();
       }
     },
     cancel() {
+      downstreamCanceled = true;
       opts.onDisconnect?.("client_disconnected");
     },
   });

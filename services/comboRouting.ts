@@ -19,6 +19,7 @@ const MAX_SESSIONS_PER_COMBO = 1000;
 const COMBO_METADATA = Symbol.for("comboMetadata");
 
 import type { RequestContext } from "../lib/requestContext.ts";
+import { getSessionModel, setSessionModel, incrementSessionCounter } from "../lib/redis.ts";
 
 export interface ComboMetadata {
   comboName: string;
@@ -295,52 +296,82 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         "COMBO",
         `Session-sticky: no x-claude-code-session-id header — falling back to simple round-robin`
       );
-      // No session to stick to — just pick next model round-robin (no sticky limit)
-      const counter = sessionAssignCounter.get(comboName) ?? 0;
-      const modelIndex = counter % models.length;
-      sessionAssignCounter.set(comboName, counter + 1);
-      assignedModel = models[modelIndex]!.model;
-    } else {
-      // Resolve or assign session
-      const comboSessions = sessionStickyMap.get(comboName) ?? new Map();
-      const sessionEntry = comboSessions.get(sessionId);
-      const now = Date.now();
-
-      if (sessionEntry && now - sessionEntry.assignedAt < SESSION_TTL_MS) {
-        assignedModel = sessionEntry.model;
-        log.info(
-          ctx ?? null,
-          "COMBO",
-          `Session-sticky: session ${sessionId} → ${assignedModel} (sticky, assigned ${Math.round((now - sessionEntry.assignedAt) / 86400000)}h ago)`
-        );
+      // No session to stick to — try Redis counter first, then in-memory
+      const redisCounter = await incrementSessionCounter(comboName);
+      if (redisCounter >= 0) {
+        const modelIndex = redisCounter % models.length;
+        assignedModel = models[modelIndex]!.model;
       } else {
-        // Assign new session round-robin
-        const counter = (sessionAssignCounter.get(comboName) ?? 0);
+        const counter = sessionAssignCounter.get(comboName) ?? 0;
         const modelIndex = counter % models.length;
         sessionAssignCounter.set(comboName, counter + 1);
         assignedModel = models[modelIndex]!.model;
+      }
+    } else {
+      // Try Redis first for session lookup
+      const redisEntry = await getSessionModel(comboName, sessionId);
+      const now = Date.now();
 
-        // LRU eviction: if at capacity, remove oldest entry
-        if (comboSessions.size >= MAX_SESSIONS_PER_COMBO) {
-          let oldestSessionId: string | null = null;
-          let oldestTime = Infinity;
-          for (const [sid, entry] of comboSessions) {
-            if (entry.assignedAt < oldestTime) {
-              oldestTime = entry.assignedAt;
-              oldestSessionId = sid;
-            }
-          }
-          if (oldestSessionId) comboSessions.delete(oldestSessionId);
-        }
-
-        comboSessions.set(sessionId, { model: assignedModel, assignedAt: now });
-        sessionStickyMap.set(comboName, comboSessions);
-
+      if (redisEntry && now - redisEntry.assignedAt < SESSION_TTL_MS) {
+        // Redis hit — use it
+        assignedModel = redisEntry.model;
         log.info(
           ctx ?? null,
           "COMBO",
-          `Session-sticky: session ${sessionId} → ${assignedModel} (new assignment, evicted ${comboSessions.size >= MAX_SESSIONS_PER_COMBO ? "LRU entry, " : ""}total sessions: ${comboSessions.size})`
+          `Session-sticky: session ${sessionId} → ${assignedModel} (Redis sticky, assigned ${Math.round((now - redisEntry.assignedAt) / 86400000)}h ago)`
         );
+      } else {
+        // Check in-memory fallback
+        const comboSessions = sessionStickyMap.get(comboName) ?? new Map();
+        const memEntry = comboSessions.get(sessionId);
+
+        if (memEntry && now - memEntry.assignedAt < SESSION_TTL_MS) {
+          // In-memory hit — use it, also backfill to Redis
+          assignedModel = memEntry.model;
+          await setSessionModel(comboName, sessionId, assignedModel);
+          log.info(
+            ctx ?? null,
+            "COMBO",
+            `Session-sticky: session ${sessionId} → ${assignedModel} (memory sticky, backfilled to Redis)`
+          );
+        } else {
+          // New assignment — try Redis counter first, then in-memory
+          const redisCounter = await incrementSessionCounter(comboName);
+          let counter: number;
+          if (redisCounter >= 0) {
+            counter = redisCounter;
+          } else {
+            counter = sessionAssignCounter.get(comboName) ?? 0;
+            sessionAssignCounter.set(comboName, counter + 1);
+          }
+          const modelIndex = counter % models.length;
+          assignedModel = models[modelIndex]!.model;
+
+          // Store in Redis
+          await setSessionModel(comboName, sessionId, assignedModel);
+
+          // Also store in memory as local cache
+          if (comboSessions.size >= MAX_SESSIONS_PER_COMBO) {
+            let oldestSessionId: string | null = null;
+            let oldestTime = Infinity;
+            for (const [sid, entry] of comboSessions) {
+              if (entry.assignedAt < oldestTime) {
+                oldestTime = entry.assignedAt;
+                oldestSessionId = sid;
+              }
+            }
+            if (oldestSessionId) comboSessions.delete(oldestSessionId);
+          }
+
+          comboSessions.set(sessionId, { model: assignedModel, assignedAt: now });
+          sessionStickyMap.set(comboName, comboSessions);
+
+          log.info(
+            ctx ?? null,
+            "COMBO",
+            `Session-sticky: session ${sessionId} → ${assignedModel} (new assignment${redisCounter >= 0 ? ", Redis counter" : ", memory counter"}, total sessions: ${comboSessions.size})`
+          );
+        }
       }
     }
 
