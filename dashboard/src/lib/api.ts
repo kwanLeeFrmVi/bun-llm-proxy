@@ -472,4 +472,31 @@ export const api = {
       return request<import("./proxTypes.ts").ProxRecent>(`/api/prox/recent?${params}`);
     },
   },
+
+  // ─── TrollLLM (trollllm.xyz) ────────────────────────────────────────────────
+  troll: {
+    getTokenStatus: () =>
+      request<{ configured: boolean; masked?: string }>("/api/troll/token"),
+    saveToken: (token: string) =>
+      request<{ success: boolean; masked: string; username?: string; warning?: string }>(
+        "/api/troll/token",
+        { method: "PUT", body: JSON.stringify({ token }) }
+      ),
+    deleteToken: () => request<{ success: boolean }>("/api/troll/token", { method: "DELETE" }),
+    getBilling: () => request<import("./trollTypes.ts").TrollBilling>("/api/troll/billing"),
+    getStatus: () => request<import("./trollTypes.ts").TrollUsageStatus>("/api/troll/status"),
+    getSummary: (period: string) =>
+      request<import("./trollTypes.ts").TrollSummary>(`/api/troll/summary?period=${period}`),
+    getLogs: (period: string, page: number, limit: number) =>
+      request<import("./trollTypes.ts").TrollLogs>(
+        `/api/troll/logs?period=${period}&page=${page}&limit=${limit}`
+      ),
+    getMe: () => request<import("./trollTypes.ts").TrollMe>("/api/troll/me"),
+    getPromo: () => request<import("./trollTypes.ts").TrollPromo>("/api/troll/promo"),
+    updateDiscord: (discordId: string) =>
+      request<{ success: boolean }>("/api/troll/discord", {
+        method: "PUT",
+        body: JSON.stringify({ discordId }),
+      }),
+  },
 };

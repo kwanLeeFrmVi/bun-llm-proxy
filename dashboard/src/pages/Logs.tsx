@@ -17,7 +17,17 @@ const LEVEL_COLORS: Record<string, string> = {
 const cardStyle =
   "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
-function wsUrl(token: string) {
+function getWebSocketBaseUrl(token: string): string {
+  if (import.meta.env.DEV) {
+    // Dev: Vite doesn't proxy /ws, so connect directly to Bun server
+    return `ws://localhost:20129/ws/console-logs?token=${encodeURIComponent(token)}`;
+  }
+  // Production: use VITE_API_URL as-is if set, otherwise same origin
+  const base = import.meta.env.VITE_API_URL ?? "";
+  // VITE_API_URL may be a full URL like "https://api.example.com" or just empty
+  if (base) {
+    return `${base.replace(/^http/, "ws")}/ws/console-logs?token=${encodeURIComponent(token)}`;
+  }
   const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
   return `${proto}${window.location.host}/ws/console-logs?token=${encodeURIComponent(token)}`;
 }
@@ -34,10 +44,14 @@ export default function Logs() {
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [autoScroll]);
 
-  // Load initial buffer via REST, then switch to WebSocket for live updates
+  // Stable token ref so reconnect doesn't re-run on token change
+  const tokenRef = useRef<string | null>(null);
+
+  // Load initial buffer via REST, then maintain WebSocket for live updates
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
+    tokenRef.current = token;
 
     // Fetch current buffer
     fetch("/api/console-logs", {
@@ -47,32 +61,59 @@ export default function Logs() {
       .then((data: ConsoleLogEntry[]) => setLogs(data))
       .catch(() => {});
 
-    // Open WebSocket for live stream — bypasses Vite proxy in dev
-    const ws = new WebSocket(wsUrl(token));
-    wsRef.current = ws;
+    let ws: WebSocket;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let destroyed = false;
+    let reconnectAttempt = 0;
 
-    ws.onmessage = (e) => {
-      try {
-        const entry: ConsoleLogEntry = JSON.parse(e.data);
-        if ("type" in entry && (entry as { type?: string }).type === "clear") {
-          setLogs([]);
-        } else {
-          setLogs((prev) => [...prev.slice(-999), entry]);
+    function connect() {
+      if (destroyed || !tokenRef.current) return;
+      ws = new WebSocket(getWebSocketBaseUrl(tokenRef.current));
+      wsRef.current = ws;
+
+      ws.onmessage = (e) => {
+        try {
+          const entry: ConsoleLogEntry = JSON.parse(e.data);
+          if ("type" in entry && (entry as { type?: string }).type === "clear") {
+            setLogs([]);
+          } else {
+            setLogs((prev) => [...prev.slice(-999), entry]);
+          }
+        } catch {
+          /* ignore parse errors */
         }
-      } catch {
-        /* ignore parse errors */
-      }
-    };
+      };
 
-    ws.onclose = () => {
-      wsRef.current = null;
-    };
+      ws.onclose = () => {
+        wsRef.current = null;
+        reconnectAttempt++;
+        if (!destroyed) {
+          // Exponential backoff: 1s, 2s, 4s, 8s, max 15s, reset on successful connect
+          const delay = Math.min(15_000, 1_000 * 2 ** Math.min(reconnectAttempt - 1, 4));
+          reconnectTimer = setTimeout(() => {
+            if (!destroyed) connect();
+          }, delay);
+        }
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    connect();
 
     return () => {
-      ws.close();
+      destroyed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
       wsRef.current = null;
     };
   }, []);
+
+  function handleClear() {
+    wsRef.current?.send("clear");
+  }
 
   useEffect(() => {
     scrollToBottom();
@@ -83,11 +124,6 @@ export default function Logs() {
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     atBottomRef.current = scrollHeight - scrollTop - clientHeight < 40;
     setAutoScroll(atBottomRef.current);
-  }
-
-  function handleClear() {
-    // Send "clear" over WS — broadcasts to all connected tabs
-    wsRef.current?.send("clear");
   }
 
   return (

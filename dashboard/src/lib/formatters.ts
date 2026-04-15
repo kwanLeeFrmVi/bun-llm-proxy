@@ -17,3 +17,11 @@ export function pct(used: number, total: number): number {
   if (!total) return 0;
   return Math.min(100, Math.round((used / total) * 100));
 }
+
+export function fmtMs(ms: number): string {
+  if (ms < 1000) return `${ms.toFixed(0)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.floor((ms % 60_000) / 1000);
+  return `${mins}m ${secs}s`;
+}

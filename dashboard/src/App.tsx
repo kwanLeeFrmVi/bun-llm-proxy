@@ -17,6 +17,7 @@ const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const MavisUsage = lazy(() => import("@/pages/MavisUsage"));
 const ZaiUsage = lazy(() => import("@/pages/ZaiUsage"));
 const ProxUsage = lazy(() => import("@/pages/ProxUsage"));
+const TrollUsage = lazy(() => import("@/pages/TrollUsage"));
 const ApiKeys = lazy(() => import("@/pages/ApiKeys"));
 const Users = lazy(() => import("@/pages/Users"));
 const UserDetail = lazy(() => import("@/pages/UserDetail"));
@@ -97,6 +98,7 @@ function ProtectedLayout() {
             <Route path="/mavis-usage" element={<Suspense fallback={<Loader />}><MavisUsage /></Suspense>} />
             <Route path="/zai-usage" element={<Suspense fallback={<Loader />}><ZaiUsage /></Suspense>} />
             <Route path="/prox-usage" element={<Suspense fallback={<Loader />}><ProxUsage /></Suspense>} />
+            <Route path="/troll-usage" element={<Suspense fallback={<Loader />}><TrollUsage /></Suspense>} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/models" element={<Models />} />
             <Route path="/models/:modelId" element={<Suspense fallback={<Loader />}><ModelStats /></Suspense>} />

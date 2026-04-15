@@ -161,31 +161,42 @@ const server = Bun.serve({
     data: {} as Request,
   },
 
-  async fetch(req) {
+  fetch(req, server) {
     if (req.method === "OPTIONS") return corsResponse();
     const url = new URL(req.url);
 
-    // Serve dashboard built assets (CSS, JS, images)
-    if (url.pathname.startsWith("/assets/")) {
-      const file = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
-      if (await file.exists()) return new Response(file);
+    // Upgrade WebSocket connections for /ws/* paths
+    if (url.pathname.startsWith("/ws/")) {
+      const upgraded = server.upgrade(req, { data: req });
+      if (upgraded) return undefined;
+      return new Response("WebSocket upgrade failed", { status: 500 });
     }
 
-    // Serve dashboard SPA for all non-API routes
-    if (!url.pathname.startsWith("/api") && !url.pathname.startsWith("/v1")) {
-      // Check for static files in dist root (logo.svg, etc.)
-      const staticFile = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
-      if (await staticFile.exists()) return new Response(staticFile);
-
-      // Fall back to index.html for SPA routing
-      const file = Bun.file(join(process.cwd(), "dashboard/dist/index.html"));
-      return new Response(file, {
-        headers: { "Content-Type": "text/html" },
-      });
-    }
-
-    return new Response("Not found", { status: 404 });
+    return handleHttpRequest(url, req);
   },
 });
+
+async function handleHttpRequest(url: URL, req: Request): Promise<Response> {
+  // Serve dashboard built assets (CSS, JS, images)
+  if (url.pathname.startsWith("/assets/")) {
+    const file = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
+    if (await file.exists()) return new Response(file);
+  }
+
+  // Serve dashboard SPA for all non-API routes
+  if (!url.pathname.startsWith("/api") && !url.pathname.startsWith("/v1")) {
+    // Check for static files in dist root (logo.svg, etc.)
+    const staticFile = Bun.file(join(process.cwd(), "dashboard/dist", url.pathname));
+    if (await staticFile.exists()) return new Response(staticFile);
+
+    // Fall back to index.html for SPA routing
+    const file = Bun.file(join(process.cwd(), "dashboard/dist/index.html"));
+    return new Response(file, {
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  return new Response("Not found", { status: 404 });
+}
 
 console.log(`[BUN] Listening on port ${server.port}`);
