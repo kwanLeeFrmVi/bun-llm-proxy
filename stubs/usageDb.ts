@@ -24,6 +24,18 @@ export function resetUsageDb(): void {
 
 const getDb = (): Database => (_getDb ?? getRawDb)();
 
+// ─── Model name normalization ───────────────────────────────────────────────────
+
+/**
+ * Strip provider prefix from a model name.
+ * "openai/gpt-4o" → "gpt-4o"
+ * "claude-opus-4-6" → "claude-opus-4-6"  (no change if no slash)
+ */
+export function normalizeModelForQuery(model: string): string {
+  const slashIdx = model.indexOf("/");
+  return slashIdx >= 0 ? model.slice(slashIdx + 1) : model;
+}
+
 // ─── In-memory state ───────────────────────────────────────────────────────────
 
 interface PendingRequest {
@@ -377,7 +389,8 @@ export function getUsageStats(period: string): UsageStats {
      FROM usage_log WHERE ${baseFilter} AND model IS NOT NULL
      GROUP BY model ORDER BY tokens DESC`
     )
-    .all();
+    .all()
+    .map((r) => ({ ...r, model: normalizeModelForQuery(r.model) }));
 
   const byApiKeyRaw = db
     .query<{ api_key_id: string; requests: number; cost: number }, []>(
@@ -427,7 +440,7 @@ export function getUsageDetails(opts: {
   }
 
   if (provider) conditions.push(`provider  = '${provider.replace(/'/g, "''")}'`);
-  if (model) conditions.push(`model     = '${model.replace(/'/g, "''")}'`);
+  if (model) conditions.push(`model     = '${normalizeModelForQuery(model).replace(/'/g, "''")}'`);
   if (apiKeyId) conditions.push(`api_key_id = '${apiKeyId.replace(/'/g, "''")}'`);
 
   const where = `WHERE ${conditions.join(" AND ")}`;
@@ -622,7 +635,7 @@ export function getModelStats(
   const since = periodToTimestamp(period);
   const limit = opts?.limit ?? 50;
   const offset = opts?.page ? (opts.page - 1) * limit : 0;
-  const escapedModel = model.replace(/'/g, "''");
+  const escapedModel = normalizeModelForQuery(model).replace(/'/g, "''");
   const timeFilter = since ? `AND timestamp >= '${since}'` : "";
 
   // Get provider for this model

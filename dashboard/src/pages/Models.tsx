@@ -51,6 +51,12 @@ type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
 
+/** Strip provider prefix so stats lookup matches DB storage: "openai/gpt-4o" → "gpt-4o" */
+function normalizeModel(model: string): string {
+  const idx = model.indexOf("/");
+  return idx >= 0 ? model.slice(idx + 1) : model;
+}
+
 type ModelEntry = {
   id: string;
   created?: number;
@@ -498,7 +504,7 @@ export default function Models() {
                   : m.id.split("/").length > 1
                     ? m.id.split("/").slice(1).join("/")
                     : m.id;
-                const statsKey = isCombo ? m.id : m.id;
+                const statsKey = isCombo ? m.id : normalizeModel(m.id);
                 const stat = latestStats.get(statsKey);
                 return (
                   <TableRow

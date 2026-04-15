@@ -33,6 +33,12 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
   );
 }
 
+/** Strip provider prefix so model param matches DB storage: "openai/gpt-4o" → "gpt-4o" */
+function normalizeModel(model: string): string {
+  const idx = model.indexOf("/");
+  return idx >= 0 ? model.slice(idx + 1) : model;
+}
+
 function fmtMs(ms: number | null): string {
   if (ms == null) return "—";
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
@@ -52,7 +58,8 @@ function fmtPct(pct: number): string {
 export default function ModelStats() {
   const { modelId } = useParams<{ modelId: string }>();
   const navigate = useNavigate();
-  const model = decodeURIComponent(modelId ?? "");
+  const displayModel = decodeURIComponent(modelId ?? "");
+  const model = normalizeModel(displayModel);
 
   const [period, setPeriod] = useState<Period>("7d");
   const [data, setData] = useState<Awaited<ReturnType<typeof api.usage.modelStats>> | null>(null);
@@ -104,7 +111,7 @@ export default function ModelStats() {
           </Button>
           <div>
             <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {model}
+              {displayModel}
             </h1>
             {summary?.provider && (
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mt-1 font-medium">

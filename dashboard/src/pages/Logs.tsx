@@ -17,11 +17,16 @@ const LEVEL_COLORS: Record<string, string> = {
 const cardStyle =
   "bg-[--surface-container-lowest] rounded-xl border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden";
 
+function wsUrl(token: string) {
+  const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
+  return `${proto}${window.location.host}/ws/console-logs?token=${encodeURIComponent(token)}`;
+}
+
 export default function Logs() {
   const [logs, setLogs] = useState<ConsoleLogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const esRef = useRef<EventSource | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const atBottomRef = useRef(true);
 
   const scrollToBottom = useCallback(() => {
@@ -29,22 +34,24 @@ export default function Logs() {
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [autoScroll]);
 
+  // Load initial buffer via REST, then switch to WebSocket for live updates
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+
+    // Fetch current buffer
     fetch("/api/console-logs", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((data: ConsoleLogEntry[]) => setLogs(data))
       .catch(() => {});
-  }, []);
 
-  useEffect(() => {
-    const es = new EventSource("/api/console-logs/stream");
-    esRef.current = es;
+    // Open WebSocket for live stream — bypasses Vite proxy in dev
+    const ws = new WebSocket(wsUrl(token));
+    wsRef.current = ws;
 
-    es.onmessage = (e) => {
+    ws.onmessage = (e) => {
       try {
         const entry: ConsoleLogEntry = JSON.parse(e.data);
         if ("type" in entry && (entry as { type?: string }).type === "clear") {
@@ -57,9 +64,13 @@ export default function Logs() {
       }
     };
 
+    ws.onclose = () => {
+      wsRef.current = null;
+    };
+
     return () => {
-      es.close();
-      esRef.current = null;
+      ws.close();
+      wsRef.current = null;
     };
   }, []);
 
@@ -72,6 +83,11 @@ export default function Logs() {
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     atBottomRef.current = scrollHeight - scrollTop - clientHeight < 40;
     setAutoScroll(atBottomRef.current);
+  }
+
+  function handleClear() {
+    // Send "clear" over WS — broadcasts to all connected tabs
+    wsRef.current?.send("clear");
   }
 
   return (
@@ -112,7 +128,7 @@ export default function Logs() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLogs([])}
+              onClick={handleClear}
               className="h-8 text-xs font-medium border-[rgba(203,213,225,0.6)]"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Clear

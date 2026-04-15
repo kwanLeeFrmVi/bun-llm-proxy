@@ -1,10 +1,18 @@
 // Bun runtime entry point for v1 API endpoints
 import { initTranslators } from "./ai-bridge/translator/index.ts";
 import { openDb } from "./db/index.ts";
-import { initConsoleLogCapture } from "./lib/consoleLogBuffer.ts";
+import {
+  initConsoleLogCapture,
+  getConsoleLogs,
+  getConsoleEmitter,
+  clearConsoleLogs,
+} from "./lib/consoleLogBuffer.ts";
 import { corsResponse } from "./lib/cors.ts";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { getSessionByToken } from "./db/index.ts";
+import type { ConsoleLogEntry } from "./lib/consoleLogBuffer.ts";
+import type { ServerWebSocket } from "bun";
 
 // Initialize DB (creates tables, opens WAL connection)
 openDb();
@@ -39,6 +47,98 @@ const isLinux = process.platform === "linux";
 // Load all route files so they self-register, then build the routes config
 await loadAllRoutes(join(process.cwd(), "routes"));
 
+// ─── WebSocket: /ws/console-logs ──────────────────────────────────────────────
+
+type WsData = {
+  onLine: (entry: ConsoleLogEntry) => void;
+  onClear: () => void;
+  heartbeat: ReturnType<typeof setInterval>;
+};
+
+const clients = new Set<ServerWebSocket<Request> & WsData>();
+
+function handleWsConsoleLogOpen(ws: ServerWebSocket<Request>) {
+  const req = ws.data;
+  const token = req?.url ? new URL(req.url).searchParams.get("token") : null;
+
+  if (!token) {
+    ws.close(1008, "Unauthorized");
+    return;
+  }
+
+  getSessionByToken(token)
+    .then((session) => {
+      if (!session) {
+        ws.close(1008, "Unauthorized");
+        return;
+      }
+
+      const emitter = getConsoleEmitter();
+      const heartbeat = setInterval(() => {
+        try {
+          ws.send(": ping");
+        } catch {
+          clearInterval(heartbeat);
+        }
+      }, 15_000);
+
+      const onLine = (entry: ConsoleLogEntry) => {
+        try {
+          ws.send(JSON.stringify(entry));
+        } catch {
+          /* closed */
+        }
+      };
+
+      const onClear = () => {
+        try {
+          ws.send(JSON.stringify({ type: "clear" }));
+        } catch {
+          /* closed */
+        }
+      };
+
+      const d = ws as ServerWebSocket<Request> & WsData;
+      d.onLine = onLine;
+      d.onClear = onClear;
+      d.heartbeat = heartbeat;
+      clients.add(d);
+
+      // Send current buffer
+      for (const entry of getConsoleLogs()) {
+        try {
+          ws.send(JSON.stringify(entry));
+        } catch {
+          break;
+        }
+      }
+
+      emitter.on("line", onLine);
+      emitter.on("clear", onClear);
+    })
+    .catch(() => ws.close(1011, "Internal error"));
+}
+
+function handleWsConsoleLogClose(ws: ServerWebSocket<Request>) {
+  const d = ws as ServerWebSocket<Request> & WsData;
+  clearInterval(d.heartbeat);
+  clients.delete(d);
+  try {
+    getConsoleEmitter().off("line", d.onLine);
+    getConsoleEmitter().off("clear", d.onClear);
+  } catch {
+    /* already cleared */
+  }
+}
+
+function handleWsConsoleLogMessage(ws: ServerWebSocket<Request>, msg: string) {
+  if (msg === "clear") {
+    clearConsoleLogs();
+  }
+}
+
+// ─── Load routes ──────────────────────────────────────────────────────────────
+
 const { buildRoutes } = await import("./lib/routeRegistry.ts");
 const routes = buildRoutes();
 
@@ -46,6 +146,20 @@ const server = Bun.serve({
   port: PORT,
   reusePort: isLinux, // SO_REUSEPORT: Linux only, enables multi-process clustering
   routes,
+  websocket: {
+    open(ws: ServerWebSocket<Request>) {
+      const req = ws.data;
+      if (req) handleWsConsoleLogOpen(ws);
+    },
+    message(ws: ServerWebSocket<Request>, msg) {
+      handleWsConsoleLogMessage(ws, msg.toString());
+    },
+    close(ws: ServerWebSocket<Request>) {
+      handleWsConsoleLogClose(ws);
+    },
+    // Pass the original HTTP request as WebSocket data for auth
+    data: {} as Request,
+  },
 
   async fetch(req) {
     if (req.method === "OPTIONS") return corsResponse();
