@@ -180,6 +180,8 @@ async function handleSingleModelChat(
         `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`
       );
       const chatSessionId = request?.headers?.get("x-claude-code-session-id") ?? null;
+      log.info(ctx ?? null, "[debug]", "header:", request?.headers);
+      
       return handleComboModelWithDB({
         ctx,
         body,
