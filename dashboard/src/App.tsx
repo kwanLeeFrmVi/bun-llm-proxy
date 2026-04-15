@@ -1,24 +1,26 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
 import Login from "@/pages/Login";
-import Providers from "@/pages/Providers";
-import ProviderDetail from "@/pages/ProviderDetail";
 import ApiKeys from "@/pages/ApiKeys";
 import Usage from "@/pages/Usage";
-import MavisUsage from "@/pages/MavisUsage";
-import ZaiUsage from "@/pages/ZaiUsage";
-import ProxUsage from "@/pages/ProxUsage";
 import Logs from "@/pages/Logs";
 import Models from "@/pages/Models";
 import ModelStats from "@/pages/ModelStats";
 import Users from "@/pages/Users";
+import ProviderDetail from "@/pages/ProviderDetail";
 import UserDetail from "@/pages/UserDetail";
-import Leaderboard from "@/pages/Leaderboard";
 import ChangePassword from "@/pages/ChangePassword";
 import OAuthCallback from "@/pages/OAuthCallback";
 import { Loader } from "@/components/Loader";
+
+// Lazy-load heavy secondary routes to reduce initial bundle
+const Providers = lazy(() => import("@/pages/Providers"));
+const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const MavisUsage = lazy(() => import("@/pages/MavisUsage"));
+const ZaiUsage = lazy(() => import("@/pages/ZaiUsage"));
+const ProxUsage = lazy(() => import("@/pages/ProxUsage"));
 
 function ProtectedLayout() {
   const { token, role, loading } = useAuth();
@@ -82,7 +84,7 @@ function ProtectedLayout() {
             {/* Admin-only routes */}
             {isAdmin && (
               <>
-                <Route path="/providers" element={<Providers />} />
+                <Route path="/providers" element={<Suspense fallback={<Loader />}><Providers /></Suspense>} />
                 <Route path="/providers/:providerId" element={<ProviderDetail />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/users/:userId" element={<UserDetail />} />
@@ -91,10 +93,10 @@ function ProtectedLayout() {
             {/* Shared routes */}
             <Route path="/keys" element={<ApiKeys />} />
             <Route path="/usage" element={<Usage />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/mavis-usage" element={<MavisUsage />} />
-            <Route path="/zai-usage" element={<ZaiUsage />} />
-            <Route path="/prox-usage" element={<ProxUsage />} />
+            <Route path="/leaderboard" element={<Suspense fallback={<Loader />}><Leaderboard /></Suspense>} />
+            <Route path="/mavis-usage" element={<Suspense fallback={<Loader />}><MavisUsage /></Suspense>} />
+            <Route path="/zai-usage" element={<Suspense fallback={<Loader />}><ZaiUsage /></Suspense>} />
+            <Route path="/prox-usage" element={<Suspense fallback={<Loader />}><ProxUsage /></Suspense>} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/models" element={<Models />} />
             <Route path="/models/:modelId" element={<ModelStats />} />

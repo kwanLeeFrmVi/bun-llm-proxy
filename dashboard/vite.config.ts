@@ -5,6 +5,18 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split chart.js + react-chartjs-2 into its own chunk (~200KB)
+          "chart.js": ["chart.js", "react-chartjs-2"],
+          // Split lodash into its own chunk
+          vendor: ["lodash"],
+        },
+      },
+    },
+  },
   server: {
     port: 20130,
     proxy: {

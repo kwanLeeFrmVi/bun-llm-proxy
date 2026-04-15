@@ -20,7 +20,7 @@ import {
   Check,
   BarChart3,
 } from "lucide-react";
-import { uniq } from "lodash";
+import uniq from "lodash/uniq";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
