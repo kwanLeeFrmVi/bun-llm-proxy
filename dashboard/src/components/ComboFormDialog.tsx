@@ -233,7 +233,7 @@ export default function ComboFormDialog({
                             Combo
                           </Badge>
                         )}
-                        {(strategy === "weight" || strategy === "speed") && (
+                        {strategy === "weight" && (
                           <Input
                             type="number"
                             min={1}

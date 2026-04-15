@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api.ts";
+import { useAuth } from "@/lib/auth.tsx";
 import { useComboStore } from "@/lib/comboStore.ts";
 import { PROVIDER_NAMES } from "@/lib/constants.ts";
 
@@ -60,6 +61,8 @@ type ModelEntry = {
 
 export default function Models() {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
   const { combos, deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -407,15 +410,17 @@ export default function Models() {
                 </ComboboxContent>
               </Combobox>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1.5 border-input bg-background shadow-none"
-                onClick={openCreateCombo}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Combos
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 border-input bg-background shadow-none"
+                  onClick={openCreateCombo}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Combos
+                </Button>
+              )}
 
               <div className="relative w-full max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-60" />
@@ -529,14 +534,22 @@ export default function Models() {
                       })()}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-3 text-right font-mono">
-                      {stat?.ttftMs != null ? (
-                        <span>{stat.ttftMs >= 1000 ? `${(stat.ttftMs / 1000).toFixed(1)}s` : `${stat.ttftMs}ms`}</span>
+                      {stat ? (
+                        stat.ttftMs != null ? (
+                          <span>
+                            {stat.ttftMs >= 1000
+                              ? `${(stat.ttftMs / 1000).toFixed(1)}s`
+                              : `${stat.ttftMs}ms`}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )
                       ) : (
                         <span className="text-muted-foreground/50">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-3 text-right font-mono">
-                      {stat?.tps != null ? (
+                      {stat && stat.tps != null ? (
                         <span>{stat.tps.toFixed(1)}</span>
                       ) : (
                         <span className="text-muted-foreground/50">—</span>
@@ -545,29 +558,48 @@ export default function Models() {
                     <TableCell className="py-3 pr-4">
                       {isCombo && (m.combo_id || combos.find((c) => c.name === m.id)) ? (
                         <div className="flex gap-1 justify-end">
-                          {(() => {
-                            const storeCombo = combos.find(
-                              (c) => (m.combo_id && c.id === m.combo_id) || c.name === m.id
-                            );
-                            return (
-                              <EditComboButton
-                                comboId={m.combo_id || storeCombo?.id || ""}
-                                comboName={m.id}
-                                comboModels={
-                                  storeCombo
-                                    ? storeCombo.models
-                                    : (m.combo_models ?? []).map((model) => ({
-                                        model,
-                                        weight: 1,
-                                      }))
-                                }
-                                comboStrategy={storeCombo?.strategy}
-                              />
-                            );
-                          })()}
-                          <DeleteComboButton
-                            comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""}
-                          />
+                          {isAdmin &&
+                            (() => {
+                              const storeCombo = combos.find(
+                                (c) => (m.combo_id && c.id === m.combo_id) || c.name === m.id
+                              );
+                              return (
+                                <EditComboButton
+                                  comboId={m.combo_id || storeCombo?.id || ""}
+                                  comboName={m.id}
+                                  comboModels={
+                                    storeCombo
+                                      ? storeCombo.models
+                                      : (m.combo_models ?? []).map((model) => ({
+                                          model,
+                                          weight: 1,
+                                        }))
+                                  }
+                                  comboStrategy={storeCombo?.strategy}
+                                />
+                              );
+                            })()}
+                          {isAdmin && (
+                            <DeleteComboButton
+                              comboId={m.combo_id || combos.find((c) => c.name === m.id)?.id || ""}
+                            />
+                          )}
+                          {!isAdmin && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => navigate(`/models/${encodeURIComponent(m.id)}`)}
+                                >
+                                  <BarChart3 className="w-3.5 h-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-[10px]">
+                                View stats
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       ) : (
                         <div className="flex justify-end">

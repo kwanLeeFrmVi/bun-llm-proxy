@@ -524,7 +524,7 @@ function wrapStreamingResponse(
         const durationMs = Date.now() - startTime;
         const errMsg = err instanceof Error ? err.message : String(err);
         log.stream(ctx, "ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
-        controller.error(err);
+        controller.close();
       } finally {
         reader.releaseLock();
         const durationMs = Date.now() - startTime;
