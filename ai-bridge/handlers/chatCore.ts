@@ -289,6 +289,16 @@ async function handleStreamingResponse(
   const stream = new ReadableStream({
     async start(controller) {
       const reader = upstream.body!.getReader();
+      let controllerClosed = false;
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (!controllerClosed) controller.enqueue(chunk);
+      };
+      const safeClose = () => {
+        if (!controllerClosed) {
+          controllerClosed = true;
+          controller.close();
+        }
+      };
 
       try {
         while (true) {
@@ -325,7 +335,7 @@ async function handleStreamingResponse(
               );
               state = translated.state;
               for (const chunk of translated.chunks) {
-                controller.enqueue(chunk);
+                safeEnqueue(chunk);
               }
             }
             continue;
@@ -351,7 +361,7 @@ async function handleStreamingResponse(
               );
               state = translated.state;
               for (const chunk of translated.chunks) {
-                controller.enqueue(chunk);
+                safeEnqueue(chunk);
               }
             }
             continue;
@@ -399,7 +409,7 @@ async function handleStreamingResponse(
             );
             state = translated.state;
             for (const chunk of translated.chunks) {
-              controller.enqueue(chunk);
+              safeEnqueue(chunk);
             }
           }
         }
@@ -417,7 +427,7 @@ async function handleStreamingResponse(
           );
           state = translated.state;
           for (const chunk of translated.chunks) {
-            controller.enqueue(chunk);
+            safeEnqueue(chunk);
           }
           ndjsonBuffer = "";
         }
@@ -433,7 +443,7 @@ async function handleStreamingResponse(
           );
           state = translated.state;
           for (const chunk of translated.chunks) {
-            controller.enqueue(chunk);
+            safeEnqueue(chunk);
           }
           sseBuffer = "";
         }
@@ -448,7 +458,7 @@ async function handleStreamingResponse(
           state
         );
         for (const chunk of doneChunks.chunks) {
-          controller.enqueue(chunk);
+          safeEnqueue(chunk);
         }
 
         // Guarantee message_delta with usage for Claude SSE clients that crash
@@ -460,13 +470,13 @@ async function handleStreamingResponse(
             "STREAM",
             "Emitting synthetic message_delta — upstream did not provide valid usage"
           );
-          controller.enqueue(
+          safeEnqueue(
             encoder.encode(
               "event: message_delta\n" +
                 'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
             )
           );
-          controller.enqueue(
+          safeEnqueue(
             encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
           );
         }
@@ -477,8 +487,16 @@ async function handleStreamingResponse(
           `Stream complete: ${chunkCount} chunks, ${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}`
         );
 
-        controller.close();
+        safeClose();
       } catch (streamErr) {
+        // Propagate downstream cancellation to the inner reader so the upstream
+        // fetch is aborted promptly rather than continuing to read in the background.
+        try {
+          reader.cancel();
+        } catch {
+          /* ignore cancel failures — reader may already be done */
+        }
+
         // Flush stop events so the client gets at least a partial signal
         // (message_delta + message_stop) before closing, preventing crashes
         // on missing input_tokens when the upstream connection drops mid-stream.
@@ -495,19 +513,19 @@ async function handleStreamingResponse(
               state
             );
             for (const chunk of doneChunks.chunks) {
-              controller.enqueue(chunk);
+              safeEnqueue(chunk);
             }
           } catch {
             /* ignore flush errors */
           }
         }
         const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
-        log.debug(
+        log.warn(
           opts.ctx ?? null,
           "STREAM",
           `Stream error — closing cleanly: ${errMsg}`
         );
-        controller.close();
+        safeClose();
       } finally {
         reader.releaseLock();
       }

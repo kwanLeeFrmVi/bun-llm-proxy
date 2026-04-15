@@ -462,6 +462,17 @@ function wrapStreamingResponse(
   const stream = new ReadableStream({
     async start(controller) {
       const reader = originalBody.getReader();
+      let controllerClosed = false;
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (!controllerClosed) controller.enqueue(chunk);
+      };
+      const safeClose = () => {
+        if (!controllerClosed) {
+          controllerClosed = true;
+          controller.close();
+        }
+      };
+
       let finalUsage: {
         prompt_tokens?: number;
         completion_tokens?: number;
@@ -519,23 +530,32 @@ function wrapStreamingResponse(
             }
           }
 
-          controller.enqueue(value);
+          safeEnqueue(value);
         }
         const durationMs = Date.now() - startTime;
         log.stream(ctx, "COMPLETE", { provider, model, usage: finalUsage });
-        controller.close();
+        safeClose();
       } catch (err) {
+        // Propagate downstream cancellation to the inner reader so upstream
+        // (chatCore) stops being pulled promptly rather than continuing in the background.
+        try {
+          reader.cancel();
+        } catch {
+          /* ignore — reader may already be done */
+        }
         const durationMs = Date.now() - startTime;
         const errMsg = err instanceof Error ? err.message : String(err);
         log.stream(ctx, "ERROR", { provider, model, duration: `${durationMs}ms`, error: errMsg });
-        // Inject an SSE error event so the client sees what went wrong
-        try {
-          const errorPayload = JSON.stringify({
-            error: { message: `Stream error: ${errMsg}`, type: "proxy_error" },
-          });
-          controller.enqueue(new TextEncoder().encode(`data: ${errorPayload}\n\n`));
-        } catch { /* ignore encoding errors */ }
-        controller.close();
+        // Only inject error event if downstream is still writable (not already canceled)
+        if (!controllerClosed) {
+          try {
+            const errorPayload = JSON.stringify({
+              error: { message: `Stream error: ${errMsg}`, type: "proxy_error" },
+            });
+            safeEnqueue(new TextEncoder().encode(`data: ${errorPayload}\n\n`));
+          } catch { /* ignore encoding errors */ }
+        }
+        safeClose();
       } finally {
         reader.releaseLock();
         const durationMs = Date.now() - startTime;

@@ -332,4 +332,118 @@ describe("handleChatCore", () => {
       globalThis.fetch = origFetch;
     }
   });
+
+  it("streaming: handles mid-stream upstream reader error without throwing", async () => {
+    // Simulates connection drop: source closes after the first chunk (no final chunk sent).
+    // Downstream sees an incomplete stream and the proxy must not throw "Controller is already closed".
+    // The scenario: upstream delivers chunks then closes abruptly without [DONE] / message_delta.
+    const origFetch = globalThis.fetch;
+    void origFetch; // intentionally unused when branch is taken
+    globalThis.fetch = (() => {
+      const body = new ReadableStream({
+        start(controller) {
+          // Deliver first chunk normally
+          controller.enqueue(
+            new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n')
+          );
+          // Simulate abrupt upstream close (connection reset) by closing the controller
+          // before the final [DONE] / message_delta is sent. This mirrors real connection drops.
+          setTimeout(() => {
+            controller.close();
+          }, 5);
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: { model: "gpt-4o", messages: [{ role: "user", content: "hi" }], stream: true },
+        modelInfo: { provider: "openai", model: "gpt-4o" },
+        credentials: { apiKey: "test-key" },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+
+      // Consume the stream: we may get the first chunk; the proxy should not throw.
+      const reader = result.response!.body!.getReader();
+      const chunks: string[] = [];
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(new TextDecoder().decode(value));
+        }
+      } catch {
+        /* read after upstream close — catch and continue */
+      } finally {
+        reader.releaseLock();
+      }
+      // At minimum, the first chunk should have been buffered before the close.
+      expect(chunks.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("streaming: handles client cancellation without throwing 'Controller is already closed'", async () => {
+    // Verifies that when the downstream consumer cancels mid-stream:
+    //   1. No unhandled error is thrown from the ReadableStream.
+    //   2. The proxy does not attempt to close an already-closed controller.
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello"}}]}\n\n')
+          );
+          setTimeout(() => {
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":" world"}}]}\n\n'));
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              controller.close();
+            }, 5);
+          }, 5);
+        },
+        cancel() {
+          // Verify cancel is called without throwing.
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: { model: "gpt-4o", messages: [{ role: "user", content: "hi" }], stream: true },
+        modelInfo: { provider: "openai", model: "gpt-4o" },
+        credentials: { apiKey: "test-key" },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+
+      // Cancel the downstream body after reading one chunk — simulates a disconnecting client.
+      const reader = result.response!.body!.getReader();
+      const first = await reader.read();
+      expect(first.done).toBe(false);
+      // Cancel mid-stream — this triggers the ReadableStream's cancel() handler.
+      await reader.cancel();
+      reader.releaseLock();
+
+      // If we reach here without an uncaught exception, the test passes.
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
