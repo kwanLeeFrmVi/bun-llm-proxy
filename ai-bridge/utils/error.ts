@@ -119,6 +119,7 @@ export function sseErrorResponse(status: number, message: string): Response {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
       "Access-Control-Allow-Origin": "*",
+      "X-Proxy-Error": String(status),
     },
   });
 }

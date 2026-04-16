@@ -122,6 +122,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error("[RECALCULATE] Error:", err);
   process.exit(1);
 });

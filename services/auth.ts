@@ -275,7 +275,7 @@ export async function markAccountUnavailable(
   );
 
   if (provider && status && reason) {
-    console.error(`❌ ${provider} [${status}]: ${reason}`);
+    console.error(`❌ [AUTH] ${provider} - ${status}: ${reason}`);
   }
 
   return { shouldFallback: true, cooldownMs };

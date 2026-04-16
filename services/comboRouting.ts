@@ -1,5 +1,7 @@
 // Combo routing strategies - extracted for testability
 
+import { sseErrorResponse } from "../ai-bridge/utils/error.ts";
+
 /**
  * Read the error message from a failed combo leg response.
  * Tries to extract a human-readable string from JSON error bodies.
@@ -25,12 +27,19 @@ async function readComboError(resp: Response, model: string): Promise<string> {
   return `Model ${model} returned status ${resp.status}`;
 }
 
-/** Build the final all-failed 503 response with proper OpenAI error shape. */
-function allFailedResponse(lastError: string | null): Response {
+/** Build the final all-failed 503 response with proper OpenAI error shape.
+ *  When `streaming` is true, returns an SSE error response (HTTP 200 with
+ *  X-Proxy-Error header) so streaming Claude clients don't crash trying to
+ *  parse JSON as SSE. */
+function allFailedResponse(lastError: string | null, streaming = false): Response {
+  const message = lastError ?? "All combo models failed";
+  if (streaming) {
+    return sseErrorResponse(503, message);
+  }
   return new Response(
     JSON.stringify({
       error: {
-        message: lastError ?? "All combo models failed",
+        message,
         type: "server_error",
         code: "service_unavailable",
       },
@@ -72,6 +81,15 @@ export interface ComboModelConfig {
 }
 
 import type { LogContext } from "../lib/requestContext.ts";
+
+/** Check whether a combo leg response represents a real success.
+ *  `sseErrorResponse` returns HTTP 200 with an `X-Proxy-Error` header so that
+ *  the combo layer can distinguish it from a genuine streaming success. */
+function isComboSuccess(resp: Response): boolean {
+  if (!resp.ok) return false;
+  if (resp.headers.get("X-Proxy-Error")) return false;
+  return true;
+}
 
 export interface ComboOptions {
   ctx?: RequestContext;
@@ -171,7 +189,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     let lastError: string | null = null;
     try {
       const resp = await handleSingleModel(body, selectedModel);
-      if (resp.ok) {
+      if (isComboSuccess(resp)) {
         return attachComboMetadata(resp, comboName, selectedModel);
       }
       lastError = await readComboError(resp, selectedModel);
@@ -188,7 +206,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       log.info(ctx ?? null, "COMBO", `Round-robin fallback: trying ${m.model}`);
       try {
         const resp = await handleSingleModel(body, m.model);
-        if (resp.ok) {
+        if (isComboSuccess(resp)) {
           log.info(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
@@ -200,7 +218,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return allFailedResponse(lastError);
+    return allFailedResponse(lastError, body.stream === true);
   }
 
   if (comboStrategy === "weight") {
@@ -232,7 +250,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     for (const m of remainingModels) {
       try {
         const resp = await handleSingleModel(body, m.model);
-        if (resp.ok) {
+        if (isComboSuccess(resp)) {
           log.info(ctx ?? null, "COMBO", `Weight: model ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
@@ -247,7 +265,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return allFailedResponse(lastError);
+    return allFailedResponse(lastError, body.stream === true);
   }
 
   if (comboStrategy === "speed") {
@@ -317,7 +335,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
       try {
         const resp = await handleSingleModel(body, m.model);
-        if (resp.ok) {
+        if (isComboSuccess(resp)) {
           if (i > 0) log.info(ctx ?? null, "COMBO", `Speed fallback: ${m.model} succeeded`);
           return attachComboMetadata(resp, comboName, m.model);
         }
@@ -329,7 +347,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return allFailedResponse(lastError);
+    return allFailedResponse(lastError, body.stream === true);
   }
 
   if (comboStrategy === "session-sticky") {
@@ -437,7 +455,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
       try {
         const resp = await handleSingleModel(body, m.model);
-        if (resp.ok) {
+        if (isComboSuccess(resp)) {
           if (m.model !== assignedModel) {
             log.info(ctx ?? null, "COMBO", `Session-sticky fallback: ${m.model} succeeded`);
           }
@@ -455,7 +473,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       }
     }
 
-    return allFailedResponse(lastError);
+    return allFailedResponse(lastError, body.stream === true);
   }
 
   // fallback (default): try each model in order
@@ -469,7 +487,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     );
     try {
       const resp = await handleSingleModel(body, m.model);
-      if (resp.ok) {
+      if (isComboSuccess(resp)) {
         log.info(ctx ?? null, "COMBO", `Fallback: model ${m.model} succeeded`);
         return attachComboMetadata(resp, comboName, m.model);
       }
@@ -482,7 +500,7 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
     attemptNumber++;
   }
 
-  return allFailedResponse(lastError);
+  return allFailedResponse(lastError, body.stream === true);
 }
 
 /**

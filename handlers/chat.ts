@@ -31,7 +31,7 @@ import { handleComboModel, getComboMetadata } from "../services/comboRouting.ts"
 import { incrementCircuitBreaker, resetCircuitBreaker } from "../lib/circuitBreaker.ts";
 
 function isClaudeStreamingClient(body: Record<string, unknown>, request: Request | null): boolean {
-  if (body.stream === false) return false;
+  if (body.stream !== true) return false;
   const endpoint = request?.url ? new URL(request.url).pathname : "";
   const fmt = detectFormatByEndpoint(endpoint, body) ?? detectFormat(body);
   return fmt === "claude";
@@ -134,7 +134,7 @@ export async function handleChat(
           apiKeyId,
           ctx
         );
-        if (resp.ok) {
+        if (resp.ok && !resp.headers.get("X-Proxy-Error")) {
           log.info(ctx, "COMBO", `Model ${m} succeeded`);
         }
         return resp;
@@ -194,7 +194,7 @@ async function handleSingleModelChat(
             apiKeyId,
             ctx
           );
-          if (resp.ok) {
+          if (resp.ok && !resp.headers.get("X-Proxy-Error")) {
             log.info(ctx, "COMBO", `Model ${m} succeeded`);
           }
           return resp;
