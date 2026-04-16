@@ -171,6 +171,48 @@ describe("claude → openai (streaming)", () => {
     expect(raw).toContain('"finish_reason":"stop"');
     expect(raw).toContain('"prompt_tokens":5');
   });
+
+  it("forwards thinking_delta as reasoning_content in delta", () => {
+    const sse =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"let me reason"}}';
+    const chunks = decodeAll(
+      convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(sse), undefined)
+    );
+    const raw = chunks.join("");
+    expect(raw).toContain('"reasoning_content":"let me reason"');
+  });
+
+  it("thinking-only response produces non-empty output with reasoning_content", () => {
+    // Simulate a full Claude thinking-only stream: message_start → thinking block → message_delta → message_stop
+    const state = undefined;
+    const sse1 =
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_think","model":"claude-sonnet-4","role":"assistant","content":[],"usage":{"input_tokens":10,"output_tokens":0}}}\n\n';
+    const sse2 =
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}\n\n';
+    const sse3 =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I am thinking deeply"}}\n\n';
+    const sse4 =
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n';
+    const sse5 =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":10,"output_tokens":5}}\n\n';
+    const sse6 =
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+
+    const combined = sse1 + sse2 + sse3 + sse4 + sse5 + sse6;
+    const chunks = decodeAll(
+      convertClaudeResponseToOpenAI(null, "claude-sonnet-4", NO_RAW, NO_RAW, encode(combined), state)
+    );
+    const raw = chunks.join("");
+
+    // Should have role delta from message_start
+    expect(raw).toContain('"role":"assistant"');
+    // Should have reasoning_content from thinking_delta
+    expect(raw).toContain('"reasoning_content":"I am thinking deeply"');
+    // Should have finish_reason
+    expect(raw).toContain('"finish_reason":"stop"');
+    // Should have [DONE]
+    expect(raw).toContain("data: [DONE]");
+  });
 });
 
 // ─── Streaming: gemini → openai ──────────────────────────────────────────────
@@ -304,6 +346,157 @@ describe("convertClaudeResponseToOpenAINonStream (claude → openai non-streamin
     const raw = encode("not json {");
     const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
     expect(new TextDecoder().decode(result)).toBe("not json {");
+  });
+
+  it("includes thinking as content + reasoning_content when no text or tool_use present", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_think_only",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [{ type: "thinking", thinking: "I need to reason about this..." }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 3 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    // Should NOT be empty — thinking text should be forwarded as content
+    expect(out.choices[0].message.content).toBe("I need to reason about this...");
+    expect(out.choices[0].message.reasoning_content).toBe("I need to reason about this...");
+    expect(out.choices[0].finish_reason).toBe("stop");
+  });
+
+  it("includes multiple thinking blocks joined when no text present", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_multi_think",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [
+          { type: "thinking", thinking: "step 1" },
+          { type: "thinking", thinking: "step 2" },
+        ],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 3 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.choices[0].message.content).toBe("step 1\nstep 2");
+    expect(out.choices[0].message.reasoning_content).toBe("step 1\nstep 2");
+  });
+
+  it("does not set reasoning_content when text content is present alongside thinking", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_mixed",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [
+          { type: "thinking", thinking: "internal reasoning" },
+          { type: "text", text: "visible answer" },
+        ],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 3 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    // Text takes priority; no reasoning_content needed
+    expect(out.choices[0].message.content).toBe("visible answer");
+    expect(out.choices[0].message.reasoning_content).toBeUndefined();
+  });
+
+  it("maps max_tokens stop reason to 'length' even with thinking-only content", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_maxtok",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [{ type: "thinking", thinking: "ran out of tokens mid-thought" }],
+        stop_reason: "max_tokens",
+        usage: { input_tokens: 100, output_tokens: 4096 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.choices[0].message.content).toBe("ran out of tokens mid-thought");
+    expect(out.choices[0].message.reasoning_content).toBe("ran out of tokens mid-thought");
+    expect(out.choices[0].finish_reason).toBe("length");
+  });
+
+  it("handles tool_use + thinking (no text) — tool_calls take priority, no reasoning_content", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_tool_think",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [
+          { type: "thinking", thinking: "I should call a tool" },
+          { type: "tool_use", id: "tool_42", name: "search", input: { query: "test" } },
+        ],
+        stop_reason: "tool_use",
+        usage: { input_tokens: 10, output_tokens: 20 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    // tool_calls present → hasContent is true, thinking is not surfaced
+    expect(out.choices[0].message.content).toBeNull();
+    expect(out.choices[0].message.tool_calls).toBeDefined();
+    expect(out.choices[0].message.tool_calls[0].function.name).toBe("search");
+    expect(out.choices[0].message.reasoning_content).toBeUndefined();
+    expect(out.choices[0].finish_reason).toBe("tool_calls");
+  });
+
+  it("handles empty content array without crashing", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_empty",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: [],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 0 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    // Empty content → message.content stays as "" (no crash, valid response)
+    expect(out.choices[0].message.content).toBe("");
+    expect(out.choices[0].finish_reason).toBe("stop");
+  });
+
+  it("handles null content without crashing", () => {
+    const raw = encode(
+      JSON.stringify({
+        id: "msg_null",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4",
+        content: null,
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 0 },
+      })
+    );
+    const result = convertClaudeResponseToOpenAINonStream(null, "", NO_RAW, NO_RAW, raw);
+    const out = JSON.parse(new TextDecoder().decode(result));
+
+    expect(out.choices[0].message.content).toBe("");
+    expect(out.choices[0].finish_reason).toBe("stop");
   });
 });
 

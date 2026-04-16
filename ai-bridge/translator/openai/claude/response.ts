@@ -26,6 +26,7 @@ export interface OpenAIStreamingState {
 
   // Accumulator
   contentAccumulator: string;
+  thinkingAccumulator: string;
   toolArgumentsAccumulator: string;
   currentToolName: string;
   currentToolId: string;
@@ -48,6 +49,7 @@ export function newState(): OpenAIStreamingState {
     toolCallBlockIndex: -1,
     currentToolIndex: -11,
     contentAccumulator: "",
+    thinkingAccumulator: "",
     toolArgumentsAccumulator: "",
     currentToolName: "",
     currentToolId: "",
@@ -157,9 +159,15 @@ export function convertClaudeResponseToOpenAI(
         );
       }
 
-      // thinking_delta → skip (OpenAI doesn't have thinking content)
+      // thinking_delta → forward as reasoning_content (OpenAI o-series style)
       if (deltaType === "thinking_delta") {
-        // OpenAI doesn't support thinking blocks natively, skip
+        const thinkingText = (delta.thinking as string | undefined) ?? "";
+        state.thinkingAccumulator += thinkingText;
+        results.push(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ id: state.messageId, object: "chat.completion.chunk", model: state.model, choices: [{ index, delta: { reasoning_content: thinkingText }, finish_reason: null }] })}\n\n`
+          )
+        );
       }
 
       // input_json_delta → accumulate tool call arguments
@@ -259,6 +267,7 @@ export function convertClaudeResponseToOpenAINonStream(
   const message: Record<string, unknown> = { role: "assistant", content: "" };
   const toolCalls: Array<Record<string, unknown>> = [];
   const parts: string[] = [];
+  const thinkingParts: string[] = [];
 
   if (Array.isArray(content)) {
     for (const block of content) {
@@ -288,7 +297,9 @@ export function convertClaudeResponseToOpenAINonStream(
           },
         });
       } else if (blockType === "thinking") {
-        // OpenAI doesn't have thinking content, skip
+        // Include thinking as reasoning_content (OpenAI o-series style)
+        const thinkingText = (block.thinking as string | undefined) ?? "";
+        if (thinkingText) thinkingParts.push(thinkingText);
       }
     }
   }
@@ -305,6 +316,13 @@ export function convertClaudeResponseToOpenAINonStream(
     if (toolCalls.length > 0) {
       message.tool_calls = toolCalls;
     }
+  } else if (thinkingParts.length > 0) {
+    // No text or tool_use, but we have thinking — emit it as content so the
+    // OpenAI client doesn't see an empty completion.  Also include
+    // reasoning_content for clients that understand it (e.g. OpenAI SDK).
+    const joined = thinkingParts.join("\n");
+    message.content = joined;
+    message.reasoning_content = joined;
   }
 
   const usage = parsed.usage as Record<string, unknown> | undefined;
