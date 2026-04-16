@@ -19,28 +19,30 @@ const PERIODS = [
 
 // ─── Credit Cards ──────────────────────────────────────────────────────────────
 
-function CreditCard({ label, value, used, color }: { label: string; value: number; used: number; color: string }) {
+function CreditCard({
+  label,
+  value,
+  used,
+  color,
+}: {
+  label: string;
+  value: number;
+  used: number;
+  color: string;
+}) {
   const remaining = Math.max(0, value - used);
   return (
     <div className="flex flex-col overflow-hidden rounded-xl bg-card p-4 border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-2 h-2 rounded-sm"
-          style={{ background: color }}
-        />
+        <div className="w-2 h-2 rounded-sm" style={{ background: color }} />
         <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--on-surface-variant)] font-600">
           {label}
         </span>
       </div>
-      <p
-        className="font-headline text-[24px] font-bold leading-none"
-        style={{ color }}
-      >
+      <p className="font-headline text-[24px] font-bold leading-none" style={{ color }}>
         ${remaining.toFixed(2)}
       </p>
-      <p className="mt-1 text-[10px] text-[var(--on-surface-variant)]">
-        Used ${used.toFixed(2)}
-      </p>
+      <p className="mt-1 text-[10px] text-[var(--on-surface-variant)]">Used ${used.toFixed(2)}</p>
     </div>
   );
 }
@@ -48,7 +50,7 @@ function CreditCard({ label, value, used, color }: { label: string; value: numbe
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TrollUsage() {
-  const [period, setPeriod] = useState("1h");
+  const [period, setPeriod] = useState("24h");
 
   const [billing, setBilling] = useState<TrollBilling | null>(null);
   const [status, setStatus] = useState<TrollUsageStatus | null>(null);
@@ -102,29 +104,30 @@ export default function TrollUsage() {
 
   const handlePageChange = async (page: number) => {
     try {
-      const data = await api.troll.getLogs(period, page, 20) as TrollLogs;
+      const data = (await api.troll.getLogs(period, page, 20)) as TrollLogs;
       setLogs(data);
     } catch {
       // silently fail on page change
     }
   };
 
-  const logRows: RequestLogRow[] = logs?.requests.map((r) => ({
-    id: r.id,
-    model: r.model,
-    inputTokens: r.inputTokens,
-    outputTokens: r.outputTokens,
-    cachedInputTokens: r.cachedInputTokens,
-    creditsCost: r.creditsCost,
-    durationMs: r.durationMs,
-    isStream: r.isStream,
-    statusCode: r.statusCode,
-    isSuccess: r.isSuccess,
-    endpoint: r.endpoint,
-    discountLabel: r.discountLabel,
-    errorMessage: r.errorMessage,
-    createdAt: r.createdAt,
-  })) ?? [];
+  const logRows: RequestLogRow[] =
+    logs?.requests.map((r) => ({
+      id: r.id,
+      model: r.model,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      cachedInputTokens: r.cachedInputTokens,
+      creditsCost: r.creditsCost,
+      durationMs: r.durationMs,
+      isStream: r.isStream,
+      statusCode: r.statusCode,
+      isSuccess: r.isSuccess,
+      endpoint: r.endpoint,
+      discountLabel: r.discountLabel,
+      errorMessage: r.errorMessage,
+      createdAt: r.createdAt,
+    })) ?? [];
 
   const avgResponse = summary ? fmtMs(summary.avgDurationMs) : "—";
 
@@ -254,11 +257,7 @@ export default function TrollUsage() {
               used={billing.creditsBonusUsed}
               color="#f97316"
             />
-            <QuotaCard
-              label="Avg Response"
-              value={avgResponse}
-              sub="per request"
-            />
+            <QuotaCard label="Avg Response" value={avgResponse} sub="per request" />
             <QuotaCard
               label="Cached Tokens"
               value={String(summary?.totalCachedTokens ?? 0)}
