@@ -124,6 +124,49 @@ export function sseErrorResponse(status: number, message: string): Response {
   });
 }
 
+// ─── OpenAI SSE Error Response ────────────────────────────────────────────────
+
+/**
+ * Return an error as an OpenAI SSE stream.
+ * Clients on /v1/chat/completions expect OpenAI-format SSE chunks:
+ *   data: {"id","object":"chat.completion.chunk","choices":[...]}\n\n
+ * NOT Claude-format events (event: message_start\ndata: {...}).
+ *
+ * Using status 200 + error in chunk body matches how the real OpenAI API reports
+ * streaming errors so clients don't see a raw HTTP failure.
+ */
+export function openaiSseErrorResponse(status: number, message: string): Response {
+  const id = `chatcmpl_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // The final chunk carries the error; an empty delta chunk is sent first so the
+  // client sees the stream open and can match the ID.
+  const body =
+    `data: ${JSON.stringify({
+      id,
+      object: "chat.completion.chunk",
+      created: nowSec,
+      model: "",
+      choices: [{ index: 0, delta: {}, finish_reason: "error", logprobs: null }],
+    })}\n\n` +
+    `data: ${JSON.stringify({
+      error: { message, type: "proxy_error", code: String(status) },
+    })}\n\n` +
+    `data: [DONE]\n\n`;
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": "*",
+      "X-Proxy-Error": String(status),
+    },
+  });
+}
+
 // ─── Antigravity-specific helpers ──────────────────────────────────────────────
 
 /**

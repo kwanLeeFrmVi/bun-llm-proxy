@@ -12,7 +12,7 @@ import { cacheClaudeHeaders } from "../ai-bridge/utils/claudeHeaderCache.ts";
 import { getSettings, getAverageTTFT, recordComboTTFT } from "../db/index.ts";
 import { getModelInfo, getFilteredComboModelConfigs } from "../services/model.ts";
 import { handleChatCore } from "../ai-bridge/handlers/chatCore.ts";
-import { errorResponse, unavailableResponse, sseErrorResponse } from "../ai-bridge/utils/error.ts";
+import { errorResponse, unavailableResponse, sseErrorResponse, openaiSseErrorResponse } from "../ai-bridge/utils/error.ts";
 import {
   HTTP_STATUS,
   TRANSIENT_RETRY,
@@ -148,6 +148,29 @@ export async function handleChat(
   }
 
   return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, apiKeyId, ctx);
+}
+
+/**
+ * Classify network-level errors for better diagnostics.
+ * Returns a category tag and optional human-readable suggestion.
+ */
+function classifyNetworkError(msg: string): { category: string; suggestion: string } {
+  if (msg.includes("unable to verify the first certificate") || msg.includes("certificate")) {
+    return {
+      category: "TLS_ERROR",
+      suggestion: "Upstream server has a certificate issue (invalid, expired, or self-signed). Check with the provider.",
+    };
+  }
+  if (msg.includes("ECONNREFUSED")) {
+    return { category: "CONNECTION_REFUSED", suggestion: "Server may be down." };
+  }
+  if (msg.includes("ENOTFOUND") || msg.includes("getaddrinfo")) {
+    return { category: "DNS_ERROR", suggestion: "DNS resolution failed." };
+  }
+  if (msg.includes("ETIMEDOUT") || msg.includes("timed out")) {
+    return { category: "TIMEOUT", suggestion: "Connection timed out." };
+  }
+  return { category: "NETWORK_ERROR", suggestion: "" };
 }
 
 /**
@@ -306,8 +329,12 @@ async function handleSingleModelChat(
 
     const isStreamingLocal = body.stream === true;
 
-    // Log format detection
-    const sourceFormat = detectFormat(body);
+    // Log format detection — incorporate endpoint detection so callers of sourceFormat
+    // (onStreamError, wrapStreamingResponse error path) get the authoritative format.
+    const endpointDetectedFormat = request?.url
+      ? (detectFormatByEndpoint(new URL(request.url).pathname, body) ?? detectFormat(body))
+      : detectFormat(body);
+    const sourceFormat = endpointDetectedFormat;
     const targetFormat = getTargetFormat(provider);
     const isPassthrough = sourceFormat === targetFormat;
     log.formatDetect(ctx, sourceFormat, targetFormat, isStreamingLocal);
@@ -325,9 +352,7 @@ async function handleSingleModelChat(
       connectionId: creds.connectionId as string | undefined,
       userAgent,
       apiKey,
-      sourceFormatOverride: request?.url
-        ? (detectFormatByEndpoint(new URL(request.url).pathname, body) ?? undefined)
-        : undefined,
+      sourceFormatOverride: endpointDetectedFormat,
       onCredentialsRefreshed: async (newCreds: Record<string, unknown>) => {
         await updateProviderCredentials(creds.connectionId as string, {
           accessToken: newCreds.accessToken,
@@ -339,7 +364,10 @@ async function handleSingleModelChat(
       onRequestSuccess: async () => {
         await clearAccountError(creds.connectionId as string, creds, model, ctx);
       },
-      onStreamError: (status: number, msg: string) => sseErrorResponse(status, msg),
+      onStreamError: (status: number, msg: string) =>
+        sourceFormat === "claude"
+          ? sseErrorResponse(status, msg)
+          : openaiSseErrorResponse(status, msg),
       onUsage: async (usage: {
         prompt_tokens?: number;
         completion_tokens?: number;
@@ -367,7 +395,8 @@ async function handleSingleModelChat(
             provider,
             model,
             startTime,
-            ctx
+            ctx,
+            sourceFormat
           );
         }
         return result.response!;
@@ -426,11 +455,22 @@ async function handleSingleModelChat(
     }
 
     appendRequestLog(requestId, `error_${finalResult.status}`);
-    if (isStreaming && isClaudeStreamingClient(body, request)) {
-      return sseErrorResponse(
-        finalResult.status ?? HTTP_STATUS.BAD_GATEWAY,
-        finalResult.error ?? "Unknown error"
-      );
+    const { category, suggestion } = classifyNetworkError(finalResult.error ?? "");
+    if (category !== "NETWORK_ERROR") {
+      log.error(ctx, "CHAT", `[${provider}/${model}] ${category}: ${finalResult.error}${suggestion ? ` — ${suggestion}` : ""}`);
+    }
+    if (isStreaming) {
+      // Use sourceFormat so OpenAI clients on /v1/chat/completions get OpenAI SSE errors,
+      // not the Claude-format events that sseErrorResponse emits.
+      return sourceFormat === "claude"
+        ? sseErrorResponse(
+            finalResult.status ?? HTTP_STATUS.BAD_GATEWAY,
+            finalResult.error ?? "Unknown error"
+          )
+        : openaiSseErrorResponse(
+            finalResult.status ?? HTTP_STATUS.BAD_GATEWAY,
+            finalResult.error ?? "Unknown error"
+          );
     }
     return (
       finalResult.response ??
@@ -452,7 +492,8 @@ function wrapStreamingResponse(
   provider: string,
   model: string,
   startTime: number,
-  ctx: RequestContext
+  ctx: RequestContext,
+  sourceFormat: string
 ): Response {
   if (!response.body) return response;
 
@@ -572,14 +613,63 @@ function wrapStreamingResponse(
           firstDownstreamChunkMs,
           durationMs,
         });
-        // Only inject error event if downstream is still writable (not already canceled)
+        // Only inject error event if downstream is still writable (not already canceled).
+        // Emit in the format the client expects (OpenAI SSE vs Claude SSE).
+        // IMPORTANT: emit a COMPLETE event sequence so Claude Code doesn't hang waiting
+        // for message_delta (usage) and message_stop that never arrive.
         if (!controllerClosed) {
-          try {
-            const errorPayload = JSON.stringify({
-              error: { message: `Stream error: ${errMsg}`, type: "proxy_error" },
-            });
-            safeEnqueue(new TextEncoder().encode(`data: ${errorPayload}\n\n`));
-          } catch { /* ignore encoding errors */ }
+          const errMsgForClient = `Stream error: ${errMsg}`;
+          if (sourceFormat === "claude") {
+            // Inject the error message as a text delta (partial content)
+            safeEnqueue(
+              new TextEncoder().encode(
+                `event: content_block_delta\ndata: ${JSON.stringify({
+                  type: "content_block_delta",
+                  index: 0,
+                  delta: { type: "text_delta", text: errMsgForClient },
+                })}\n\n`
+              )
+            );
+            // Close the content block
+            safeEnqueue(
+              new TextEncoder().encode(
+                `event: content_block_stop\ndata: ${JSON.stringify({
+                  type: "content_block_stop",
+                  index: 0,
+                })}\n\n`
+              )
+            );
+            // Emit message_delta with usage so Claude Code doesn't crash on missing input_tokens
+            safeEnqueue(
+              new TextEncoder().encode(
+                `event: message_delta\ndata: ${JSON.stringify({
+                  type: "message_delta",
+                  delta: { stop_reason: "end_turn", stop_sequence: null },
+                  usage: { input_tokens: 0, output_tokens: 0 },
+                })}\n\n`
+              )
+            );
+            // End the message
+            safeEnqueue(
+              new TextEncoder().encode(
+                `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
+              )
+            );
+          } else {
+            // OpenAI SSE: emit a final chunk with error finish_reason + [DONE]
+            safeEnqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({
+                  id: `chatcmpl_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`,
+                  object: "chat.completion.chunk",
+                  created: Math.floor(Date.now() / 1000),
+                  model,
+                  choices: [{ index: 0, delta: { content: errMsgForClient }, finish_reason: "error", logprobs: null }],
+                })}\n\n`
+              )
+            );
+            safeEnqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+          }
         }
         safeClose();
       } finally {

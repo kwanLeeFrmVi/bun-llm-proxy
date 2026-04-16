@@ -1,5 +1,6 @@
 // Unit tests for combo routing strategies
 import { describe, it, expect, beforeEach } from "bun:test";
+import { sseErrorResponse } from "../../ai-bridge/utils/error.ts";
 
 // Mock TTFT data with insertion order for stable sorting
 let insertionCounter = 0;
@@ -865,5 +866,136 @@ describe("Combo TTFT Functions", () => {
       expect(avg1b).toBe(200);
       expect(avg2a).toBe(300);
     });
+  });
+});
+
+// ─── readComboError tests (tested via combo weight fallback behavior) ──────────
+
+describe("readComboError via combo fallback", () => {
+  beforeEach(() => {
+    resetAllComboState();
+  });
+
+  it("should extract error message from SSE error response (Claude format)", async () => {
+    const models = [
+      { model: "model-a", weight: 10 },
+      { model: "model-b", weight: 1 },
+    ];
+
+    // model-a returns an SSE error response (simulating handleSingleModelChat's sseErrorResponse)
+    let callOrder: string[] = [];
+    const mockHandleSingle = async (_body: unknown, model: string) => {
+      callOrder.push(model);
+      if (model === "model-a") {
+        return sseErrorResponse(502, "unable to verify the first certificate");
+      }
+      return new Response(JSON.stringify({ result: "success" }), { status: 200 });
+    };
+
+    const result = await handleComboModel({
+      body: {},
+      models,
+      handleSingleModel: mockHandleSingle,
+      log: { info: () => {}, warn: () => {} },
+      comboName: "test-sse-error",
+      comboStrategy: "weight",
+      settings: {},
+    });
+
+    // model-a should be detected as failed (via X-Proxy-Error header)
+    // model-b should succeed
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe(200);
+  });
+
+  it("should extract error from SSE error response when all models fail", async () => {
+    const models = [
+      { model: "model-a", weight: 1 },
+      { model: "model-b", weight: 1 },
+    ];
+
+    const mockHandleSingle = async (_body: unknown, _model: string) => {
+      return sseErrorResponse(503, "All accounts unavailable");
+    };
+
+    const result = await handleComboModel({
+      body: {},
+      models,
+      handleSingleModel: mockHandleSingle,
+      log: { info: () => {}, warn: () => {} },
+      comboName: "test-sse-all-fail",
+      comboStrategy: "weight",
+      settings: {},
+    });
+
+    // Should return 503 (all-failed response)
+    expect(result.status).toBe(503);
+    const body = await result.text();
+    const parsed = JSON.parse(body);
+    // The error message should contain the extracted SSE error text, NOT "returned status 200"
+    expect(parsed.error.message).toContain("All accounts unavailable");
+  });
+
+  it("should extract error from standard JSON error response", async () => {
+    const models = [
+      { model: "model-a", weight: 1 },
+      { model: "model-b", weight: 1 },
+    ];
+
+    const mockHandleSingle = async (_body: unknown, _model: string) => {
+      return new Response(
+        JSON.stringify({ error: { message: "Rate limited", type: "rate_limit_error" } }),
+        { status: 429, headers: { "Content-Type": "application/json" } }
+      );
+    };
+
+    const result = await handleComboModel({
+      body: {},
+      models,
+      handleSingleModel: mockHandleSingle,
+      log: { info: () => {}, warn: () => {} },
+      comboName: "test-json-error",
+      comboStrategy: "weight",
+      settings: {},
+    });
+
+    expect(result.status).toBe(503);
+    const body = await result.text();
+    const parsed = JSON.parse(body);
+    expect(parsed.error.message).toContain("Rate limited");
+  });
+
+  it("should handle SSE error with unreadable body gracefully", async () => {
+    const models = [
+      { model: "model-a", weight: 1 },
+    ];
+
+    // Return a response with X-Proxy-Error header but empty body
+    const mockHandleSingle = async (_body: unknown, _model: string) => {
+      return new Response("", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "X-Proxy-Error": "503",
+        },
+      });
+    };
+
+    const result = await handleComboModel({
+      body: {},
+      models,
+      handleSingleModel: mockHandleSingle,
+      log: { info: () => {}, warn: () => {} },
+      comboName: "test-empty-sse",
+      comboStrategy: "weight",
+      settings: {},
+    });
+
+    expect(result.status).toBe(503);
+    const body = await result.text();
+    const parsed = JSON.parse(body);
+    // Should contain "[Proxy Error 503]" fallback, NOT "returned status 200"
+    expect(parsed.error.message).toContain("[Proxy Error 503]");
+    expect(parsed.error.message).not.toContain("returned status 200");
   });
 });

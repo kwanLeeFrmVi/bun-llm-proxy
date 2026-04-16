@@ -525,7 +525,14 @@ async function handleStreamingResponse(
           state
         );
         for (const chunk of doneChunks.chunks) {
-          safeEnqueue(chunk);
+          // Ensure [DONE] event ends with \n\n so synthetic events
+          // after it are properly separated in the SSE stream.
+          const raw = decoder.decode(chunk, { stream: false });
+          if (!raw.endsWith("\n\n")) {
+            safeEnqueue(encoder.encode(raw + "\n\n"));
+          } else {
+            safeEnqueue(chunk);
+          }
         }
 
         // Guarantee message_delta with usage for Claude SSE clients that crash
@@ -586,11 +593,34 @@ async function handleStreamingResponse(
               state
             );
             for (const chunk of doneChunks.chunks) {
-              safeEnqueue(chunk);
+              // Ensure [DONE] event ends with \n\n so synthetic events
+              // after it are properly separated in the SSE stream.
+              const raw = decoder.decode(chunk, { stream: false });
+              if (!raw.endsWith("\n\n")) {
+                safeEnqueue(encoder.encode(raw + "\n\n"));
+              } else {
+                safeEnqueue(chunk);
+              }
             }
           } catch {
             /* ignore flush errors */
           }
+        }
+
+        // Guarantee message_delta with usage for Claude SSE clients that crash
+        // on missing input_tokens (e.g. Claude Code). When the upstream errors
+        // mid-stream, the normal-completion path's synthetic message_delta never
+        // runs, so we must emit it here too.
+        if (!sawValidMessageDelta && sourceFormat === "claude") {
+          safeEnqueue(
+            encoder.encode(
+              "event: message_delta\n" +
+                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+            )
+          );
+          safeEnqueue(
+            encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+          );
         }
         const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
         const totalMs = Date.now() - streamStartMs;

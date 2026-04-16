@@ -375,3 +375,231 @@ describe("handleChat — streaming error responses", () => {
     }
   });
 });
+
+// ─── wrapStreamingResponse error injection tests ──────────────────────────────
+
+describe("wrapStreamingResponse — mid-stream error injection", () => {
+  /**
+   * Create a Response whose body stream throws after emitting some chunks.
+   * This simulates an upstream disconnect mid-stream.
+   *
+   * Note: chatCore.ts's inner stream handler catches upstream errors and
+   * flushes synthetic message_delta/message_stop events before closing
+   * normally. So the OUTER stream (wrapStreamingResponse) typically sees
+   * a clean close with those synthetic events already included.
+   *
+   * This test verifies the complete error sequence reaches the client.
+   */
+  function createFailingStreamResponse(
+    chunksBeforeError: string[],
+    _errorMessage: string
+  ): Response {
+    const encoder = new TextEncoder();
+    let chunkIndex = 0;
+
+    // Simulate upstream that sends some chunks then abruptly closes
+    // (like a TCP disconnect). This is more realistic than throwing
+    // from pull(), which causes unhandled errors in Bun's test runner.
+    const body = new ReadableStream({
+      pull(controller) {
+        if (chunkIndex < chunksBeforeError.length) {
+          controller.enqueue(encoder.encode(chunksBeforeError[chunkIndex]!));
+          chunkIndex++;
+        } else {
+          // Abrupt close — no message_delta, no message_stop.
+          // This simulates the real-world scenario where the upstream
+          // disconnects mid-stream without sending closing events.
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(body, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  }
+
+  it("should deliver complete Claude SSE sequence to client when upstream errors mid-stream", async () => {
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "anthropic", model: "claude-sonnet" })
+    );
+    mockGetProviderCredentials.mockImplementation(() =>
+      Promise.resolve({
+        connectionId: "conn-1",
+        connectionName: "test-conn",
+        apiKey: "test-key",
+      })
+    );
+    mockMarkAccountUnavailable.mockImplementation(() => Promise.resolve({ shouldFallback: false }));
+    mockIncrementCircuitBreaker.mockImplementation(() => Promise.resolve(0));
+
+    // Mock fetch to return a stream that sends one valid chunk then throws
+    const validChunk =
+      `event: message_start\ndata: ${JSON.stringify({
+        type: "message_start",
+        message: {
+          id: "msg_test",
+          type: "message",
+          role: "assistant",
+          content: [],
+          usage: { input_tokens: 10, output_tokens: 0 },
+        },
+      })}\n\n` +
+      `event: content_block_start\ndata: ${JSON.stringify({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      })}\n\n` +
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Hello" },
+      })}\n\n`;
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(createFailingStreamResponse([validChunk], "Connection reset by peer"))) as unknown as typeof globalThis.fetch;
+
+    try {
+      const res = await handleChat(
+        makeRequest({
+          model: "anthropic/claude-sonnet",
+          stream: true,
+          messages: [{ role: "user", content: "hi" }],
+        })
+      );
+
+      // Debug: log the raw response text to understand what we got
+      // (the inner stream may propagate the upstream error to the consumer)
+      const text = await res.text().catch((e: Error) => {
+        console.log("[TEST] res.text() rejected:", e.message);
+        return "";
+      });
+
+      // Verify the complete Claude SSE event sequence was delivered to the client.
+      // The inner stream handler (chatCore.ts) detects the upstream closed without
+      // sending message_delta and emits synthetic message_delta + message_stop events.
+      const events = parseSSE(text);
+
+      // Should contain the original valid events
+      const start = events.find((e) => e.event === "message_start");
+      expect(start).toBeDefined();
+
+      // Should contain the original content
+      const contentDeltas = events.filter((e) => e.event === "content_block_delta");
+      expect(contentDeltas.length).toBeGreaterThanOrEqual(1);
+
+      // CRITICAL: Should contain message_delta with usage (synthetic fallback)
+      const msgDelta = events.find((e) => e.event === "message_delta");
+      expect(msgDelta).toBeDefined();
+      const deltaData = msgDelta!.data as Record<string, unknown>;
+      const usage = deltaData.usage as Record<string, number>;
+      expect(typeof usage.input_tokens).toBe("number");
+      expect(typeof usage.output_tokens).toBe("number");
+
+      // Should contain message_stop
+      const msgStop = events.find((e) => e.event === "message_stop");
+      expect(msgStop).toBeDefined();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+});
+
+// ─── classifyNetworkError tests (tested via error response path) ──────────────
+
+describe("classifyNetworkError — error categorization via response", () => {
+  it("should return SSE error with TLS error message when upstream has certificate error", async () => {
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "anthropic-compatible-test", model: "claude-sonnet" })
+    );
+    mockGetProviderCredentials.mockImplementation(() =>
+      Promise.resolve({
+        connectionId: "conn-1",
+        connectionName: "test-conn",
+        apiKey: "test-key",
+      })
+    );
+    mockMarkAccountUnavailable.mockImplementation(() => Promise.resolve({ shouldFallback: false }));
+    mockIncrementCircuitBreaker.mockImplementation(() => Promise.resolve(0));
+
+    // Mock fetch to throw a TLS certificate error
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error("unable to verify the first certificate");
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const res = await handleChat(
+        makeRequest({
+          model: "anthropic-compatible-test/claude-sonnet",
+          stream: true,
+          messages: [{ role: "user", content: "hi" }],
+        })
+      );
+
+      // Should return an SSE error response (not crash)
+      expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+      const text = await res.text();
+
+      // Should contain the full Claude SSE event sequence
+      const events = parseSSE(text);
+      const start = events.find((e) => e.event === "message_start");
+      const delta = events.find((e) => e.event === "message_delta");
+      const stop = events.find((e) => e.event === "message_stop");
+      expect(start).toBeDefined();
+      expect(delta).toBeDefined();
+      expect(stop).toBeDefined();
+
+      // The error message should mention the certificate error
+      const cbDelta = events.find((e) => e.event === "content_block_delta");
+      expect(cbDelta).toBeDefined();
+      const deltaText = ((cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>).text as string;
+      expect(deltaText).toContain("unable to verify the first certificate");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("should return SSE error with connection refused message", async () => {
+    mockGetModelInfo.mockImplementation(() =>
+      Promise.resolve({ provider: "ollama-local", model: "llama3" })
+    );
+    mockGetProviderCredentials.mockImplementation(() =>
+      Promise.resolve({
+        connectionId: "conn-1",
+        connectionName: "test-conn",
+        apiKey: "test-key",
+        providerSpecificData: { baseUrl: "http://localhost:11434" },
+      })
+    );
+    mockMarkAccountUnavailable.mockImplementation(() => Promise.resolve({ shouldFallback: false }));
+    mockIncrementCircuitBreaker.mockImplementation(() => Promise.resolve(0));
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error("ECONNREFUSED");
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const res = await handleChat(
+        makeRequest({
+          model: "ollama-local/llama3",
+          stream: true,
+          messages: [{ role: "user", content: "hi" }],
+        })
+      );
+
+      expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+      const text = await res.text();
+      const events = parseSSE(text);
+      const cbDelta = events.find((e) => e.event === "content_block_delta");
+      expect(cbDelta).toBeDefined();
+      const deltaText = ((cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>).text as string;
+      expect(deltaText).toContain("ECONNREFUSED");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+});

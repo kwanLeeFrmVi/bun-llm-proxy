@@ -5,9 +5,41 @@ import { sseErrorResponse } from "../ai-bridge/utils/error.ts";
 /**
  * Read the error message from a failed combo leg response.
  * Tries to extract a human-readable string from JSON error bodies.
+ * Handles SSE error responses (HTTP 200 with X-Proxy-Error header) by scanning
+ * the SSE events for the error text in content_block_delta.
  * Falls back to "Model X returned status N" if the body is unreadable.
  */
 async function readComboError(resp: Response, model: string): Promise<string> {
+  // Check if this is an SSE error response (HTTP 200 with X-Proxy-Error header)
+  const proxyErrorStatus = resp.headers.get("X-Proxy-Error");
+  if (proxyErrorStatus) {
+    try {
+      const text = await resp.clone().text();
+      // Claude SSE: extract error text from content_block_delta
+      const deltaMatch = text.match(/event: content_block_delta\ndata: ({.*?})\n\n/s);
+      if (deltaMatch) {
+        try {
+          const parsed = JSON.parse(deltaMatch[1]!);
+          const deltaText = parsed?.delta?.text ?? "";
+          // Strip the "[Proxy Error N] " prefix to get the clean message
+          const clean = deltaText.replace(/^\[Proxy Error \d+\]\s*/, "");
+          if (clean) return clean;
+        } catch { /* fall through */ }
+      }
+      // OpenAI SSE: extract error from data line
+      const errorMatch = text.match(/data: ({.*?"error".*?})\n\n/s);
+      if (errorMatch) {
+        try {
+          const parsed = JSON.parse(errorMatch[1]!);
+          const msg = parsed?.error?.message ?? parsed?.error;
+          if (msg && typeof msg === "string") return msg;
+        } catch { /* fall through */ }
+      }
+    } catch { /* fall through */ }
+    return `[Proxy Error ${proxyErrorStatus}]`;
+  }
+
+  // Standard JSON error body
   try {
     const text = await resp.clone().text();
     if (text) {
