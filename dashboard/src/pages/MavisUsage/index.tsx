@@ -183,7 +183,7 @@ export default function MavisUsage() {
           </div>
           <ModelTable usage={usage} pricing={pricing} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-            <TimeseriesChart usage={usage} />
+            <TimeseriesChart usage={usage} range={range} />
             <PricingTable usage={usage} />
           </div>
         </>

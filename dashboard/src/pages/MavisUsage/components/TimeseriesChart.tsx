@@ -15,6 +15,7 @@ import { Chart } from "react-chartjs-2";
 import type { MavisUsageResponse } from "@/lib/mavisTypes.ts";
 import { SectionHeader } from "@/components/SectionHeader.tsx";
 import { fmt } from "@/lib/formatters.ts";
+import type { Range } from "../utils/constants.ts";
 
 ChartJS.register(
   CategoryScale,
@@ -32,7 +33,7 @@ ChartJS.register(
 const cardClass =
   "overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
 
-export function TimeseriesChart({ usage }: { usage: MavisUsageResponse | null }) {
+export function TimeseriesChart({ usage, range }: { usage: MavisUsageResponse | null; range?: Range }) {
   const ts = usage?.timeseries ?? [];
 
   if (ts.length === 0) {
@@ -46,7 +47,16 @@ export function TimeseriesChart({ usage }: { usage: MavisUsageResponse | null })
     );
   }
 
-  const labels = ts.map((d) => d.time.slice(5));
+  const labels = ts.map((d) => {
+    if (range === "24h") {
+      // Show "04-15 14:00" for hourly granularity
+      const parts = d.time.split(" ");
+      if (parts.length === 2) {
+        return parts[0].slice(5) + " " + parts[1].slice(0, 5);
+      }
+    }
+    return d.time.slice(5);
+  });
 
   const chartData = {
     labels,
