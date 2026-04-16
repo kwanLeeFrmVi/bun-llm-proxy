@@ -516,8 +516,8 @@ function wrapStreamingResponse(
   let downstreamCanceled = false; // set true when ReadableStream's cancel() fires
   let downstreamChunkCount = 0;
   let firstDownstreamChunkMs: number | null = null;
-  // Possible close reasons: "normal" | "downstream_canceled" | "inner_stream_error"
-  type CloseReason = "normal" | "downstream_canceled" | "inner_stream_error";
+  // Possible close reasons: "normal" | "downstream_canceled" | "inner_stream_error" | "upstream_error"
+  type CloseReason = "normal" | "downstream_canceled" | "inner_stream_error" | "upstream_error";
 
   // AbortController lets the cancel() callback interrupt the read loop synchronously.
   const abortController = new AbortController();
@@ -545,6 +545,7 @@ function wrapStreamingResponse(
       } | null = null;
       let ttftRecorded = false;
       let firstChunkTime: number | null = null;
+      let upstreamErrorMsg: string | null = null;
 
       try {
         while (true) {
@@ -569,6 +570,16 @@ function wrapStreamingResponse(
 
           // Parse SSE chunks for usage data
           const text = new TextDecoder().decode(value);
+
+          // Detect upstream-error sentinel injected by chatCore.ts catch block.
+          // The sentinel is an SSE comment (": __UPSTREAM_ERROR__: ...") that is
+          // invisible to compliant SSE clients but lets us log accurately.
+          if (text.includes(": __UPSTREAM_ERROR__:")) {
+            // Extract error message for logging, don't forward sentinel to client
+            upstreamErrorMsg = text.split(": __UPSTREAM_ERROR__:")[1]?.split("\n")[0]?.trim() ?? "unknown";
+            continue;
+          }
+
           for (const line of text.split("\n")) {
             if (line.startsWith("data: ")) {
               try {
@@ -599,15 +610,27 @@ function wrapStreamingResponse(
           safeEnqueue(value);
         }
         const durationMs = Date.now() - startTime;
-        log.stream(ctx, "OUTER_COMPLETE", {
-          provider,
-          model,
-          usage: finalUsage,
-          closeReason: "normal" as CloseReason,
-          downstreamChunkCount,
-          firstDownstreamChunkMs,
-          durationMs,
-        });
+        if (upstreamErrorMsg) {
+          log.stream(ctx, "OUTER_ERROR", {
+            provider,
+            model,
+            error: `Upstream stream truncated: ${upstreamErrorMsg}`,
+            closeReason: "upstream_error" as CloseReason,
+            downstreamChunkCount,
+            firstDownstreamChunkMs,
+            durationMs,
+          });
+        } else {
+          log.stream(ctx, "OUTER_COMPLETE", {
+            provider,
+            model,
+            usage: finalUsage,
+            closeReason: "normal" as CloseReason,
+            downstreamChunkCount,
+            firstDownstreamChunkMs,
+            durationMs,
+          });
+        }
         safeClose();
       } catch (err) {
         const durationMs = Date.now() - startTime;

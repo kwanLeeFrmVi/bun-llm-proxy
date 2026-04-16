@@ -387,6 +387,13 @@ async function handleStreamingResponse(
               );
               state = translated.state;
               for (const chunk of translated.chunks) {
+                // Track message_delta in NDJSON-translated chunks (mirrors SSE path below)
+                if (!sawValidMessageDelta) {
+                  const chunkText = decoder.decode(chunk, { stream: false });
+                  if (chunkText.includes('"type":"message_delta"') && chunkText.includes('"usage"')) {
+                    sawValidMessageDelta = true;
+                  }
+                }
                 safeEnqueue(chunk);
               }
             }
@@ -494,6 +501,12 @@ async function handleStreamingResponse(
           );
           state = translated.state;
           for (const chunk of translated.chunks) {
+            if (!sawValidMessageDelta) {
+              const chunkText = decoder.decode(chunk, { stream: false });
+              if (chunkText.includes('"type":"message_delta"') && chunkText.includes('"usage"')) {
+                sawValidMessageDelta = true;
+              }
+            }
             safeEnqueue(chunk);
           }
           ndjsonBuffer = "";
@@ -634,6 +647,13 @@ async function handleStreamingResponse(
           );
         } else {
           closeReason = "upstream_error";
+          // Enqueue a sentinel SSE comment so the outer stream (handlers/chat.ts)
+          // can detect the upstream truncation and log OUTER_ERROR instead of
+          // OUTER_COMPLETE. The comment is invisible to SSE clients (RFC 6762:
+          // lines starting with ":" are comments), so it won't break any protocol.
+          safeEnqueue(
+            encoder.encode(`: __UPSTREAM_ERROR__: ${errMsg}\n\n`)
+          );
           log.warn(
             opts.ctx ?? null,
             "STREAM",
