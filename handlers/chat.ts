@@ -332,7 +332,9 @@ async function handleSingleModelChat(
       );
       if (pid) {
         refreshedCredentials.projectId = pid;
-        updateProviderCredentials(creds.connectionId as string, { projectId: pid }).catch(() => {});
+        updateProviderCredentials(creds.connectionId as string, { projectId: pid }).catch((e) => {
+          log.debug(ctx, "AUTH", `updateProviderCredentials failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
       }
     }
 
@@ -549,9 +551,10 @@ function wrapStreamingResponse(
         if (!controllerClosed) {
           try {
             controller.enqueue(chunk);
-          } catch {
+          } catch (enqueueErr) {
             // Controller may already be closed by cancel() — swallow silently.
             // This is expected when the downstream client disconnects mid-stream.
+            log.debug(ctx, "STREAM", `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`);
           }
         }
       };
@@ -560,8 +563,8 @@ function wrapStreamingResponse(
           controllerClosed = true;
           try {
             controller.close();
-          } catch {
-            // Already closed — safe to ignore.
+          } catch (closeErr) {
+            log.debug(ctx, "STREAM", `safeClose: controller.close failed (already closed): ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`);
           }
         }
       };
@@ -592,7 +595,9 @@ function wrapStreamingResponse(
           if (comboMetadata && !ttftRecorded) {
             const ttftMs = Date.now() - startTime;
             recordComboTTFT(comboMetadata.comboName, comboMetadata.selectedModel, ttftMs).catch(
-              () => {}
+              (e) => {
+                log.debug(ctx, "COMBO", `recordComboTTFT failed: ${e instanceof Error ? e.message : String(e)}`);
+              }
             );
             ttftRecorded = true;
           }
@@ -630,8 +635,8 @@ function wrapStreamingResponse(
                     cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
                   };
                 }
-              } catch {
-                /* skip non-JSON SSE lines */
+              } catch (e) {
+                log.debug(ctx, "STREAM", `SSE usage parse: non-JSON line: ${e instanceof Error ? e.message : String(e)}`);
               }
             }
           }
@@ -757,7 +762,9 @@ function wrapStreamingResponse(
             tokens_per_second: tokensPerSecond,
           },
           durationMs
-        ).catch(() => {});
+        ).catch((e) => {
+          log.debug(ctx, "USAGE", `saveRequestUsage failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
         RequestContext.delete(ctx.id);
       }
     },

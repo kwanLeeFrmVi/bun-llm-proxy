@@ -150,7 +150,9 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         translatedBytes,
         opts
       );
-      opts.onRequestSuccess?.().catch(() => {});
+      opts.onRequestSuccess?.().catch((e) => {
+        log.debug(ctx ?? null, "CHAT", `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
       return { success: true, response };
     } else {
       const responseBody = await upstream.text();
@@ -183,8 +185,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
             cached_tokens: parsed.usage.prompt_tokens_details?.cached_tokens,
           };
         }
-      } catch {
-        /* non-JSON response, skip usage */
+      } catch (e) {
+        log.debug(ctx ?? null, "USAGE", `Non-JSON response body, skipping usage extraction: ${e instanceof Error ? e.message : String(e)}`);
       }
 
       const response = new globalThis.Response(translated, {
@@ -192,8 +194,12 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       });
 
-      opts.onRequestSuccess?.().catch(() => {});
-      opts.onUsage?.(usageData).catch(() => {});
+      opts.onRequestSuccess?.().catch((e) => {
+        log.debug(ctx ?? null, "CHAT", `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
+      opts.onUsage?.(usageData).catch((e) => {
+        log.debug(ctx ?? null, "CHAT", `onUsage callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
       return { success: true, response };
     }
   } catch (err) {
@@ -322,9 +328,10 @@ async function handleStreamingResponse(
             if (firstTranslatedChunkMs === null) firstTranslatedChunkMs = now;
             translatedChunkCount++;
             controller.enqueue(chunk);
-          } catch {
+          } catch (enqueueErr) {
             // Controller may already be closed by cancel() — swallow silently.
             // This is expected when the downstream client disconnects mid-stream.
+            log.debug(opts.ctx ?? null, "STREAM", `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`);
           }
         }
       };
@@ -333,9 +340,8 @@ async function handleStreamingResponse(
           controllerClosed = true;
           try {
             controller.close();
-          } catch {
-            log.debug(opts.ctx ?? null, "STREAM", "Controller close failed (already closed)");
-            // Already closed — safe to ignore.
+          } catch (closeErr) {
+            log.debug(opts.ctx ?? null, "STREAM", `safeClose: controller.close failed (already closed): ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`);
           }
         }
       };
@@ -469,8 +475,8 @@ async function handleStreamingResponse(
                       );
                     }
                   }
-                } catch {
-                  // Non-JSON first event — may be a comment or keep-alive; not necessarily wrong
+                } catch (e) {
+                  log.debug(opts.ctx ?? null, "STREAM", `SSE shape validation: non-JSON first event (may be comment/keep-alive): ${e instanceof Error ? e.message : String(e)}`);
                 }
               }
             }
@@ -485,8 +491,8 @@ async function handleStreamingResponse(
                     sawValidMessageDelta = true;
                   }
                 }
-              } catch {
-                /* ignore parse errors in tracking */
+              } catch (e) {
+                log.debug(opts.ctx ?? null, "STREAM", `message_delta tracking: JSON parse error: ${e instanceof Error ? e.message : String(e)}`);
               }
             }
 
@@ -604,8 +610,8 @@ async function handleStreamingResponse(
         // fetch is aborted promptly rather than continuing to read in the background.
         try {
           reader.cancel();
-        } catch {
-          /* ignore cancel failures — reader may already be done */
+        } catch (cancelErr) {
+          log.debug(opts.ctx ?? null, "STREAM", `reader.cancel() failed (may already be done): ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`);
         }
 
         // Flush stop events so the client gets at least a partial signal
@@ -633,8 +639,8 @@ async function handleStreamingResponse(
                 safeEnqueue(chunk);
               }
             }
-          } catch {
-            /* ignore flush errors */
+          } catch (flushErr) {
+            log.debug(opts.ctx ?? null, "STREAM", `Failed to flush done chunks on stream error: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`);
           }
         }
 
