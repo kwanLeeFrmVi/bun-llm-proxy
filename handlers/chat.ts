@@ -2,6 +2,15 @@
 // Replaced @/lib/localDb → ../db/index
 // Replaced ../utils/logger.js → ../lib/logger
 
+// Private marker to detect responses already wrapped by wrapStreamingResponse.
+// Prevents double-wrapping when a combo model resolves to another combo model
+// (the inner combo would wrap, then the outer combo would wrap again).
+const WRAPPED_STREAM_MARKER = Symbol.for("wrappedStream");
+
+function isAlreadyWrappedStream(resp: Response): boolean {
+  return (resp as unknown as Record<symbol, unknown>)[WRAPPED_STREAM_MARKER] === true;
+}
+
 import {
   getProviderCredentials,
   markAccountUnavailable,
@@ -400,6 +409,13 @@ async function handleSingleModelChat(
       if (result.success) {
         await resetCircuitBreaker(creds.connectionId as string, model);
         if (isStreamingLocal) {
+          // Skip double-wrapping: combo→combo nesting can produce a response already
+          // wrapped by an inner wrapStreamingResponse call. Wrapping again creates two
+          // nested ReadableStreams which buffer all chunks until the inner stream fully
+          // drains, preventing Claude Code from seeing any output.
+          if (isAlreadyWrappedStream(result.response!)) {
+            return result.response!;
+          }
           return wrapStreamingResponse(
             result.response!,
             requestId,
@@ -737,10 +753,12 @@ function wrapStreamingResponse(
     },
   });
 
-  return new Response(stream, {
+  const finalResponse = new Response(stream, {
     status: response.status,
     headers: response.headers,
   });
+  (finalResponse as unknown as Record<symbol, boolean>)[WRAPPED_STREAM_MARKER] = true;
+  return finalResponse;
 }
 
 // ─── Combo model routing strategies ─────────────────────────────────────────────
