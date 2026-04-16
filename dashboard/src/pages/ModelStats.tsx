@@ -226,14 +226,14 @@ export default function ModelStats() {
                           {fmtMs(r.durationMs)}
                         </TableCell>
                         <TableCell className="py-2.5 text-sm text-right font-mono">
-                          {r.streaming && r.ttftMs != null ? (
+                          {r.ttftMs != null ? (
                             fmtMs(r.ttftMs)
                           ) : (
                             <span className="text-muted-foreground/50">—</span>
                           )}
                         </TableCell>
                         <TableCell className="py-2.5 text-sm text-right font-mono">
-                          {r.streaming && r.tokensPerSecond != null ? (
+                          {r.tokensPerSecond != null ? (
                             fmtTps(r.tokensPerSecond)
                           ) : (
                             <span className="text-muted-foreground/50">—</span>

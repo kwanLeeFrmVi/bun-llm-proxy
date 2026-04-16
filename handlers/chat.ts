@@ -375,7 +375,18 @@ async function handleSingleModelChat(
         cached_tokens?: number;
       }) => {
         if (!isStreamingLocal) {
-          await saveRequestUsage(requestId, { ...usage, provider, model }, Date.now() - startTime);
+          const durMs = Date.now() - startTime;
+          const completionTokens = usage.completion_tokens ?? 0;
+          const tps = completionTokens > 0 && durMs > 0
+            ? (completionTokens / durMs) * 1000
+            : undefined;
+          await saveRequestUsage(requestId, {
+            ...usage,
+            provider,
+            model,
+            ttft_ms: durMs,
+            tokens_per_second: tps,
+          }, durMs);
         }
       },
     };

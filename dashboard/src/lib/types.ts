@@ -46,6 +46,12 @@ export interface UsageRecord {
 
 export type TestStatus = "ok" | "error" | null;
 
+export interface ModelTestResult {
+  status: TestStatus;
+  ttftMs?: number;
+  tps?: number;
+}
+
 export interface ConsoleLogEntry {
   id: string;
   timestamp: string;

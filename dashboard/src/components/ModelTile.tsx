@@ -15,6 +15,18 @@ export interface ModelTileProps {
   testStatus?: TestStatus;
   onDelete?: () => void;
   className?: string;
+  /** TTFT in milliseconds from aggregated DB stats */
+  ttftMs?: number | null;
+  /** Tokens per second from aggregated DB stats */
+  tps?: number | null;
+  /** TTFT from most recent client-side test */
+  testTtftMs?: number;
+  /** TPS from most recent client-side test */
+  testTps?: number;
+}
+
+function fmtMs(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
 export function ModelTile({
@@ -27,6 +39,10 @@ export function ModelTile({
   testStatus,
   onDelete,
   className,
+  ttftMs,
+  tps,
+  testTtftMs,
+  testTps,
 }: ModelTileProps) {
   // Use alias (full model ID with prefix) or fall back to modelId
   const fullModelId = alias ?? modelId;
@@ -37,11 +53,16 @@ export function ModelTile({
 
   const formattedName = formatModelName(modelNameOnly);
 
+  // Prefer client-side test stats, fall back to aggregated DB stats
+  const displayTtft = testTtftMs ?? ttftMs;
+  const displayTps = testTps ?? tps;
+  const hasStats = displayTtft != null || displayTps != null;
+
   return (
     <TooltipProvider>
       <div
         className={cn(
-          "group flex items-center gap-2 px-3 py-2 rounded-lg border bg-surface-container-low/30 transition-all hover:bg-surface-container-low/60",
+          "group flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-surface-container-low/30 transition-all hover:bg-surface-container-low/60",
           testStatus === "ok" && "border-green-500/30 bg-green-500/5",
           testStatus === "error" && "border-red-500/30 bg-red-500/5",
           !testStatus && "border-outline-variant",
@@ -68,11 +89,31 @@ export function ModelTile({
                 <span className="text-[10px] font-mono text-on-surface-variant/70 truncate">
                   {fullModelId}
                 </span>
+                {hasStats && (
+                  <span className="text-[10px] text-on-surface-variant/60 mt-0.5 flex items-center gap-1.5">
+                    {displayTtft != null && (
+                      <span>TTFT: {fmtMs(displayTtft)}</span>
+                    )}
+                    {displayTtft != null && displayTps != null && (
+                      <span className="text-on-surface-variant/30">&middot;</span>
+                    )}
+                    {displayTps != null && (
+                      <span>Token/s: {displayTps.toFixed(1)}</span>
+                    )}
+                  </span>
+                )}
               </div>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-75 break-all">
               <p className="font-semibold mb-1">{formattedName}</p>
               <p className="text-xs font-mono">{fullModelId}</p>
+              {hasStats && (
+                <p className="text-xs mt-1 text-muted-foreground">
+                  {displayTtft != null && `TTFT: ${fmtMs(displayTtft)}`}
+                  {displayTtft != null && displayTps != null && " · "}
+                  {displayTps != null && `Token/s: ${displayTps.toFixed(1)}`}
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
         </div>

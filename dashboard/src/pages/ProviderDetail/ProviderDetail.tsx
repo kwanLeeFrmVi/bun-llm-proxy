@@ -31,7 +31,7 @@ import { AddCustomModelModal } from "./AddCustomModelModal";
 import { ModelTile } from "@/components/ModelTile";
 import { getLogoPath } from "./utils";
 import type { ProviderModel } from "./types";
-import type { TestStatus } from "@/lib/types";
+import type { TestStatus, ModelTestResult } from "@/lib/types";
 import { EditProviderModal } from "@/components/EditProviderModal";
 
 function normalizeModelId(modelId: string, prefixes: string[]) {
@@ -75,9 +75,25 @@ export default function ProviderDetail() {
   const [copied, setCopied] = useState<string | null>(null);
   const [testingAll, setTestingAll] = useState(false);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
-  const [modelTestResults, setModelTestResults] = useState<Record<string, TestStatus>>({});
+  const [modelTestResults, setModelTestResults] = useState<Record<string, ModelTestResult>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
   const [settings, setSettings] = useState<Record<string, unknown>>({});
+
+  // Aggregated model stats from DB (TTFT, Token/s)
+  const [modelStats, setModelStats] = useState<Map<string, { ttftMs: number | null; tps: number | null }>>(new Map());
+
+  const loadModelStats = useCallback(async () => {
+    try {
+      const statsData = await api.usage.modelsLatestStats();
+      const map = new Map<string, { ttftMs: number | null; tps: number | null }>();
+      for (const s of statsData.stats ?? []) {
+        map.set(s.model, { ttftMs: s.latestTtftMs, tps: s.latestTokensPerSecond });
+      }
+      setModelStats(map);
+    } catch {
+      /* ignore stats load failure */
+    }
+  }, []);
 
   // Determine provider info
   const isCompatible =
@@ -195,6 +211,10 @@ export default function ProviderDetail() {
   useEffect(() => {
     fetchPredefinedModels();
   }, [fetchPredefinedModels]);
+
+  useEffect(() => {
+    loadModelStats();
+  }, [loadModelStats]);
 
   // Copy helper
   function handleCopy(text: string) {
@@ -377,13 +397,12 @@ export default function ProviderDetail() {
         headers,
         body: JSON.stringify({
           model: fullModel,
-          max_tokens: 1,
-          stream: false,
+          max_tokens: 50,
+          stream: true,
           messages: [{ role: "user", content: "hi" }],
         }),
         signal: AbortSignal.timeout(15000),
       });
-      const latencyMs = Date.now() - start;
 
       // Handle both streaming (SSE) and non-streaming (JSON) responses
       // For STREAM_PROVIDERS (openai, codex), backend always streams regardless of stream:false
@@ -392,6 +411,8 @@ export default function ProviderDetail() {
 
       let success = false;
       let errorMsg = "";
+      let firstChunkTime: number | null = null;
+      let completionTokens = 0;
 
       if (!res.ok) {
         // Try to parse error from response
@@ -411,6 +432,7 @@ export default function ProviderDetail() {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
+              const now = Date.now();
               const text = decoder.decode(value);
               // Check for error in SSE
               if (text.includes('"error"')) {
@@ -431,6 +453,23 @@ export default function ProviderDetail() {
                 (text.includes('"content"') || text.includes('"delta"'))
               ) {
                 foundContent = true;
+                if (!firstChunkTime) firstChunkTime = now;
+              }
+              // Parse usage data from SSE chunks
+              for (const line of text.split("\n")) {
+                if (line.startsWith("data: ") && !line.includes("[DONE]")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    const usageSource = data.usage && typeof data.usage === "object"
+                      ? data.usage
+                      : null;
+                    if (usageSource) {
+                      completionTokens = usageSource.completion_tokens ?? usageSource.output_tokens ?? 0;
+                    }
+                  } catch {
+                    /* skip non-JSON lines */
+                  }
+                }
               }
               // Check for [DONE] marker
               if (text.includes("[DONE]")) {
@@ -452,20 +491,35 @@ export default function ProviderDetail() {
           errorMsg = data.error.message ?? "Unknown error";
         } else if (data?.choices?.length) {
           success = true;
+          firstChunkTime = Date.now();
+          completionTokens = data.usage?.completion_tokens ?? 0;
         } else {
           errorMsg = "No choices in response";
         }
       }
 
+      const totalMs = Date.now() - start;
+      const ttftMs = firstChunkTime ? firstChunkTime - start : undefined;
+      const tps = ttftMs && completionTokens > 0 && totalMs > ttftMs
+        ? (completionTokens / (totalMs - ttftMs)) * 1000
+        : undefined;
+
       if (!success) {
-        setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
+        setModelTestResults((prev) => ({ ...prev, [modelId]: { status: "error" } }));
         toast.error(`Model ${modelId} test failed${errorMsg ? `: ${errorMsg}` : ""}`);
       } else {
-        setModelTestResults((prev) => ({ ...prev, [modelId]: "ok" }));
-        toast.success(`Model ${modelId} tested successfully (${latencyMs}ms)`);
+        setModelTestResults((prev) => ({
+          ...prev,
+          [modelId]: { status: "ok", ttftMs, tps },
+        }));
+        const ttftStr = ttftMs != null ? ` | TTFT: ${ttftMs >= 1000 ? `${(ttftMs / 1000).toFixed(1)}s` : `${ttftMs}ms`}` : "";
+        const tpsStr = tps != null ? ` | Token/s: ${tps.toFixed(1)}` : "";
+        toast.success(`Model ${modelId} tested successfully (${totalMs}ms${ttftStr}${tpsStr})`);
+        // Refresh aggregated stats from DB after a short delay to let the backend save
+        setTimeout(() => loadModelStats(), 500);
       }
     } catch (err) {
-      setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
+      setModelTestResults((prev) => ({ ...prev, [modelId]: { status: "error" } }));
       toast.error(
         `Model ${modelId} test failed: ${err instanceof Error ? err.message : "Unknown error"}`
       );
@@ -992,19 +1046,29 @@ export default function ProviderDetail() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {predefinedModels.map((m) => (
-                      <ModelTile
-                        key={m.id}
-                        modelId={m.name ?? m.id}
-                        alias={m.id}
-                        onCopy={handleCopy}
-                        copied={copied}
-                        onTest={connections.length > 0 ? () => handleTestModel(m.id) : undefined}
-                        isTesting={testingModelId === m.id}
-                        testStatus={modelTestResults[m.id]}
-                        onDelete={() => handleDeletePredefinedModel(m.id)}
-                      />
-                    ))}
+                    {predefinedModels.map((m) => {
+                      // Normalize: DB stores model without provider prefix
+                      const statsKey = normalizeModelId(m.id, [providerPrefix, decodedId]);
+                      const dbStat = modelStats.get(statsKey) ?? modelStats.get(m.id);
+                      const testResult = modelTestResults[m.id];
+                      return (
+                        <ModelTile
+                          key={m.id}
+                          modelId={m.name ?? m.id}
+                          alias={m.id}
+                          onCopy={handleCopy}
+                          copied={copied}
+                          onTest={connections.length > 0 ? () => handleTestModel(m.id) : undefined}
+                          isTesting={testingModelId === m.id}
+                          testStatus={testResult?.status}
+                          onDelete={() => handleDeletePredefinedModel(m.id)}
+                          ttftMs={dbStat?.ttftMs}
+                          tps={dbStat?.tps}
+                          testTtftMs={testResult?.ttftMs}
+                          testTps={testResult?.tps}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1020,6 +1084,10 @@ export default function ProviderDetail() {
                       const alias = m.startsWith(`${providerPrefix}/`)
                         ? m
                         : `${providerPrefix}/${m}`;
+                      // Normalize: DB stores model without provider prefix
+                      const statsKey = normalizeModelId(m, [providerPrefix, decodedId]);
+                      const dbStat = modelStats.get(statsKey) ?? modelStats.get(m);
+                      const testResult = modelTestResults[m];
                       return (
                         <ModelTile
                           key={m}
@@ -1029,8 +1097,12 @@ export default function ProviderDetail() {
                           copied={copied}
                           onTest={connections.length > 0 ? () => handleTestModel(m) : undefined}
                           isTesting={testingModelId === m}
-                          testStatus={modelTestResults[m]}
+                          testStatus={testResult?.status}
                           onDelete={() => handleDeleteCustomModel(m)}
+                          ttftMs={dbStat?.ttftMs}
+                          tps={dbStat?.tps}
+                          testTtftMs={testResult?.ttftMs}
+                          testTps={testResult?.tps}
                         />
                       );
                     })}

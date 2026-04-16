@@ -735,12 +735,12 @@ export function getModelStats(
       `SELECT
          COUNT(*) as total,
          SUM(CASE WHEN status NOT IN ('ok', 'pending') THEN 1 ELSE 0 END) as failed,
-         MIN(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_min,
-         AVG(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_avg,
-         MAX(CASE WHEN streaming = 1 AND ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_max,
-         MIN(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_min,
-         AVG(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_avg,
-         MAX(CASE WHEN streaming = 1 AND tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_max,
+         MIN(CASE WHEN ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_min,
+         AVG(CASE WHEN ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_avg,
+         MAX(CASE WHEN ttft_ms IS NOT NULL THEN ttft_ms END) as ttft_max,
+         MIN(CASE WHEN tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_min,
+         AVG(CASE WHEN tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_avg,
+         MAX(CASE WHEN tokens_per_second IS NOT NULL THEN tokens_per_second END) as tps_max,
          MIN(duration_ms) as lat_min,
          AVG(duration_ms) as lat_avg,
          MAX(duration_ms) as lat_max
@@ -841,7 +841,7 @@ export function getModelsLatestStats(): ModelLatestStats[] {
          AVG(ttft_ms) as avg_ttft_ms,
          AVG(tokens_per_second) as avg_tps
        FROM usage_log
-       WHERE streaming = 1 AND status = 'ok' AND ttft_ms IS NOT NULL
+       WHERE status = 'ok' AND ttft_ms IS NOT NULL
        GROUP BY model, provider`
     )
     .all();
