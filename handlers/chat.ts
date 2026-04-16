@@ -546,12 +546,23 @@ function wrapStreamingResponse(
       const reader = originalBody.getReader();
       let controllerClosed = false;
       const safeEnqueue = (chunk: Uint8Array) => {
-        if (!controllerClosed) controller.enqueue(chunk);
+        if (!controllerClosed) {
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            // Controller may already be closed by cancel() — swallow silently.
+            // This is expected when the downstream client disconnects mid-stream.
+          }
+        }
       };
       const safeClose = () => {
         if (!controllerClosed) {
           controllerClosed = true;
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            // Already closed — safe to ignore.
+          }
         }
       };
 
@@ -656,7 +667,10 @@ function wrapStreamingResponse(
         const reason: CloseReason = downstreamCanceled
           ? "downstream_canceled"
           : "inner_stream_error";
-        log.stream(ctx, "OUTER_ERROR", {
+        // Use a distinct event name for downstream cancellation — this is expected
+        // behavior (client disconnected) and should not be conflated with real errors.
+        const eventName = downstreamCanceled ? "OUTER_CANCELED" : "OUTER_ERROR";
+        log.stream(ctx, eventName, {
           provider,
           model,
           error: errMsg,

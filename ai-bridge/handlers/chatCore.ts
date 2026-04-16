@@ -307,27 +307,43 @@ async function handleStreamingResponse(
     `Starting stream: ${sourceFormat} → ${targetFormat} | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`
   );
 
+  // AbortController shared between cancel() and start() so that downstream
+  // disconnect immediately stops the upstream reader loop.
+  const streamAbort = new AbortController();
+
   const stream = new ReadableStream({
     async start(controller) {
       const reader = upstream.body!.getReader();
       let controllerClosed = false;
       const safeEnqueue = (chunk: Uint8Array) => {
         if (!controllerClosed) {
-          const now = Date.now();
-          if (firstTranslatedChunkMs === null) firstTranslatedChunkMs = now;
-          translatedChunkCount++;
-          controller.enqueue(chunk);
+          try {
+            const now = Date.now();
+            if (firstTranslatedChunkMs === null) firstTranslatedChunkMs = now;
+            translatedChunkCount++;
+            controller.enqueue(chunk);
+          } catch {
+            // Controller may already be closed by cancel() — swallow silently.
+            // This is expected when the downstream client disconnects mid-stream.
+          }
         }
       };
       const safeClose = () => {
         if (!controllerClosed) {
           controllerClosed = true;
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            log.debug(opts.ctx ?? null, "STREAM", "Controller close failed (already closed)");
+            // Already closed — safe to ignore.
+          }
         }
       };
 
       try {
         while (true) {
+          // Check abort flag before each read — cancel() may have fired between chunks
+          if (streamAbort.signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -681,6 +697,11 @@ async function handleStreamingResponse(
     },
     cancel() {
       downstreamCanceled = true;
+      // Abort the upstream reader loop so it stops trying to enqueue into
+      // the already-closed controller. Without this, the loop continues
+      // reading upstream chunks until the upstream finishes or times out,
+      // wasting bandwidth and producing "Controller is already closed" errors.
+      streamAbort.abort();
       opts.onDisconnect?.("client_disconnected");
     },
   });
