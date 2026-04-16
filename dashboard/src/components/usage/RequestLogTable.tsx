@@ -1,4 +1,6 @@
 import { fmt, fmtDate, fmtMs } from "@/lib/formatters.ts";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip.tsx";
+import { AlertCircle } from "lucide-react";
 
 export interface RequestLogRow {
   id: string;
@@ -15,6 +17,9 @@ export interface RequestLogRow {
   discountLabel?: string;
   errorMessage?: string;
   createdAt: string;
+  cachedInputTokens?: number;
+  cacheWriteTokens?: number;
+  cacheHitTokens?: number;
 }
 
 interface RequestLogTableProps {
@@ -54,6 +59,43 @@ function TokenCell({ input, output }: { input: number; output: number }) {
         <span>{fmt(output)}</span>
       </div>
     </div>
+  );
+}
+
+function CacheCell({
+  cached,
+  write,
+  hit,
+}: {
+  cached: number;
+  write: number;
+  hit: number;
+}) {
+  if (cached === 0 && write === 0 && hit === 0) {
+    return <span className="text-[var(--on-surface-variant)] text-[11px]">—</span>;
+  }
+  return (
+    <div className="text-right text-[11px]">
+      <div className="flex items-center justify-end gap-1">
+        <span style={{ color: "#a78bfa" }}>◇</span>
+        <span className="text-[var(--on-surface)]">{fmt(cached)}</span>
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        <span style={{ color: "#6ee7b7" }}>▸</span>
+        <span className="text-[var(--on-surface)]">{fmt(write)}</span>
+      </div>
+    </div>
+  );
+}
+
+function DiscountBadge({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold"
+      style={{ background: "rgba(249,115,22,0.15)", color: "#f97316" }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -100,14 +142,30 @@ export function RequestLogTable({
             <table className="w-full" style={{ fontSize: "12px", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(203,213,225,0.4)" }}>
-                  {["Model", "Tokens", "Cost", "Latency", "Type", "Status", "Timestamp"].map((h) => (
+                  {[
+                    "Model",
+                    "Tokens",
+                    "Cache ◇▸",
+                    "Discount",
+                    "Cost",
+                    "Latency",
+                    "Type",
+                    "Error",
+                    "Status",
+                    "Timestamp",
+                  ].map((h) => (
                     <th
                       key={h}
                       style={{
                         padding: "6px 12px",
-                        textAlign: h === "Tokens" || h === "Cost" || h === "Latency" || h === "Timestamp"
-                          ? "right"
-                          : "left",
+                        textAlign:
+                          h === "Tokens" ||
+                          h === "Cache ◇▸" ||
+                          h === "Cost" ||
+                          h === "Latency" ||
+                          h === "Timestamp"
+                            ? "right"
+                            : "left",
                         fontWeight: 600,
                         color: "var(--on-surface-variant)",
                         textTransform: "uppercase",

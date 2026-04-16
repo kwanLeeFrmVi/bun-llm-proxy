@@ -8,7 +8,7 @@ import { QuotaCard } from "@/components/QuotaCard.tsx";
 import { RpmCard } from "@/components/usage/RpmCard.tsx";
 import { RequestLogTable, type RequestLogRow } from "@/components/usage/RequestLogTable.tsx";
 import { TrollTimeseriesChart } from "./components/TrollTimeseriesChart.tsx";
-import { fmtMs } from "@/lib/formatters.ts";
+import { fmt, fmtMs } from "@/lib/formatters.ts";
 
 const PERIODS = [
   { label: "1h", value: "1h" },
@@ -260,17 +260,17 @@ export default function TrollUsage() {
             <QuotaCard label="Avg Response" value={avgResponse} sub="per request" />
             <QuotaCard
               label="Cached Tokens"
-              value={String(summary?.totalCachedTokens ?? 0)}
+              value={fmt(summary?.totalCachedTokens ?? 0)}
               sub="cached"
             />
             <QuotaCard
               label="Input Tokens"
-              value={String(summary?.inputTokens ?? 0)}
+              value={fmt(summary?.inputTokens ?? 0)}
               sub="prompt"
             />
             <QuotaCard
               label="Output Tokens"
-              value={String(summary?.outputTokens ?? 0)}
+              value={fmt(summary?.outputTokens ?? 0)}
               sub="completion"
             />
           </div>
