@@ -1,5 +1,6 @@
 // Translates Ollama SSE streaming → Anthropic SSE format
 // Ollama sends: data: {"model":"...","done":false,"message":{"role":"assistant","content":"..."}}
+// Tool call chunks: data: {"model":"...","message":{"tool_calls":[{"function":{"name":"bash","arguments":"{\"cmd\":\"ls\"}"}}]}}
 
 export interface OllamaStreamingState {
   messageId: string;
@@ -10,6 +11,9 @@ export interface OllamaStreamingState {
   messageStarted: boolean;
   messageStopSent: boolean;
   contentAccumulator: string;
+  // Tool call support
+  toolBlockIndex: number;
+  nextToolIndex: number;
 }
 
 export function newState(): OllamaStreamingState {
@@ -22,6 +26,8 @@ export function newState(): OllamaStreamingState {
     messageStarted: false,
     messageStopSent: false,
     contentAccumulator: "",
+    toolBlockIndex: -1,
+    nextToolIndex: 0,
   };
 }
 
@@ -40,7 +46,7 @@ export function convertOllamaResponseToClaude(
     return buildDoneEvents(param ?? newState());
   }
 
-  const stripped = rawText.startsWith("data: ") ? rawText.slice(5).trim() : rawText;
+  const stripped = rawText.startsWith("data: ") ? rawText.slice(6).trim() : rawText;
 
   if (stripped === "[DONE]") {
     return buildDoneEvents(param ?? newState());
@@ -79,6 +85,44 @@ export function convertOllamaResponseToClaude(
   }
 
   const message = parsed.message as Record<string, unknown> | undefined;
+
+  // ── Handle tool_calls ──────────────────────────────────────────────────────────
+  const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : null;
+  if (toolCalls) {
+    for (const tc of toolCalls) {
+      const tcObj = tc as Record<string, unknown>;
+      const fn = tcObj.function as Record<string, unknown> | undefined;
+      const toolName = (fn?.name as string) ?? "";
+      const rawArgs =
+        typeof fn?.arguments === "string"
+          ? fn.arguments
+          : JSON.stringify(fn?.arguments ?? {});
+
+      state.toolBlockIndex = state.nextBlockIndex++;
+      state.nextToolIndex++;
+      const toolId = `toolu_${state.toolBlockIndex}_${state.messageId}`;
+
+      // content_block_start: tool_use
+      results.push(
+        buildSSEEvent("content_block_start", {
+          type: "content_block_start",
+          index: state.toolBlockIndex,
+          content_block: { type: "tool_use", id: toolId, name: toolName, input: "" },
+        })
+      );
+
+      // content_block_delta: input_json_delta
+      results.push(
+        buildSSEEvent("content_block_delta", {
+          type: "content_block_delta",
+          index: state.toolBlockIndex,
+          delta: { type: "input_json_delta", partial_json: rawArgs },
+        })
+      );
+    }
+  }
+
+  // ── Handle text content ───────────────────────────────────────────────────────
   if (message) {
     const content = message.content as string | undefined;
     if (content) {
@@ -108,10 +152,19 @@ export function convertOllamaResponseToClaude(
 
   // done
   if (parsed.done === true) {
-    const doneReason = parsed.done_reason as string | undefined;
-    const stopReason = doneReason === "length" ? "max_tokens" : "end_turn";
+    // Extract real usage from Ollama's eval_count / prompt_eval_count
+    const outputTokens = (parsed.eval_count as number) ?? 0;
+    const inputTokens = (parsed.prompt_eval_count as number) ?? 0;
 
-    // Stop text block
+    const doneReason = parsed.done_reason as string | undefined;
+    let stopReason = "end_turn";
+    if (doneReason === "length") {
+      stopReason = "max_tokens";
+    } else if (doneReason === "tool_calls") {
+      stopReason = "tool_use";
+    }
+
+    // Close text block if started
     if (state.textBlockStarted) {
       results.push(
         buildSSEEvent("content_block_stop", {
@@ -126,7 +179,7 @@ export function convertOllamaResponseToClaude(
       buildSSEEvent("message_delta", {
         type: "message_delta",
         delta: { stop_reason: stopReason, stop_sequence: null },
-        usage: { input_tokens: 0, output_tokens: 0 },
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
       })
     );
 
@@ -152,8 +205,52 @@ export function convertOllamaResponseToClaudeNonStream(
   }
 
   const message = parsed.message as Record<string, unknown> | undefined;
-  const content = (message?.content as string | undefined) ?? "";
+  const textContent = (message?.content as string | undefined) ?? "";
+
+  // Build content array (text + tool_use blocks)
+  const content: Record<string, unknown>[] = [];
+
+  // Text block
+  if (textContent) {
+    content.push({ type: "text", text: textContent });
+  }
+
+  // Tool calls
+  const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : null;
+  if (toolCalls) {
+    for (let i = 0; i < toolCalls.length; i++) {
+      const tc = toolCalls[i] as Record<string, unknown>;
+      const fn = tc.function as Record<string, unknown> | undefined;
+      const toolName = (fn?.name as string) ?? "";
+      const rawArgs =
+        typeof fn?.arguments === "string"
+          ? fn.arguments
+          : JSON.stringify(fn?.arguments ?? {});
+      content.push({
+        type: "tool_use",
+        id: `toolu_${i}_${Date.now()}`,
+        name: toolName,
+        input: rawArgs,
+      });
+    }
+  }
+
   const model = (parsed.model as string | undefined) ?? "";
+  const doneReason = parsed.done_reason as string | undefined;
+  let stopReason = "end_turn";
+  if (doneReason === "length") {
+    stopReason = "max_tokens";
+  } else if (doneReason === "tool_calls" || content.some((c) => c.type === "tool_use")) {
+    stopReason = "tool_use";
+  }
+
+  const outputTokens = (parsed.eval_count as number) ?? 0;
+  const inputTokens = (parsed.prompt_eval_count as number) ?? 0;
+
+  // If no content at all, send a minimal text block
+  if (content.length === 0) {
+    content.push({ type: "text", text: "" });
+  }
 
   return new TextEncoder().encode(
     JSON.stringify({
@@ -161,10 +258,10 @@ export function convertOllamaResponseToClaudeNonStream(
       type: "message",
       role: "assistant",
       model,
-      content: [{ type: "text", text: content }],
-      stop_reason: parsed.done_reason === "length" ? "max_tokens" : "end_turn",
+      content,
+      stop_reason: stopReason,
       stop_sequence: null,
-      usage: { input_tokens: 0, output_tokens: 0 },
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
     })
   );
 }

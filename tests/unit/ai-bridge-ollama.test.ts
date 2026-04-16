@@ -294,6 +294,8 @@ describe("convertOllamaResponseToClaude", () => {
       messageStarted: false,
       messageStopSent: false,
       contentAccumulator: "",
+      toolBlockIndex: -1,
+      nextToolIndex: 0,
     };
     const chunk1 = enc.encode(
       'data: {"model":"llama3","message":{"role":"assistant","content":"hel"}}\n\n'
@@ -308,6 +310,101 @@ describe("convertOllamaResponseToClaude", () => {
     // Second chunk should not emit message_start again (state tracks)
     expect(text2).not.toContain("event: message_start");
     expect(text2).toContain("event: content_block_delta");
+    expect(result1.length).toBeGreaterThan(0);
+  });
+
+  // ── Tool call handling ──────────────────────────────────────────────────────
+  it("emits tool_use content_block_start and input_json_delta for tool_calls", () => {
+    const raw = enc.encode(
+      JSON.stringify({
+        model: "qwen3-coder-next:cloud",
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { function: { name: "bash", arguments: '{"cmd":"ls"}' } },
+          ],
+        },
+        done: false,
+      })
+    );
+    const chunks = convertOllamaResponseToClaude(null, "qwen", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain("event: content_block_start");
+    expect(text).toContain('"type":"tool_use"');
+    expect(text).toContain('"name":"bash"');
+    expect(text).toContain("event: content_block_delta");
+    expect(text).toContain('"type":"input_json_delta"');
+    expect(text).toContain('"partial_json":"{\\"cmd\\":\\"ls\\"}"');
+  });
+
+  it("maps done_reason=tool_calls to stop_reason=tool_use", () => {
+    const raw = enc.encode(
+      JSON.stringify({
+        model: "qwen",
+        done: true,
+        done_reason: "tool_calls",
+        eval_count: 12,
+        prompt_eval_count: 34,
+      })
+    );
+    const chunks = convertOllamaResponseToClaude(null, "qwen", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"stop_reason":"tool_use"');
+  });
+
+  it("uses real eval_count and prompt_eval_count for usage", () => {
+    const raw = enc.encode(
+      JSON.stringify({
+        model: "qwen",
+        done: true,
+        done_reason: "stop",
+        eval_count: 42,
+        prompt_eval_count: 100,
+      })
+    );
+    const chunks = convertOllamaResponseToClaude(null, "qwen", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"input_tokens":100');
+    expect(text).toContain('"output_tokens":42');
+  });
+
+  it("handles mixed text and tool_calls in one chunk", () => {
+    const raw = enc.encode(
+      JSON.stringify({
+        model: "qwen",
+        message: {
+          role: "assistant",
+          content: "let me check",
+          tool_calls: [{ function: { name: "ls", arguments: "{}" } }],
+        },
+        done: false,
+      })
+    );
+    const chunks = convertOllamaResponseToClaude(null, "qwen", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    // Both tool_use block and text block should be present
+    expect(text).toContain('"type":"tool_use"');
+    expect(text).toContain('"type":"text"');
+    expect(text).toContain("text_delta");
+    expect(text).toContain("input_json_delta");
+  });
+
+  it("accepts arguments as object and stringifies to partial_json", () => {
+    const raw = enc.encode(
+      JSON.stringify({
+        model: "qwen",
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [{ function: { name: "bash", arguments: { cmd: "ls" } } }],
+        },
+        done: false,
+      })
+    );
+    const chunks = convertOllamaResponseToClaude(null, "qwen", NO_RAW, NO_RAW, raw, undefined);
+    const text = decodeAll(chunks);
+    expect(text).toContain('"partial_json":"{\\"cmd\\":\\"ls\\"}"');
   });
 });
 
