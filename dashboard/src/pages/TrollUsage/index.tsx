@@ -118,6 +118,8 @@ export default function TrollUsage() {
       inputTokens: r.inputTokens,
       outputTokens: r.outputTokens,
       cachedInputTokens: r.cachedInputTokens,
+      cacheWriteTokens: r.cacheWriteTokens,
+      cacheHitTokens: r.cacheHitTokens,
       creditsCost: r.creditsCost,
       durationMs: r.durationMs,
       isStream: r.isStream,

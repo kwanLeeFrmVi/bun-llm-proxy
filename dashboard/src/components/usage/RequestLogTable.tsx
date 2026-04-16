@@ -188,22 +188,25 @@ export function RequestLogTable({
                     {/* Model */}
                     <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: "11px" }}>
                       <span className="text-[var(--on-surface)]">{row.model}</span>
-                      {row.discountLabel && (
-                        <span
-                          className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold"
-                          style={{ background: "rgba(249,115,22,0.15)", color: "#f97316" }}
-                        >
-                          {row.discountLabel}
-                        </span>
-                      )}
                     </td>
 
                     {/* Tokens */}
                     <td style={{ padding: "8px 12px" }}>
-                      <TokenCell
-                        input={row.inputTokens}
-                        output={row.outputTokens}
+                      <TokenCell input={row.inputTokens} output={row.outputTokens} />
+                    </td>
+
+                    {/* Cache ◇▸ */}
+                    <td style={{ padding: "8px 12px" }}>
+                      <CacheCell
+                        cached={row.cachedInputTokens ?? 0}
+                        write={row.cacheWriteTokens ?? 0}
+                        hit={row.cacheHitTokens ?? 0}
                       />
+                    </td>
+
+                    {/* Discount */}
+                    <td style={{ padding: "8px 12px" }}>
+                      {row.discountLabel ? <DiscountBadge label={row.discountLabel} /> : null}
                     </td>
 
                     {/* Cost */}
@@ -246,6 +249,22 @@ export function RequestLogTable({
                       >
                         {row.isStream ? "Stream" : "Normal"}
                       </span>
+                    </td>
+
+                    {/* Error */}
+                    <td style={{ padding: "8px 12px" }}>
+                      {row.errorMessage ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="cursor-help">
+                              <AlertCircle className="w-4 h-4 text-red-400" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-[11px]">{row.errorMessage}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
                     </td>
 
                     {/* Status */}
