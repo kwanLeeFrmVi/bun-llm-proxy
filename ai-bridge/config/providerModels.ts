@@ -348,7 +348,7 @@ export const PROVIDER_MODELS: Record<string, ModelEntry[]> = {
   ],
   ollama: [
     { id: "gpt-oss:120b", name: "GPT OSS 120B" },
-    { id: "kimi-k2.5", name: "Kimi K2.5" },
+    { id: "kimi-k2.5:cloud", name: "Kimi K2.5" },
     { id: "glm-5.1:cloud", name: "GLM 5.1" },
     { id: "minimax-m2.7:cloud", name: "MiniMax M2.7" },
     { id: "glm-4.7:cloud", name: "GLM 4.7" },
