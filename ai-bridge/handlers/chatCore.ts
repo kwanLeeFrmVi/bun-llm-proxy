@@ -127,7 +127,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       const errorText = await upstream.text().catch(() => "");
       const errResult = handleUpstreamError(upstream.status, errorText, provider);
       if (errResult) return errResult;
-      // For other non-ok statuses, return a generic error (don't continue to read body again)
+      // Log the raw upstream error body for debugging (helps diagnose 400s from providers)
+      log.warn(ctx ?? null, "UPSTREAM", `[${provider}] HTTP ${upstream.status}: ${errorText}`);
       const errorMsg = errorText || `Upstream error: ${upstream.status}`;
       return {
         success: false,
@@ -262,6 +263,7 @@ async function handleStreamingResponse(
     const errorText = await upstream.text().catch(() => "");
     const status = upstream.status;
     const msg = errorText || `Upstream error: ${status}`;
+    log.warn(opts.ctx ?? null, "UPSTREAM", `[${opts.modelInfo.provider}] HTTP ${status}: ${errorText}`);
     log.warn(opts.ctx ?? null, "STREAM", `Upstream error ${status}: ${msg}`);
     if (opts.onStreamError) return opts.onStreamError(status, msg);
     return sseErrorResponse(status, msg);

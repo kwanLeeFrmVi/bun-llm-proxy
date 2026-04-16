@@ -469,6 +469,8 @@ async function handleSingleModelChat(
     const { category, suggestion } = classifyNetworkError(finalResult.error ?? "");
     if (category !== "NETWORK_ERROR") {
       log.error(ctx, "CHAT", `[${provider}/${model}] ${category}: ${finalResult.error}${suggestion ? ` — ${suggestion}` : ""}`);
+    } else {
+      log.warn(ctx, "CHAT", `[${provider}/${model}] Upstream error (${finalResult.status}): ${finalResult.error}`);
     }
     if (isStreaming) {
       // Use sourceFormat so OpenAI clients on /v1/chat/completions get OpenAI SSE errors,
