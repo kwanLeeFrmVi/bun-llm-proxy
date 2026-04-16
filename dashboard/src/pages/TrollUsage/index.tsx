@@ -2,25 +2,19 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import type { TrollBilling, TrollUsageStatus, TrollSummary, TrollLogs, TrollMe } from "@/lib/trollTypes.ts";
+import type { TrollBilling, TrollUsageStatus, TrollSummary, TrollLogs } from "@/lib/trollTypes.ts";
 import { BudgetCard } from "@/components/BudgetCard.tsx";
-import { QuotaCardGrid } from "@/components/usage/QuotaCardGrid.tsx";
+import { QuotaCard } from "@/components/QuotaCard.tsx";
 import { RpmCard } from "@/components/usage/RpmCard.tsx";
-import { ApiEndpointsCard } from "@/components/usage/ApiEndpointsCard.tsx";
-import { DiscordCard } from "@/components/usage/DiscordCard.tsx";
 import { RequestLogTable, type RequestLogRow } from "@/components/usage/RequestLogTable.tsx";
-import { fmt, fmtMs } from "@/lib/formatters.ts";
+import { TrollTimeseriesChart } from "./components/TrollTimeseriesChart.tsx";
+import { fmtMs } from "@/lib/formatters.ts";
 
 const PERIODS = [
   { label: "1h", value: "1h" },
   { label: "24h", value: "24h" },
   { label: "7d", value: "7d" },
   { label: "30d", value: "30d" },
-];
-
-const ENDPOINTS = [
-  { label: "OPENAI COMPATIBLE", url: "https://chat.trollllm.xyz/v1" },
-  { label: "ANTHROPIC COMPATIBLE", url: "https://chat.trollllm.xyz" },
 ];
 
 // ─── Credit Cards ──────────────────────────────────────────────────────────────
@@ -51,26 +45,6 @@ function CreditCard({ label, value, used, color }: { label: string; value: numbe
   );
 }
 
-// ─── Plan Badge ────────────────────────────────────────────────────────────────
-
-function PlanBadge({ tier, expiresAt }: { tier: string; expiresAt: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className="px-3 py-1.5 rounded-lg text-[12px] font-bold uppercase tracking-wider"
-        style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6" }}
-      >
-        {tier}
-      </span>
-      <span className="text-[11px] text-[var(--on-surface-variant)]">
-        Exp. {new Date(expiresAt).toLocaleDateString()}
-      </span>
-      <span className="text-[11px] text-[var(--on-surface-variant)]">·</span>
-      <span className="text-[11px] text-[var(--on-surface-variant)]">1000 VND/$1</span>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TrollUsage() {
@@ -80,7 +54,6 @@ export default function TrollUsage() {
   const [status, setStatus] = useState<TrollUsageStatus | null>(null);
   const [summary, setSummary] = useState<TrollSummary | null>(null);
   const [logs, setLogs] = useState<TrollLogs | null>(null);
-  const [me, setMe] = useState<TrollMe | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,18 +64,16 @@ export default function TrollUsage() {
     setError(null);
     setLoading(true);
     try {
-      const [b, s, sm, l, m] = await Promise.all([
+      const [b, s, sm, l] = await Promise.all([
         api.troll.getBilling() as Promise<TrollBilling>,
         api.troll.getStatus() as Promise<TrollUsageStatus>,
         api.troll.getSummary(period) as Promise<TrollSummary>,
         api.troll.getLogs(period, 1, 20) as Promise<TrollLogs>,
-        api.troll.getMe() as Promise<TrollMe>,
       ]);
       setBilling(b);
       setStatus(s);
       setSummary(sm);
       setLogs(l);
-      setMe(m);
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load TrollLLM data");
@@ -117,21 +88,16 @@ export default function TrollUsage() {
 
   // Auto-refresh every 60s
   useEffect(() => {
-    const id = setInterval(() => load(), 60_000);
+    const id = setInterval(() => {
+      if (!refreshing) load();
+    }, 60_000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, refreshing]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  };
-
-  const handleDiscordSave = async (discordId: string) => {
-    await api.troll.updateDiscord(discordId);
-    // Refresh me data
-    const updated = await api.troll.getMe() as TrollMe;
-    setMe(updated);
   };
 
   const handlePageChange = async (page: number) => {
@@ -160,18 +126,7 @@ export default function TrollUsage() {
     createdAt: r.createdAt,
   })) ?? [];
 
-  const avgResponse = summary
-    ? fmtMs(summary.avgDurationMs)
-    : "—";
-
-  const quotaItems = [
-    { label: "Total Spend", value: `$${summary?.totalCost.toFixed(4) ?? "0.0000"}`, sub: "Credits used", color: "#f97316" },
-    { label: "Total Requests", value: fmt(summary?.requestCount ?? 0), sub: "requests" },
-    { label: "Avg Response", value: avgResponse, sub: "per request" },
-    { label: "Cached Tokens", value: fmt(summary?.totalCachedTokens ?? 0), sub: "cached" },
-    { label: "Input Tokens", value: fmt(summary?.inputTokens ?? 0), sub: "prompt" },
-    { label: "Output Tokens", value: fmt(summary?.outputTokens ?? 0), sub: "completion" },
-  ];
+  const avgResponse = summary ? fmtMs(summary.avgDurationMs) : "—";
 
   return (
     <div className="flex flex-col gap-6">
@@ -216,32 +171,77 @@ export default function TrollUsage() {
         </p>
       )}
 
-      {/* Error */}
       {error && (
         <div className="flex gap-3 rounded-xl bg-[var(--surface-container-lowest)] p-6 border border-[rgba(239,68,68,0.4)]">
-          <AlertCircle className="shrink-0 w-5 h-5 text-red-500" />
+          <AlertCircle className="shrink-0 w-5 h-5 text-[#ef4444]" />
           <div>
-            <p className="text-[13px] font-600 text-red-500">Failed to load TrollLLM data</p>
+            <p className="text-[13px] font-600 text-[#ef4444]">Failed to load TrollLLM data</p>
             <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">{error}</p>
+            <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">
+              Make sure{" "}
+              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+                TROLL_USAGE_TOKEN
+              </code>{" "}
+              is set in your{" "}
+              <code className="bg-[var(--surface-container-low)] px-1.5 py-0.5 rounded text-[11px]">
+                .env
+              </code>{" "}
+              file.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Loading */}
-      {!billing && loading && (
+      {!billing || loading ? (
         <div className="px-12 py-12 text-center">
           <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
           <p className="mt-3 text-[13px] text-[var(--on-surface-variant)]">
-            Loading from trollllm.xyz...
+            Loading from trollllm.xyz
           </p>
         </div>
-      )}
-
-      {/* Content */}
-      {billing && !loading && (
+      ) : (
         <>
-          {/* Top row: Credits, Bonus, Daily Budget, RPM */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Top row: BudgetCard full width */}
+          <BudgetCard
+            source={{
+              type: "troll",
+              tier: billing.tier,
+              credits: billing.credits,
+              creditsUsed: billing.creditsUsed,
+              creditsBonus: billing.creditsBonus,
+              creditsBonusUsed: billing.creditsBonusUsed,
+              planDailyAllocation: billing.planDailyAllocation,
+              planDailyUsed: billing.planDailyUsed,
+              planDailyResetDate: billing.planDailyResetDate,
+              planExpiresAt: billing.planExpiresAt,
+            }}
+          />
+
+          {/* Second row: RPM, Total Spend, Total Requests */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {status && (
+              <RpmCard
+                rpmUsed={status.rpm.used}
+                rpmLimit={status.rpm.limit}
+                concurrentUsed={status.concurrent.used}
+                concurrentLimit={status.concurrent.limit}
+              />
+            )}
+            <QuotaCard
+              label="Total Spend"
+              value={`$${summary?.totalCost.toFixed(4) ?? "0.0000"}`}
+              sub="Credits used"
+              color="#f97316"
+            />
+            <QuotaCard
+              label="Total Requests"
+              value={String(summary?.requestCount ?? 0)}
+              sub="requests"
+            />
+          </div>
+
+          {/* Third row: Credits, Bonus, Avg Response, Cached, Input, Output */}
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             <CreditCard
               label="CREDITS"
               value={billing.credits}
@@ -254,46 +254,30 @@ export default function TrollUsage() {
               used={billing.creditsBonusUsed}
               color="#f97316"
             />
-            <BudgetCard
-              source={{
-                type: "troll",
-                tier: billing.tier,
-                credits: billing.credits,
-                creditsUsed: billing.creditsUsed,
-                creditsBonus: billing.creditsBonus,
-                creditsBonusUsed: billing.creditsBonusUsed,
-                planDailyAllocation: billing.planDailyAllocation,
-                planDailyUsed: billing.planDailyUsed,
-                planDailyResetDate: billing.planDailyResetDate,
-                planExpiresAt: billing.planExpiresAt,
-              }}
+            <QuotaCard
+              label="Avg Response"
+              value={avgResponse}
+              sub="per request"
             />
-            {status && (
-              <RpmCard
-                rpmUsed={status.rpm.used}
-                rpmLimit={status.rpm.limit}
-                concurrentUsed={status.concurrent.used}
-                concurrentLimit={status.concurrent.limit}
-              />
-            )}
+            <QuotaCard
+              label="Cached Tokens"
+              value={String(summary?.totalCachedTokens ?? 0)}
+              sub="cached"
+            />
+            <QuotaCard
+              label="Input Tokens"
+              value={String(summary?.inputTokens ?? 0)}
+              sub="prompt"
+            />
+            <QuotaCard
+              label="Output Tokens"
+              value={String(summary?.outputTokens ?? 0)}
+              sub="completion"
+            />
           </div>
 
-          {/* Quota grid */}
-          <QuotaCardGrid items={quotaItems} />
-
-          {/* Plan badge */}
-          {me && <PlanBadge tier={me.tier} expiresAt={billing.planExpiresAt} />}
-
-          {/* API Endpoints + Discord in a row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ApiEndpointsCard endpoints={ENDPOINTS} />
-            {me && (
-              <DiscordCard
-                discordId={me.discordId ?? ""}
-                onSave={handleDiscordSave}
-              />
-            )}
-          </div>
+          {/* Timeseries chart */}
+          <TrollTimeseriesChart logs={logs} />
 
           {/* Request History Table */}
           {logs && (

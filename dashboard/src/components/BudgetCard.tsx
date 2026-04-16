@@ -47,6 +47,15 @@ function proxPct(spent: number, total: number) {
   return Math.min(100, total > 0 ? (spent / total) * 100 : 0);
 }
 
+/** Advances a stored reset-date by 24 h chunks until it is in the future. */
+function nextResetDate(stored: string): string {
+  let ms = new Date(stored).getTime();
+  if (isNaN(ms)) return stored;
+  const now = Date.now();
+  while (ms < now) ms += 24 * 60 * 60 * 1000;
+  return new Date(ms).toISOString();
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 interface BudgetCardProps {
@@ -298,7 +307,7 @@ export function BudgetCard({ source }: BudgetCardProps) {
           <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
             ${planDailyUsed.toFixed(2)} / ${planDailyAllocation.toFixed(2)} today
           </span>
-          <CountdownCard target={planDailyResetDate} compact={true} />
+          <CountdownCard target={nextResetDate(planDailyResetDate)} compact={true} />
         </div>
       </div>
     );
