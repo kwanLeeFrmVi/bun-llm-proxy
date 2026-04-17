@@ -285,6 +285,8 @@ async function handleStreamingResponse(
   const isSSE = targetFormat !== "ollama";
   let ndjsonBuffer = "";
   let sawValidMessageDelta = false;
+  let sawMessageStart = false;
+  let sawMessageStop = false;
   let chunkCount = 0;
   let eventCount = 0;
 
@@ -497,6 +499,8 @@ async function handleStreamingResponse(
                 log.debug(opts.ctx ?? null, "STREAM", `message_delta tracking: JSON parse error: ${e instanceof Error ? e.message : String(e)}`);
               }
             }
+            if (eventText.includes("message_start")) sawMessageStart = true;
+            if (eventText.includes("message_stop")) sawMessageStop = true;
 
             const eventRaw = encoder.encode(eventText);
             const translated = translateChunk(
@@ -581,23 +585,39 @@ async function handleStreamingResponse(
           }
         }
 
-        // Guarantee message_delta with usage for Claude SSE clients that crash
-        // on missing input_tokens (e.g. Claude Code). If the upstream never sent
-        // a valid message_delta with usage, emit a synthetic fallback.
-        if (!sawValidMessageDelta && sourceFormat === "claude") {
+        // Guarantee a complete Claude SSE termination sequence (message_start →
+        // message_delta → message_stop) for Claude Code clients. TrollLLM
+        // (anthropic-compatible) may omit message_start or send message_stop without
+        // a current message, causing "Received message_stop without a current message".
+        // Always emit message_start if upstream didn't send it, so Claude Code's
+        // SSE parser has the required message context.
+        if (sourceFormat === "claude") {
+          if (!sawMessageStart) {
+            safeEnqueue(
+              encoder.encode(
+                "event: message_start\n" +
+                  'data: {"type":"message_start","message":{"id":"msg_proxy","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-7","usage":{"input_tokens":0,"output_tokens":0}}}\n\n'
+              )
+            );
+          }
+          if (!sawValidMessageDelta) {
+            safeEnqueue(
+              encoder.encode(
+                "event: message_delta\n" +
+                  'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+              )
+            );
+          }
+          if (!sawMessageStop) {
+            safeEnqueue(
+              encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+            );
+          }
           log.debug(
             opts.ctx ?? null,
             "STREAM",
-            "Emitting synthetic message_delta — upstream did not provide valid usage"
-          );
-          safeEnqueue(
-            encoder.encode(
-              "event: message_delta\n" +
-                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
-            )
-          );
-          safeEnqueue(
-            encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+            `Claude SSE termination: injected message_start=${!sawMessageStart}, ` +
+              `message_delta=${!sawValidMessageDelta}, message_stop=${!sawMessageStop}`
           );
         }
 
@@ -607,7 +627,8 @@ async function handleStreamingResponse(
           opts.ctx ?? null,
           "STREAM",
           `INNER complete: ${chunkCount} upstreamChunks, ${translatedChunkCount} translatedChunks, ` +
-            `${eventCount} events, sawValidMessageDelta=${sawValidMessageDelta}, ` +
+            `${eventCount} events, sawMessageStart=${sawMessageStart}, sawMessageStop=${sawMessageStop}, ` +
+            `sawValidMessageDelta=${sawValidMessageDelta}, ` +
             `firstUpstreamChunkAfterMs=${firstUpstreamChunkMs != null ? firstUpstreamChunkMs - streamStartMs : "?"}, ` +
             `firstTranslatedAfterMs=${firstTranslatedChunkMs != null ? firstTranslatedChunkMs - streamStartMs : "?"}, ` +
             `closeReason=${closeReason}, totalMs=${totalMs}`
@@ -655,20 +676,29 @@ async function handleStreamingResponse(
           }
         }
 
-        // Guarantee message_delta with usage for Claude SSE clients that crash
-        // on missing input_tokens (e.g. Claude Code). When the upstream errors
-        // mid-stream, the normal-completion path's synthetic message_delta never
-        // runs, so we must emit it here too.
-        if (!sawValidMessageDelta && sourceFormat === "claude") {
-          safeEnqueue(
-            encoder.encode(
-              "event: message_delta\n" +
-                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
-            )
-          );
-          safeEnqueue(
-            encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
-          );
+        // Guarantee a complete Claude SSE termination sequence for error paths too.
+        if (sourceFormat === "claude") {
+          if (!sawMessageStart) {
+            safeEnqueue(
+              encoder.encode(
+                "event: message_start\n" +
+                  'data: {"type":"message_start","message":{"id":"msg_proxy","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-7","usage":{"input_tokens":0,"output_tokens":0}}}\n\n'
+              )
+            );
+          }
+          if (!sawValidMessageDelta) {
+            safeEnqueue(
+              encoder.encode(
+                "event: message_delta\n" +
+                  'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+              )
+            );
+          }
+          if (!sawMessageStop) {
+            safeEnqueue(
+              encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+            );
+          }
         }
         const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
         const totalMs = Date.now() - streamStartMs;
