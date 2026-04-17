@@ -552,8 +552,7 @@ function wrapStreamingResponse(
           try {
             controller.enqueue(chunk);
           } catch (enqueueErr) {
-            // Controller may already be closed by cancel() — swallow silently.
-            // This is expected when the downstream client disconnects mid-stream.
+            controllerClosed = true;
             log.debug(ctx, "STREAM", `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`);
           }
         }

@@ -121,7 +121,7 @@ function normalizeClaudeStreamingUsage(raw: Uint8Array): Uint8Array {
 
     const parsed = JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
 
-    if (parsed.type === "message_delta" && (parsed.usage === undefined || parsed.usage === null)) {
+    if (parsed.type === "message_delta" && !("usage" in parsed)) {
       lines[dataLineIndex] = `data: ${JSON.stringify({
         ...parsed,
         usage: { input_tokens: 0, output_tokens: 0 },

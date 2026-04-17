@@ -329,8 +329,7 @@ async function handleStreamingResponse(
             translatedChunkCount++;
             controller.enqueue(chunk);
           } catch (enqueueErr) {
-            // Controller may already be closed by cancel() — swallow silently.
-            // This is expected when the downstream client disconnects mid-stream.
+            controllerClosed = true;
             log.debug(opts.ctx ?? null, "STREAM", `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`);
           }
         }
@@ -487,8 +486,11 @@ async function handleStreamingResponse(
                 const dataMatch = eventText.match(/data:\s*(\{.*\})/);
                 if (dataMatch) {
                   const parsed = JSON.parse(dataMatch[1]!);
-                  if (parsed.type === "message_delta" && parsed.usage != null) {
-                    sawValidMessageDelta = true;
+                  if (parsed.type === "message_delta") {
+                    const hasUsage = "usage" in parsed && parsed.usage != null;
+                    log.debug(opts.ctx ?? null, "STREAM",
+                      `message_delta event: hasUsage=${hasUsage}, usageValue=${JSON.stringify(parsed.usage)}`);
+                    if (hasUsage) sawValidMessageDelta = true;
                   }
                 }
               } catch (e) {
