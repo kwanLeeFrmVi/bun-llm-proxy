@@ -626,7 +626,7 @@ async function handleStreamingResponse(
         // on missing input_tokens when the upstream connection drops mid-stream.
         // NOTE: use controller.close() instead of controller.error() — error()
         // closes the controller immediately and discards all enqueued chunks.
-        if (state !== undefined && sourceFormat !== "claude") {
+        if (state !== undefined ) {
           // Skip for claude source — Claude SSE streams terminate with
           // `event: message_stop`, not `data: [DONE]`.
           try {
