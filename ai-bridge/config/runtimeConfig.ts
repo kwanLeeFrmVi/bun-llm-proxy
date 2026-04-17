@@ -106,3 +106,7 @@ export const MEMORY_CONFIG = {
 } as const;
 
 export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry → proactive refresh
+
+// SSE streaming keep-alive: prevent client ECONNRESET on slow upstreams
+export const STREAM_HEARTBEAT_INTERVAL_MS = 30_000; // 30s between SSE comment pings
+export const STREAM_STALL_TIMEOUT_MS = 300_000; // 5min max silence before aborting

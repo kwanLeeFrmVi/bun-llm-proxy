@@ -1,4 +1,5 @@
 import { ERROR_TYPES, DEFAULT_ERROR_MESSAGES } from "../config/runtimeConfig.ts";
+import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 
 // ─── Core builders ─────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export function sseErrorResponse(status: number, message: string): Response {
         type: "content_block_stop",
         index: 0,
       })}`,
+      buildClaudeErrorEvent(mapToAnthropicErrorType(status), errorText).replace(/\n\n$/, ""),
       `event: message_delta\ndata: ${JSON.stringify({
         type: "message_delta",
         delta: { stop_reason: "end_turn", stop_sequence: null },

@@ -2,7 +2,8 @@
 // Handles the full lifecycle: translate request → upstream fetch → translate response → stream back.
 
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
-import { HTTP_STATUS } from "../config/runtimeConfig.ts";
+import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS } from "../config/runtimeConfig.ts";
+import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import {
   detectFormat,
@@ -347,12 +348,78 @@ async function handleStreamingResponse(
         }
       };
 
+      // ── Heartbeat + stall timeout ─────────────────────────────────────────────
+      // Race reader.read() against two timers:
+      //   - Heartbeat (30s): sends `: ping\n\n` (SSE comment, invisible to clients)
+      //     to prevent intermediate proxies/clients from closing idle connections.
+      //   - Stall timeout (5min): aborts if upstream sends nothing for too long.
+      // Timers use setTimeout (not setInterval) to avoid accumulation issues.
+      // All timers are cleaned up in the finally block.
+      const HEARTBEAT_SYMBOL = Symbol("heartbeat");
+      const STALL_SYMBOL = Symbol("stall");
+      let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+      let stallTimer: ReturnType<typeof setTimeout> | null = null;
+      let heartbeatResolve: (() => void) | null = null;
+      let stallResolve: (() => void) | null = null;
+
+      const clearStreamTimers = () => {
+        if (heartbeatTimer !== null) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
+        if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; }
+        heartbeatResolve = null;
+        stallResolve = null;
+      };
+
+      const makeHeartbeatPromise = () => new Promise<typeof HEARTBEAT_SYMBOL>((resolve) => {
+        heartbeatResolve = () => resolve(HEARTBEAT_SYMBOL);
+        heartbeatTimer = setTimeout(() => heartbeatResolve?.(), STREAM_HEARTBEAT_INTERVAL_MS);
+      });
+
+      const makeStallPromise = () => new Promise<typeof STALL_SYMBOL>((resolve) => {
+        stallResolve = () => resolve(STALL_SYMBOL);
+        stallTimer = setTimeout(() => stallResolve?.(), STREAM_STALL_TIMEOUT_MS);
+      });
+
       try {
+        let readPromise = reader.read();
+        let heartbeatPromise = makeHeartbeatPromise();
+        let stallPromise = makeStallPromise();
+
         while (true) {
           // Check abort flag before each read — cancel() may have fired between chunks
           if (streamAbort.signal.aborted) break;
-          const { done, value } = await reader.read();
+
+          const result = await Promise.race([
+            readPromise.then((r) => ({ kind: "data" as const, done: r.done, value: r.value })),
+            heartbeatPromise.then(() => ({ kind: "heartbeat" as const, done: false as const, value: undefined })),
+            stallPromise.then(() => ({ kind: "stall" as const, done: false as const, value: undefined })),
+          ]);
+
+          if (result.kind === "heartbeat") {
+            // Send SSE comment ping — invisible to compliant SSE clients
+            safeEnqueue(encoder.encode(": ping\n\n"));
+            heartbeatTimer = null;
+            heartbeatResolve = null;
+            heartbeatPromise = makeHeartbeatPromise();
+            continue;
+          }
+
+          if (result.kind === "stall") {
+            const stallMsg = `Upstream stalled: no data received for ${STREAM_STALL_TIMEOUT_MS / 1000}s`;
+            log.warn(opts.ctx ?? null, "STREAM", stallMsg);
+            reader.cancel().catch(() => {});
+            throw new Error(stallMsg);
+          }
+
+          // result.kind === "data"
+          const { done, value } = result;
           if (done) break;
+
+          // Data arrived — reset both timers
+          if (heartbeatTimer !== null) { clearTimeout(heartbeatTimer); heartbeatTimer = null; heartbeatResolve = null; }
+          if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; stallResolve = null; }
+          heartbeatPromise = makeHeartbeatPromise();
+          stallPromise = makeStallPromise();
+          readPromise = reader.read();
 
           if (firstUpstreamChunkMs === null) firstUpstreamChunkMs = Date.now();
 
@@ -676,8 +743,16 @@ async function handleStreamingResponse(
           }
         }
 
+        const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+
         // Guarantee a complete Claude SSE termination sequence for error paths too.
         if (sourceFormat === "claude") {
+          // Emit Anthropic error event for upstream failures — Claude Code recognizes
+          // this type and may trigger its retry mechanism.
+          if (!downstreamCanceled) {
+            const errorType = mapToAnthropicErrorType(null, errMsg);
+            safeEnqueue(encoder.encode(buildClaudeErrorEvent(errorType, `Upstream error: ${errMsg}`)));
+          }
           if (!sawMessageStart) {
             safeEnqueue(
               encoder.encode(
@@ -700,7 +775,6 @@ async function handleStreamingResponse(
             );
           }
         }
-        const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
         const totalMs = Date.now() - streamStartMs;
         if (downstreamCanceled) {
           closeReason = "downstream_canceled";
@@ -739,6 +813,12 @@ async function handleStreamingResponse(
               `translatedChunks=${translatedChunkCount}, totalMs=${totalMs}`
           );
         }
+        clearStreamTimers();
+        // Cancel any in-flight read before releasing the lock.
+        // With the Promise.race heartbeat pattern, a pending readPromise may be
+        // in-flight when the abort signal fires and we break early. Calling
+        // releaseLock() while a read is pending throws AbortError in Bun.
+        try { reader.cancel(); } catch { /* ignore — may already be canceled/done */ }
         reader.releaseLock();
       }
     },

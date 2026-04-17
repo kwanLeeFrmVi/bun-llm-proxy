@@ -34,6 +34,7 @@ import { updateProviderCredentials, checkAndRefreshToken } from "../services/tok
 import { getProjectIdForConnection } from "../services/tokenRefresh.ts";
 import { trackPendingRequest, saveRequestUsage, appendRequestLog } from "../stubs/usageDb.ts";
 import { detectFormat } from "../ai-bridge/handlers/provider.ts";
+import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../ai-bridge/translator/common/sse.ts";
 import { getTargetFormat } from "../ai-bridge/handlers/provider.js";
 import { getProviderDisplayName } from "../lib/providers.ts";
 import { handleComboModel, getComboMetadata } from "../services/comboRouting.ts";
@@ -690,7 +691,13 @@ function wrapStreamingResponse(
         if (!controllerClosed) {
           const errMsgForClient = `Stream error: ${errMsg}`;
           if (sourceFormat === "claude") {
-            // Inject the error message as a text delta (partial content)
+            // Emit Anthropic error event — Claude Code recognizes this and may retry.
+            safeEnqueue(
+              new TextEncoder().encode(
+                buildClaudeErrorEvent(mapToAnthropicErrorType(null, errMsg), errMsgForClient)
+              )
+            );
+            // Also inject the error message as a text delta (partial content)
             safeEnqueue(
               new TextEncoder().encode(
                 `event: content_block_delta\ndata: ${JSON.stringify({
