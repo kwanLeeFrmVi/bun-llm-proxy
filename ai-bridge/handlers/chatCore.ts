@@ -552,23 +552,30 @@ async function handleStreamingResponse(
           sseBuffer = "";
         }
 
-        // Normal completion: flush done events
-        const doneChunks = translateChunk(
-          targetFormat,
-          sourceFormat,
-          model,
-          translatedBytes,
-          encoder.encode("data: [DONE]"),
-          state
-        );
-        for (const chunk of doneChunks.chunks) {
-          // Ensure [DONE] event ends with \n\n so synthetic events
-          // after it are properly separated in the SSE stream.
-          const raw = decoder.decode(chunk, { stream: false });
-          if (!raw.endsWith("\n\n")) {
-            safeEnqueue(encoder.encode(raw + "\n\n"));
-          } else {
-            safeEnqueue(chunk);
+        // Normal completion: flush done events.
+        // Skip for claude source format — Claude SSE streams terminate with
+        // `event: message_stop`, not `data: [DONE]` (that's OpenAI format).
+        // Forwarding `data: [DONE]` to a Claude client (e.g. via identity
+        // passthrough) causes the client to see an invalid terminator and
+        // abort the socket ("socket connection was closed unexpectedly").
+        if (sourceFormat !== "claude") {
+          const doneChunks = translateChunk(
+            targetFormat,
+            sourceFormat,
+            model,
+            translatedBytes,
+            encoder.encode("data: [DONE]"),
+            state
+          );
+          for (const chunk of doneChunks.chunks) {
+            // Ensure [DONE] event ends with \n\n so synthetic events
+            // after it are properly separated in the SSE stream.
+            const raw = decoder.decode(chunk, { stream: false });
+            if (!raw.endsWith("\n\n")) {
+              safeEnqueue(encoder.encode(raw + "\n\n"));
+            } else {
+              safeEnqueue(chunk);
+            }
           }
         }
 
@@ -619,7 +626,9 @@ async function handleStreamingResponse(
         // on missing input_tokens when the upstream connection drops mid-stream.
         // NOTE: use controller.close() instead of controller.error() — error()
         // closes the controller immediately and discards all enqueued chunks.
-        if (state !== undefined) {
+        if (state !== undefined && sourceFormat !== "claude") {
+          // Skip for claude source — Claude SSE streams terminate with
+          // `event: message_stop`, not `data: [DONE]`.
           try {
             const doneChunks = translateChunk(
               targetFormat,
