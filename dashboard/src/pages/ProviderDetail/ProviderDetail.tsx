@@ -80,7 +80,9 @@ export default function ProviderDetail() {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   // Aggregated model stats from DB (TTFT, Token/s)
-  const [modelStats, setModelStats] = useState<Map<string, { ttftMs: number | null; tps: number | null }>>(new Map());
+  const [modelStats, setModelStats] = useState<
+    Map<string, { ttftMs: number | null; tps: number | null }>
+  >(new Map());
 
   const loadModelStats = useCallback(async () => {
     try {
@@ -399,7 +401,9 @@ export default function ProviderDetail() {
           model: fullModel,
           max_tokens: 50,
           stream: true,
-          messages: [{ role: "user", content: "hi" }],
+          messages: [
+            { role: "user", content: "Respond with exactly 10 words about the weather today." },
+          ],
         }),
         signal: AbortSignal.timeout(15000),
       });
@@ -460,11 +464,11 @@ export default function ProviderDetail() {
                 if (line.startsWith("data: ") && !line.includes("[DONE]")) {
                   try {
                     const data = JSON.parse(line.slice(6));
-                    const usageSource = data.usage && typeof data.usage === "object"
-                      ? data.usage
-                      : null;
+                    const usageSource =
+                      data.usage && typeof data.usage === "object" ? data.usage : null;
                     if (usageSource) {
-                      completionTokens = usageSource.completion_tokens ?? usageSource.output_tokens ?? 0;
+                      completionTokens =
+                        usageSource.completion_tokens ?? usageSource.output_tokens ?? 0;
                     }
                   } catch {
                     /* skip non-JSON lines */
@@ -500,9 +504,10 @@ export default function ProviderDetail() {
 
       const totalMs = Date.now() - start;
       const ttftMs = firstChunkTime ? firstChunkTime - start : undefined;
-      const tps = ttftMs && completionTokens > 0 && totalMs > ttftMs
-        ? (completionTokens / (totalMs - ttftMs)) * 1000
-        : undefined;
+      const tps =
+        ttftMs && completionTokens > 0 && totalMs > ttftMs
+          ? (completionTokens / (totalMs - ttftMs)) * 1000
+          : undefined;
 
       if (!success) {
         setModelTestResults((prev) => ({ ...prev, [modelId]: { status: "error" } }));
@@ -512,7 +517,10 @@ export default function ProviderDetail() {
           ...prev,
           [modelId]: { status: "ok", ttftMs, tps },
         }));
-        const ttftStr = ttftMs != null ? ` | TTFT: ${ttftMs >= 1000 ? `${(ttftMs / 1000).toFixed(1)}s` : `${ttftMs}ms`}` : "";
+        const ttftStr =
+          ttftMs != null
+            ? ` | TTFT: ${ttftMs >= 1000 ? `${(ttftMs / 1000).toFixed(1)}s` : `${ttftMs}ms`}`
+            : "";
         const tpsStr = tps != null ? ` | Token/s: ${tps.toFixed(1)}` : "";
         toast.success(`Model ${modelId} tested successfully (${totalMs}ms${ttftStr}${tpsStr})`);
         // Refresh aggregated stats from DB after a short delay to let the backend save

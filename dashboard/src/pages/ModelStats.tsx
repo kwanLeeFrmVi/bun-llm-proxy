@@ -13,9 +13,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "@/components/PaginationControls";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play, Loader2 } from "lucide-react";
 import { StatusBadge } from "@/components/usage/StatusBadge";
 import { cardStyle } from "@/components/usage/utils";
+import { toast } from "sonner";
+import type { TestStatus } from "@/lib/types";
 
 const PERIODS = ["2h", "5h", "24h", "7d", "30d"] as const;
 type Period = (typeof PERIODS)[number];
@@ -65,6 +67,10 @@ export default function ModelStats() {
   const [data, setData] = useState<Awaited<ReturnType<typeof api.usage.modelStats>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<TestStatus>(null);
+  const [testTtftMs, setTestTtftMs] = useState<number | undefined>();
+  const [testTps, setTestTps] = useState<number | undefined>();
 
   const load = useCallback(async () => {
     if (!model) return;
@@ -86,6 +92,160 @@ export default function ModelStats() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function handleTest() {
+    if (testing) return;
+    setTesting(true);
+    setTestStatus(null);
+    setTestTtftMs(undefined);
+    setTestTps(undefined);
+
+    try {
+      // Get an API key for authentication
+      const apiKeysRes = await api.keys.list();
+      const keys = apiKeysRes.keys as Array<{
+        isActive?: boolean;
+        key?: string;
+      }>;
+      const activeKey = keys.find((k) => k.isActive !== false)?.key;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (activeKey) {
+        headers["Authorization"] = `Bearer ${activeKey}`;
+      }
+
+      const start = Date.now();
+      const res = await fetch(`${window.location.origin}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: displayModel,
+          max_tokens: 50,
+          stream: true,
+          messages: [
+            { role: "user", content: "Respond with exactly 10 words about the weather today." },
+          ],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const contentType = res.headers.get("content-type") ?? "";
+      const isStreaming = contentType.includes("text/event-stream");
+
+      let success = false;
+      let errorMsg = "";
+      let firstChunkTime: number | null = null;
+      let completionTokens = 0;
+
+      if (!res.ok) {
+        try {
+          const errData = await res.json();
+          errorMsg = errData?.error?.message ?? `HTTP ${res.status}`;
+        } catch {
+          errorMsg = `HTTP ${res.status}`;
+        }
+      } else if (isStreaming) {
+        try {
+          const reader = res.body?.getReader();
+          if (reader) {
+            const decoder = new TextDecoder();
+            let foundContent = false;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const now = Date.now();
+              const text = decoder.decode(value);
+              if (text.includes('"error"')) {
+                const match = text.match(/"error":\s*({[^}]+})/);
+                if (match) {
+                  try {
+                    const errObj = JSON.parse(match[1]!);
+                    errorMsg = errObj?.message ?? "Stream error";
+                  } catch {
+                    /* ignore */
+                  }
+                }
+                break;
+              }
+              if (
+                text.includes('"choices"') &&
+                (text.includes('"content"') || text.includes('"delta"'))
+              ) {
+                foundContent = true;
+                if (!firstChunkTime) firstChunkTime = now;
+              }
+              for (const line of text.split("\n")) {
+                if (line.startsWith("data: ") && !line.includes("[DONE]")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    const usageSource =
+                      data.usage && typeof data.usage === "object" ? data.usage : null;
+                    if (usageSource) {
+                      completionTokens =
+                        usageSource.completion_tokens ?? usageSource.output_tokens ?? 0;
+                    }
+                  } catch {
+                    /* skip non-JSON lines */
+                  }
+                }
+              }
+              if (text.includes("[DONE]")) {
+                break;
+              }
+            }
+            success = foundContent;
+            if (!foundContent && !errorMsg) {
+              errorMsg = "No content in stream";
+            }
+          }
+        } catch (e) {
+          errorMsg = e instanceof Error ? e.message : "Stream parse error";
+        }
+      } else {
+        const data = await res.json().catch(() => null);
+        if (data?.error) {
+          errorMsg = data.error.message ?? "Unknown error";
+        } else if (data?.choices?.length) {
+          success = true;
+          firstChunkTime = Date.now();
+          completionTokens = data.usage?.completion_tokens ?? 0;
+        } else {
+          errorMsg = "No choices in response";
+        }
+      }
+
+      const totalMs = Date.now() - start;
+      const ttftMs = firstChunkTime ? firstChunkTime - start : undefined;
+      const tps =
+        ttftMs && completionTokens > 0 && totalMs > ttftMs
+          ? (completionTokens / (totalMs - ttftMs)) * 1000
+          : undefined;
+
+      if (!success) {
+        setTestStatus("error");
+        toast.error(`Model test failed${errorMsg ? `: ${errorMsg}` : ""}`);
+      } else {
+        setTestStatus("ok");
+        setTestTtftMs(ttftMs);
+        setTestTps(tps);
+        const ttftStr =
+          ttftMs != null
+            ? ` | TTFT: ${ttftMs >= 1000 ? `${(ttftMs / 1000).toFixed(1)}s` : `${ttftMs}ms`}`
+            : "";
+        const tpsStr = tps != null ? ` | Token/s: ${tps.toFixed(1)}` : "";
+        toast.success(`Model tested successfully (${totalMs}ms${ttftStr}${tpsStr})`);
+        // Refresh stats after a short delay
+        setTimeout(() => load(), 500);
+      }
+    } catch (err) {
+      setTestStatus("error");
+      toast.error(`Model test failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setTesting(false);
+    }
+  }
 
   if (!model) {
     return <div className="p-12 text-center text-muted-foreground">No model specified.</div>;
@@ -120,19 +280,35 @@ export default function ModelStats() {
             )}
           </div>
         </div>
-        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <TabsList className="h-8 sm:h-9 bg-[--surface-container-low] rounded-lg p-1">
-            {PERIODS.map((p) => (
-              <TabsTrigger
-                key={p}
-                value={p}
-                className="h-6 sm:h-7 px-2 sm:px-3 rounded text-xs sm:text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
-              >
-                {p}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs font-medium border-[rgba(203,213,225,0.6)]"
+            onClick={handleTest}
+            disabled={testing}
+          >
+            {testing ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5 mr-1" />
+            )}
+            Test Model
+          </Button>
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <TabsList className="h-8 sm:h-9 bg-[--surface-container-low] rounded-lg p-1">
+              {PERIODS.map((p) => (
+                <TabsTrigger
+                  key={p}
+                  value={p}
+                  className="h-6 sm:h-7 px-2 sm:px-3 rounded text-xs sm:text-sm font-medium data-[state=active]:bg-[--surface-container-lowest] data-[state=active]:shadow-sm"
+                >
+                  {p}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {/* Summary Cards */}
