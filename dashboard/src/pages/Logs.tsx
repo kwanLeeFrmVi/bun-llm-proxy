@@ -30,8 +30,16 @@ function getSseUrl(): string {
 export default function Logs() {
   const [logs, setLogs] = useState<ConsoleLogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [requestIdFilter, setRequestIdFilter] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+
+  const filteredLogs = logs.filter((entry) => {
+    if (!requestIdFilter) return true;
+    const match = entry.message.match(/\[req:([a-zA-Z0-9]+)\]/);
+    if (!match) return false;
+    return match[1].toLowerCase().includes(requestIdFilter.toLowerCase());
+  });
 
   const scrollToBottom = useCallback(() => {
     if (!autoScroll || !containerRef.current) return;
@@ -101,7 +109,7 @@ export default function Logs() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [logs, scrollToBottom]);
+  }, [filteredLogs, scrollToBottom]);
 
   function handleScroll() {
     if (!containerRef.current) return;
@@ -114,10 +122,11 @@ export default function Logs() {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
     try {
-      await fetch("/api/console-logs", {
+      const res = await fetch("/api/console-logs", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.ok) setLogs([]);
     } catch {
       /* ignore */
     }
@@ -145,10 +154,17 @@ export default function Logs() {
             </span>
             <span className="text-sm font-semibold text-[--on-surface]">Console Logs</span>
             <Badge variant="secondary" className="text-xs font-medium">
-              {logs.length} lines
+              {requestIdFilter ? `${filteredLogs.length} / ${logs.length}` : logs.length} lines
             </Badge>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <input
+              type="text"
+              placeholder="Filter by req ID…"
+              value={requestIdFilter}
+              onChange={(e) => setRequestIdFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-[--surface] border border-[rgba(203,213,225,0.4)] rounded-md text-[--on-surface] placeholder:text-[--on-surface-variant] focus:outline-none focus:ring-2 focus:ring-[--primary] w-32 sm:w-40"
+            />
             <div className="flex items-center gap-2">
               <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
               <Label
@@ -176,7 +192,7 @@ export default function Logs() {
           className="flex-1 overflow-y-auto bg-[#0d1117] p-4 font-mono text-sm leading-relaxed"
           style={{ borderRadius: "0 0 0.625rem 0.625rem" }}
         >
-          {logs.map((entry) => (
+          {filteredLogs.map((entry) => (
             <div key={entry.id} className={`${LEVEL_COLORS[entry.level] ?? "text-slate-100"}`}>
               <span className="text-gray-600">
                 [{entry.timestamp.split("T")[1]?.split(".")[0]}]
@@ -185,8 +201,10 @@ export default function Logs() {
               {entry.message}
             </div>
           ))}
-          {logs.length === 0 && (
-            <div className="text-gray-600 italic">No logs yet. Waiting for output…</div>
+          {filteredLogs.length === 0 && (
+            <div className="text-gray-600 italic">
+              {logs.length === 0 ? "No logs yet. Waiting for output…" : "No logs match the filter."}
+            </div>
           )}
         </div>
       </div>
