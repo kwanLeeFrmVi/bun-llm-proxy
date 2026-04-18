@@ -47,7 +47,7 @@ module.exports = {
     {
       name: "bunLLM-Dashboard",
       script: `${process.env.HOME}/.bun/bin/bun`,
-      args: "run preview --port 20130",
+      args: "run vite-preview",
       interpreter: "none",
       exec_mode: "fork",
       instances: 1,

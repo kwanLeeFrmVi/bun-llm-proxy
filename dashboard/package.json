@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --port 20130",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 20130"
+    "preview": "vite preview --port 20130",
+    "vite-preview": "vite preview --host 0.0.0.0 --port 20130"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
