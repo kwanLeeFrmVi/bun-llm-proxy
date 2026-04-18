@@ -30,7 +30,10 @@ module.exports = {
       args: "run index.ts",
       interpreter: "none",
       exec_mode: "fork",
-      instances: isLinux ? 4 : 1,
+      // Single instance — SQLite WAL supports multi-reader/single-writer but
+      // multiple PM2 instances all running openDb() on startup causes SQLITE_BUSY.
+      // Bun.serve with reusePort handles concurrency within a single process.
+      instances: 1,
       cwd: __dirname,
       autorestart: true,
       watch: false,

@@ -578,6 +578,9 @@ function wrapStreamingResponse(
       let ttftRecorded = false;
       let firstChunkTime: number | null = null;
       let upstreamErrorMsg: string | null = null;
+      // SSE buffer for the outer wrapper — accumulate partial TCP chunks
+      // and only parse complete SSE events (delimited by \n\n).
+      let outerSseBuffer = "";
 
       // ── Heartbeat for outer wrapper ─────────────────────────────────────────────
       // The inner stream (chatCore.ts) sends `: ping\n\n` heartbeats every 30s,
@@ -643,6 +646,10 @@ function wrapStreamingResponse(
           }
 
           // Parse SSE chunks for usage data
+          // Use a stateful SSE parser instead of naive line splitting, because
+          // TCP chunks can split SSE events mid-line (e.g. a JSON string containing
+          // a literal newline). Accumulate a buffer and only parse complete events
+          // (delimited by blank lines).
           const text = new TextDecoder().decode(value);
 
           // Detect upstream-error sentinel injected by chatCore.ts catch block.
@@ -654,10 +661,24 @@ function wrapStreamingResponse(
             continue;
           }
 
-          for (const line of text.split("\n")) {
-            if (line.startsWith("data: ")) {
+          // Accumulate into SSE buffer and parse complete events only
+          outerSseBuffer += text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          while (outerSseBuffer.includes("\n\n")) {
+            const eventEnd = outerSseBuffer.indexOf("\n\n");
+            const eventText = outerSseBuffer.slice(0, eventEnd + 2);
+            outerSseBuffer = outerSseBuffer.slice(eventEnd + 2);
+
+            // Extract data lines from this complete SSE event
+            const dataLines: string[] = [];
+            for (const line of eventText.split("\n")) {
+              if (line.startsWith("data: ")) {
+                dataLines.push(line.slice(6));
+              }
+            }
+            if (dataLines.length > 0) {
+              const dataStr = dataLines.join("");
               try {
-                const data = JSON.parse(line.slice(6));
+                const data = JSON.parse(dataStr);
                 // Read usage from top-level (OpenAI/Gemini) or nested in message (Claude message_start)
                 const usageSource =
                   data.usage && typeof data.usage === "object"
@@ -676,7 +697,7 @@ function wrapStreamingResponse(
                   };
                 }
               } catch (e) {
-                log.debug(ctx, "STREAM", `SSE usage parse: non-JSON line: ${e instanceof Error ? e.message : String(e)}`);
+                log.debug(ctx, "STREAM", `SSE usage parse: non-JSON event: ${e instanceof Error ? e.message : String(e)}`);
               }
             }
           }

@@ -22,10 +22,15 @@ export function getRawDb(): Database {
   mkdirSync(dataDir, { recursive: true });
   const dbPath = join(dataDir, "router.db");
 
-  _db = new Database(dbPath, { create: true });
+  // Open with busy_timeout in the constructor options so SQLite waits for locks
+  // instead of failing immediately with SQLITE_BUSY on PM2 restarts.
+  _db = new Database(dbPath, { create: true, strict: false });
   _db.run("PRAGMA journal_mode = WAL;");
   _db.run("PRAGMA synchronous = NORMAL;");
-  _db.run("PRAGMA busy_timeout = 5000;");
+  _db.run("PRAGMA busy_timeout = 10000;");
+  // Run a WAL checkpoint to clean up any leftover WAL/SHM files from a
+  // previous process that didn't shut down cleanly (e.g. PM2 kill).
+  try { _db.run("PRAGMA wal_checkpoint(TRUNCATE);"); } catch { /* ignore if WAL not active */ }
 
   return _db;
 }

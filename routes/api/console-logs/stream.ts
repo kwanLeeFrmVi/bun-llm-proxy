@@ -74,6 +74,8 @@ export async function GET(req: Request): Promise<Response> {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      // Prevent reverse proxy gzip compression from buffering SSE heartbeats
+      "Content-Encoding": "identity",
       "X-Accel-Buffering": "no",
     },
   });
