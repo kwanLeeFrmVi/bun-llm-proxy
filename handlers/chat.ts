@@ -620,7 +620,7 @@ function wrapStreamingResponse(
       clientSignal?.addEventListener("abort", onClientAbort, { once: true });
 
       try {
-        let readPromise = (reader as any).read({ signal: abortController.signal });
+        let readPromise = (reader as any).read({ signal: abortController.signal }).catch(() => ({ done: true }));
         let heartbeatPromise = makeHeartbeat();
 
         while (true) {
@@ -647,7 +647,7 @@ function wrapStreamingResponse(
           // Data arrived — reset heartbeat
           clearHeartbeat();
           heartbeatPromise = makeHeartbeat();
-          readPromise = (reader as any).read({ signal: abortController.signal });
+          readPromise = (reader as any).read({ signal: abortController.signal }).catch(() => ({ done: true }));
 
           if (!firstChunkTime) firstChunkTime = Date.now();
           if (!firstDownstreamChunkMs) firstDownstreamChunkMs = Date.now() - startTime;
@@ -832,7 +832,12 @@ function wrapStreamingResponse(
       } finally {
         clearHeartbeat();
         clientSignal?.removeEventListener("abort", onClientAbort);
-        reader.releaseLock();
+        // Cancel any in-flight read before releasing the lock.
+        // With the Promise.race heartbeat pattern, a pending readPromise may be
+        // in-flight when the abort signal fires and we break early. Calling
+        // releaseLock() while a read is pending throws in Bun.
+        try { reader.cancel(); } catch { /* ignore — may already be canceled/done */ }
+        try { reader.releaseLock(); } catch { /* ignore — may already be released */ }
         const durationMs = Date.now() - startTime;
         const ttftMs = firstChunkTime ? firstChunkTime - startTime : undefined;
         const completionTokens = finalUsage?.completion_tokens ?? 0;
