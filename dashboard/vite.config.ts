@@ -29,6 +29,7 @@ export default defineConfig({
   },
   preview: {
     port: 20128,
+    host: "0.0.0.0",
     allowedHosts: ["ai.mylast.io.vn", "localhost"],
   },
   resolve: {
