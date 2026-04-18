@@ -579,13 +579,53 @@ function wrapStreamingResponse(
       let firstChunkTime: number | null = null;
       let upstreamErrorMsg: string | null = null;
 
+      // ── Heartbeat for outer wrapper ─────────────────────────────────────────────
+      // The inner stream (chatCore.ts) sends `: ping\n\n` heartbeats every 30s,
+      // but if the inner stream itself is slow to start (e.g. buffered translation),
+      // the outer wrapper blocks silently and Claude Code sees a stall.
+      // Race reader.read() against a 25s heartbeat so the downstream always sees
+      // activity, even when the inner stream is quiet.
+      const OUTER_HEARTBEAT_MS = 25_000;
+      const encoder = new TextEncoder();
+      let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+      let heartbeatResolve: (() => void) | null = null;
+      const HEARTBEAT_SYM = Symbol("hb");
+
+      const makeHeartbeat = () => new Promise<typeof HEARTBEAT_SYM>((resolve) => {
+        heartbeatResolve = () => resolve(HEARTBEAT_SYM);
+        heartbeatTimer = setTimeout(() => heartbeatResolve?.(), OUTER_HEARTBEAT_MS);
+      });
+      const clearHeartbeat = () => {
+        if (heartbeatTimer !== null) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
+        heartbeatResolve = null;
+      };
+
       try {
+        let readPromise = (reader as any).read({ signal: abortController.signal });
+        let heartbeatPromise = makeHeartbeat();
+
         while (true) {
-          // Use `as any` to pass the AbortSignal — Bun's types omit the optional
-          // ReadableStreamReadOptions parameter but the runtime supports it.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { done, value } = await (reader as any).read({ signal: abortController.signal });
+          const raceResult = await Promise.race([
+            readPromise.then((r: { done: boolean; value?: Uint8Array }) => ({ kind: "data" as const, ...r })),
+            heartbeatPromise.then(() => ({ kind: "heartbeat" as const, done: false, value: undefined })),
+          ]);
+
+          if (raceResult.kind === "heartbeat") {
+            // Send SSE comment ping to keep downstream alive
+            safeEnqueue(encoder.encode(": ping\n\n"));
+            heartbeatTimer = null;
+            heartbeatResolve = null;
+            heartbeatPromise = makeHeartbeat();
+            continue;
+          }
+
+          const { done, value } = raceResult;
           if (done) break;
+
+          // Data arrived — reset heartbeat
+          clearHeartbeat();
+          heartbeatPromise = makeHeartbeat();
+          readPromise = (reader as any).read({ signal: abortController.signal });
 
           if (!firstChunkTime) firstChunkTime = Date.now();
           if (!firstDownstreamChunkMs) firstDownstreamChunkMs = Date.now() - startTime;
@@ -750,6 +790,7 @@ function wrapStreamingResponse(
         }
         safeClose();
       } finally {
+        clearHeartbeat();
         reader.releaseLock();
         const durationMs = Date.now() - startTime;
         const ttftMs = firstChunkTime ? firstChunkTime - startTime : undefined;

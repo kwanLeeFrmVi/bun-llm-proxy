@@ -426,6 +426,25 @@ async function handleStreamingResponse(
           const raw = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
           chunkCount++;
 
+          // ── Identity passthrough: pipe raw bytes directly, no buffering ─────────
+          // When source and target format are both "claude", the upstream sends
+          // Claude SSE and the client expects Claude SSE — no translation is needed.
+          // Skipping the SSE buffer + translateChunk pipeline avoids buffering all
+          // chunks until the outer wrapper's read loop catches up, which was causing
+          // the 128s stall observed when Claude Code's SSE parser gives up.
+          if (isClaudeIdentityPassthrough) {
+            // Check abort again: cancel() may have fired between chunks
+            if (streamAbort.signal.aborted) break;
+            // Lightweight tracking for termination injection safety net —
+            // scan the raw bytes for key SSE event markers without buffering.
+            const rawText = decoder.decode(raw, { stream: true });
+            if (rawText.includes("message_start")) sawMessageStart = true;
+            if (rawText.includes("message_stop")) sawMessageStop = true;
+            if (rawText.includes("message_delta") && rawText.includes("usage")) sawValidMessageDelta = true;
+            safeEnqueue(raw);
+            continue;
+          }
+
           // Vertex AI (Gemini format) streaming returns JSON array: [{obj},{obj},...]
           // Strip array delimiters and split into individual JSON objects for the translator
           if (opts.modelInfo.provider === "vertex") {
