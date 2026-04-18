@@ -677,6 +677,16 @@ function resolveModelNames(db: Database, model: string): string[] {
     const m = queue.shift()!;
     if (visited.has(m)) continue;
     visited.add(m);
+
+    // If the member name contains a slash (e.g. "trll/gpt-5.4"), it's a specific provider/model reference.
+    // We normalize it to get the bare model name (e.g. "gpt-5.4") and treat it as a leaf.
+    // We MUST NOT try to resolve it further as a combo, even if the bare name matches a combo name,
+    // because that's how it's stored in usage_log.
+    if (m.includes("/")) {
+      allModels.add(normalizeModelForQuery(m));
+      continue;
+    }
+
     const bare = normalizeModelForQuery(m);
     const subMembers = getComboMembers(db, bare);
     if (subMembers.length > 0) {
