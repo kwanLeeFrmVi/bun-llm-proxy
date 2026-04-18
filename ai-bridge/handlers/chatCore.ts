@@ -858,6 +858,11 @@ async function handleStreamingResponse(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      // Disable Cloudflare Tunnel / reverse proxy gzip compression.
+      // Without this, tiny SSE heartbeats like `: ping\n\n` (8 bytes) are held
+      // until the gzip dictionary fills (~45KB), preventing Claude Code from
+      // receiving keep-alive pings and triggering a 128s timeout stall.
+      "Content-Encoding": "identity",
       "X-Accel-Buffering": "no",
     },
   });
