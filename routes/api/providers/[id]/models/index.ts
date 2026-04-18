@@ -3,7 +3,7 @@ import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getProviderEnabledModels, getProviderNodeById } from "db/index.ts";
+import { getProviderConnections, getProviderEnabledModels, getProviderNodeById, getProviderExcludedModels } from "db/index.ts";
 import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
@@ -22,6 +22,22 @@ function normalizeModelId(modelId: string, prefixes: string[]): string {
     }
   }
   return trimmedModelId;
+}
+
+function filterExcludedModels(
+  models: ProviderModelResponse[],
+  excludedModels: string[],
+  prefixes: string[]
+): ProviderModelResponse[] {
+  if (!excludedModels.length) return models;
+  const excludedSet = new Set<string>();
+  for (const ex of excludedModels) {
+    excludedSet.add(normalizeModelId(ex, prefixes));
+  }
+  return models.filter((m) => {
+    const rawId = normalizeModelId(m.id, prefixes);
+    return !excludedSet.has(rawId);
+  });
 }
 
 function mergeModels(
@@ -95,6 +111,8 @@ export async function GET(req: Request): Promise<Response> {
 
     // Get enabled models from provider-level storage using the provider's name
     const enabledModels = await getProviderEnabledModels(providerName);
+    // Get excluded models (models the user has deleted/hidden)
+    const excludedModels = await getProviderExcludedModels(providerName);
 
     // For compatible providers, try fetching models from the remote endpoint
     if (isCompatible) {
@@ -147,7 +165,11 @@ export async function GET(req: Request): Promise<Response> {
               })
               .filter((m): m is NonNullable<typeof m> => m !== null);
 
-            const models = mergeModels(remoteModels, enabledModels, outputAlias, id, alias);
+            const prefixes = [outputAlias, alias, id].filter(
+              (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
+            );
+            const merged = mergeModels(remoteModels, enabledModels, outputAlias, id, alias);
+            const models = filterExcludedModels(merged, excludedModels, prefixes);
 
             return Response.json(
               { provider: id, alias: outputAlias, models },
@@ -161,7 +183,10 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     // Fallback: return static/predefined models
-    const models = mergeModels(
+    const fallbackPrefixes = [outputAlias, alias, id].filter(
+      (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
+    );
+    const fallbackMerged = mergeModels(
       getModelsByProviderId(id).map((m) => ({
         id: `${outputAlias}/${m.id}`,
         name: m.name,
@@ -172,6 +197,7 @@ export async function GET(req: Request): Promise<Response> {
       id,
       alias
     );
+    const models = filterExcludedModels(fallbackMerged, excludedModels, fallbackPrefixes);
 
     return Response.json(
       {

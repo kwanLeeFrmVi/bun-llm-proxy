@@ -5,6 +5,9 @@ import {
   getProviderEnabledModels,
   updateProviderEnabledModels,
   getProviderNodeById,
+  addProviderExcludedModel,
+  removeProviderExcludedModel,
+  updateProviderExcludedModels,
 } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
@@ -60,6 +63,9 @@ export async function PUT(req: Request): Promise<Response> {
 
   const models = await updateProviderEnabledModels(providerName, body.models);
 
+  // Clear excluded list since the user is explicitly setting the full model list
+  await updateProviderExcludedModels(providerName, []);
+
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
 }
 
@@ -96,6 +102,9 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Remove from excluded list if it was previously excluded
+  await removeProviderExcludedModel(providerName, modelId);
+
   const models = await updateProviderEnabledModels(providerName, [...currentModels, modelId]);
 
   return Response.json({ provider: id, models }, { headers: CORS_HEADERS });
@@ -127,6 +136,9 @@ export async function DELETE(req: Request): Promise<Response> {
   const modelId = body.model.trim();
   const currentModels = await getProviderEnabledModels(providerName);
   const models = currentModels.filter((m) => m !== modelId);
+
+  // Add to excluded list so it doesn't reappear from remote fetch
+  await addProviderExcludedModel(providerName, modelId);
 
   await updateProviderEnabledModels(providerName, models);
 

@@ -2,6 +2,7 @@ import {
   getProviderConnections,
   updateProviderEnabledModels,
   getProviderNodeById,
+  updateProviderExcludedModels,
 } from "db/index.ts";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
@@ -141,6 +142,8 @@ export async function POST(req: Request): Promise<Response> {
   // Persist enabledModels at provider level using the provider's name
   const providerName = await getProviderName(id);
   await updateProviderEnabledModels(providerName, modelIds);
+  // Clear excluded models since user is explicitly re-fetching all models
+  await updateProviderExcludedModels(providerName, []);
 
   const prefix = (psd.prefix as string | undefined) ?? getProviderAlias(id) ?? id;
 

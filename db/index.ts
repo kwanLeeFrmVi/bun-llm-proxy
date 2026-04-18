@@ -1701,6 +1701,58 @@ export async function getAllProviderEnabledModels(): Promise<Record<string, stri
   return result;
 }
 
+// ─── Provider-level excluded models (models hidden from the UI) ──────────────────
+
+function getProviderExcludedModelsSettingKey(providerId: string): string {
+  return `providerExcludedModels:${providerId}`;
+}
+
+export async function getProviderExcludedModels(providerId: string): Promise<string[]> {
+  const value = await getSettingValue<unknown>(getProviderExcludedModelsSettingKey(providerId), []);
+
+  if (!Array.isArray(value)) return [];
+
+  return value.filter(
+    (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+  );
+}
+
+export async function updateProviderExcludedModels(
+  providerId: string,
+  modelIds: unknown
+): Promise<string[]> {
+  const next = Array.isArray(modelIds)
+    ? modelIds.filter(
+        (modelId): modelId is string => typeof modelId === "string" && modelId.trim() !== ""
+      )
+    : [];
+
+  await updateSetting(getProviderExcludedModelsSettingKey(providerId), next);
+  return next;
+}
+
+export async function addProviderExcludedModel(
+  providerId: string,
+  modelId: string
+): Promise<string[]> {
+  const current = await getProviderExcludedModels(providerId);
+  const trimmed = modelId.trim();
+  if (!trimmed || current.includes(trimmed)) return current;
+  const next = [...current, trimmed];
+  await updateSetting(getProviderExcludedModelsSettingKey(providerId), next);
+  return next;
+}
+
+export async function removeProviderExcludedModel(
+  providerId: string,
+  modelId: string
+): Promise<string[]> {
+  const current = await getProviderExcludedModels(providerId);
+  const next = current.filter((m) => m !== modelId.trim());
+  await updateSetting(getProviderExcludedModelsSettingKey(providerId), next);
+  return next;
+}
+
 // ─── Pricing (dedicated table) ───────────────────────────────────────────────────
 
 export interface PricingEntry {
