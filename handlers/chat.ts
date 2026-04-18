@@ -426,7 +426,8 @@ async function handleSingleModelChat(
             model,
             startTime,
             ctx,
-            sourceFormat
+            sourceFormat,
+            request?.signal
           );
         }
         return result.response!;
@@ -525,7 +526,8 @@ function wrapStreamingResponse(
   model: string,
   startTime: number,
   ctx: RequestContext,
-  sourceFormat: string
+  sourceFormat: string,
+  clientSignal?: AbortSignal
 ): Response {
   if (!response.body) return response;
 
@@ -588,7 +590,7 @@ function wrapStreamingResponse(
       // the outer wrapper blocks silently and Claude Code sees a stall.
       // Race reader.read() against a 25s heartbeat so the downstream always sees
       // activity, even when the inner stream is quiet.
-      const OUTER_HEARTBEAT_MS = 25_000;
+      const OUTER_HEARTBEAT_MS = 15_000;
       const encoder = new TextEncoder();
       let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
       let heartbeatResolve: (() => void) | null = null;
@@ -603,11 +605,28 @@ function wrapStreamingResponse(
         heartbeatResolve = null;
       };
 
+      // ── Client disconnect detection ────────────────────────────────────────────
+      // Listen to the original request's AbortSignal so we detect client disconnect
+      // immediately (e.g. Cloudflare/nginx closing the connection) instead of waiting
+      // for the next reader.read() to fail. Without this, Bun may not propagate the
+      // cancel() to the outer ReadableStream for seconds after the TCP connection drops.
+      if (clientSignal?.aborted) {
+        safeClose();
+        return;
+      }
+      const onClientAbort = () => {
+        abortController.abort();
+      };
+      clientSignal?.addEventListener("abort", onClientAbort, { once: true });
+
       try {
         let readPromise = (reader as any).read({ signal: abortController.signal });
         let heartbeatPromise = makeHeartbeat();
 
         while (true) {
+          // Check if client disconnected between iterations
+          if (abortController.signal.aborted) break;
+
           const raceResult = await Promise.race([
             readPromise.then((r: { done: boolean; value?: Uint8Array }) => ({ kind: "data" as const, ...r })),
             heartbeatPromise.then(() => ({ kind: "heartbeat" as const, done: false, value: undefined })),
@@ -812,6 +831,7 @@ function wrapStreamingResponse(
         safeClose();
       } finally {
         clearHeartbeat();
+        clientSignal?.removeEventListener("abort", onClientAbort);
         reader.releaseLock();
         const durationMs = Date.now() - startTime;
         const ttftMs = firstChunkTime ? firstChunkTime - startTime : undefined;
