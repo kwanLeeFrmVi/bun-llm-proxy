@@ -1,5 +1,4 @@
 // HTTP status codes and runtime constants for ai-bridge
-// A clean, well-organized config file — not a dumping ground like runtimeConfig.js
 
 export const HTTP_STATUS = {
   BAD_REQUEST: 400,
@@ -108,5 +107,5 @@ export const MEMORY_CONFIG = {
 export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry → proactive refresh
 
 // SSE streaming keep-alive: prevent client ECONNRESET on slow upstreams
-export const STREAM_HEARTBEAT_INTERVAL_MS = 15_000; // 15s between SSE comment pings
+export const STREAM_HEARTBEAT_INTERVAL_MS = 5_000; // 5s between SSE comment pings
 export const STREAM_STALL_TIMEOUT_MS = 300_000; // 5min max silence before aborting

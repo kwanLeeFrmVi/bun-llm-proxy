@@ -385,6 +385,19 @@ async function handleStreamingResponse(
         let heartbeatPromise = makeHeartbeatPromise();
         let stallPromise = makeStallPromise();
 
+        // Create a promise that resolves immediately when streamAbort fires.
+        // Without this, cancel() → streamAbort.abort() only sets a flag that's
+        // checked at the top of the while-loop; if the loop is currently awaiting
+        // Promise.race(readPromise, heartbeatPromise, stallPromise), it won't wake
+        // up until the heartbeat timer fires (15s) or the upstream sends data.
+        // This was causing Claude Code to hang: client disconnects → outer wrapper
+        // cancel() → inner stream cancel() → streamAbort.abort(), but the inner
+        // loop stays stuck in Promise.race for up to 15s.
+        const abortPromise = new Promise<{ kind: "abort"; done: false; value: undefined }>((resolve) => {
+          streamAbort.signal.addEventListener("abort", () =>
+            resolve({ kind: "abort" as const, done: false as const, value: undefined }), { once: true });
+        });
+
         while (true) {
           // Check abort flag before each read — cancel() may have fired between chunks
           if (streamAbort.signal.aborted) break;
@@ -393,7 +406,14 @@ async function handleStreamingResponse(
             readPromise.then((r) => ({ kind: "data" as const, done: r.done, value: r.value })),
             heartbeatPromise.then(() => ({ kind: "heartbeat" as const, done: false as const, value: undefined })),
             stallPromise.then(() => ({ kind: "stall" as const, done: false as const, value: undefined })),
+            abortPromise,
           ]);
+
+          if (result.kind === "abort") {
+            // Downstream canceled — break out of the read loop immediately.
+            // The finally block will cancel the upstream reader and clean up.
+            break;
+          }
 
           if (result.kind === "heartbeat") {
             // Send SSE comment ping — invisible to compliant SSE clients
@@ -645,6 +665,29 @@ async function handleStreamingResponse(
           sseBuffer = "";
         }
 
+        // If downstream canceled (client disconnected), skip termination injection
+        // and close immediately. The outer wrapper already detected the disconnect
+        // and logged OUTER_CANCELED; injecting events into a closed controller is
+        // pointless and just produces "Controller is already closed" errors.
+        if (downstreamCanceled) {
+          closeReason = "downstream_canceled";
+          const totalMs = Date.now() - streamStartMs;
+          log.info(
+            opts.ctx ?? null,
+            "STREAM",
+            `INNER complete: ${chunkCount} upstreamChunks, ${translatedChunkCount} translatedChunks, ` +
+              `${eventCount} events, sawMessageStart=${sawMessageStart}, sawMessageStop=${sawMessageStop}, ` +
+              `sawValidMessageDelta=${sawValidMessageDelta}, ` +
+              `firstUpstreamChunkAfterMs=${firstUpstreamChunkMs != null ? firstUpstreamChunkMs - streamStartMs : "?"}, ` +
+              `firstTranslatedAfterMs=${firstTranslatedChunkMs != null ? firstTranslatedChunkMs - streamStartMs : "?"}, ` +
+              `closeReason=downstream_canceled, totalMs=${totalMs}`
+          );
+          // Don't call safeClose() — the controller is already closed by the
+          // ReadableStream cancel machinery. Calling it just produces a harmless
+          // but noisy "Controller is already closed" log.
+          return; // finally block still runs: clears timers, cancels reader, releases lock
+        }
+
         // Normal completion: flush done events.
         // Skip for claude source format — Claude SSE streams terminate with
         // `event: message_stop`, not `data: [DONE]` (that's OpenAI format).
@@ -672,13 +715,61 @@ async function handleStreamingResponse(
           }
         }
 
-        // Guarantee a complete Claude SSE termination sequence (message_start →
-        // message_delta → message_stop) for Claude Code clients. TrollLLM
-        // (anthropic-compatible) may omit message_start or send message_stop without
-        // a current message, causing "Received message_stop without a current message".
-        // Always emit message_start if upstream didn't send it, so Claude Code's
-        // SSE parser has the required message context.
-        if (sourceFormat === "claude") {
+        // Detect empty/garbage upstream responses: the upstream returned HTTP 200
+        // with a stream, but the stream contained no real content (no message_start
+        // from upstream, no tokens). This happens when upstream providers (e.g.
+        // pro-x) return a 200 with an empty or error body that looks like a valid
+        // stream start. Passing this through causes Claude Code to hang because it
+        // receives a response with no actual content.
+        const isEmptyUpstream =
+          sourceFormat === "claude" &&
+          !sawMessageStart &&
+          !sawMessageStop &&
+          chunkCount <= 2;
+
+        if (isEmptyUpstream) {
+          log.warn(
+            opts.ctx ?? null,
+            "STREAM",
+            `EMPTY_UPSTREAM: upstream returned 200 with empty stream ` +
+              `(chunks=${chunkCount}, sawMessageStart=${sawMessageStart}, ` +
+              `sawMessageStop=${sawMessageStop}, provider=${opts.modelInfo.provider}). ` +
+              `Injecting error event instead of synthetic termination.`
+          );
+          // Emit an upstream error sentinel so the outer wrapper logs OUTER_ERROR
+          safeEnqueue(
+            encoder.encode(`: __UPSTREAM_ERROR__: Empty upstream response (0 tokens)\n\n`)
+          );
+          // Emit a Claude error event so Claude Code can trigger its retry mechanism
+          safeEnqueue(
+            encoder.encode(
+              buildClaudeErrorEvent("api_error", "Upstream returned empty response")
+            )
+          );
+          // Minimal termination sequence so the client doesn't hang waiting for events
+          safeEnqueue(
+            encoder.encode(
+              "event: message_start\n" +
+                'data: {"type":"message_start","message":{"id":"msg_proxy","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-7","usage":{"input_tokens":0,"output_tokens":0}}}\n\n'
+            )
+          );
+          safeEnqueue(
+            encoder.encode(
+              "event: message_delta\n" +
+                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}\n\n'
+            )
+          );
+          safeEnqueue(
+            encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
+          );
+          closeReason = "upstream_error";
+        } else if (sourceFormat === "claude") {
+          // Guarantee a complete Claude SSE termination sequence (message_start →
+          // message_delta → message_stop) for Claude Code clients. TrollLLM
+          // (anthropic-compatible) may omit message_start or send message_stop without
+          // a current message, causing "Received message_stop without a current message".
+          // Always emit message_start if upstream didn't send it, so Claude Code's
+          // SSE parser has the required message context.
           if (!sawMessageStart) {
             safeEnqueue(
               encoder.encode(
@@ -700,15 +791,17 @@ async function handleStreamingResponse(
               encoder.encode("event: message_stop\n" + 'data: {"type":"message_stop"}\n\n')
             );
           }
-          log.debug(
-            opts.ctx ?? null,
-            "STREAM",
-            `Claude SSE termination: injected message_start=${!sawMessageStart}, ` +
-              `message_delta=${!sawValidMessageDelta}, message_stop=${!sawMessageStop}`
-          );
         }
+        log.debug(
+          opts.ctx ?? null,
+          "STREAM",
+          `Claude SSE termination: injected message_start=${!sawMessageStart}, ` +
+            `message_delta=${!sawValidMessageDelta}, message_stop=${!sawMessageStop}`
+        );
 
-        closeReason = "normal";
+        if (closeReason !== "upstream_error") {
+          closeReason = "normal";
+        }
         const totalMs = Date.now() - streamStartMs;
         log.info(
           opts.ctx ?? null,

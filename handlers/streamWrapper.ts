@@ -16,6 +16,7 @@ import { saveRequestUsage } from "../stubs/usageDb.ts";
 import { getComboMetadata } from "../services/comboRouting.ts";
 import { recordComboTTFT } from "../db/index.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../ai-bridge/translator/common/sse.ts";
+import { STREAM_HEARTBEAT_INTERVAL_MS } from "../ai-bridge/config/runtimeConfig.ts";
 
 // Marker to detect responses already wrapped by wrapStreamingResponse.
 // Prevents double-wrapping when a combo model resolves to another combo model.
@@ -52,7 +53,7 @@ export function wrapStreamingResponseV2(
     startTime,
     ctx,
   });
-  const { transform: heartbeatTransform, stop: stopHeartbeat } = createHeartbeatTransform(15_000);
+  const { transform: heartbeatTransform, stop: stopHeartbeat } = createHeartbeatTransform(STREAM_HEARTBEAT_INTERVAL_MS);
 
   // Pipe: upstream → diagnostics → heartbeat
   const pipedBody = response.body
@@ -89,15 +90,34 @@ export function wrapStreamingResponseV2(
 
     // Emit the appropriate log event
     if (closeReason === "normal" && !st.upstreamErrorMsg) {
-      log.stream(ctx, "OUTER_COMPLETE", {
-        provider,
-        model,
-        usage: st.finalUsage,
-        closeReason: "normal" as CloseReason,
-        downstreamChunkCount: st.downstreamChunkCount,
-        firstDownstreamChunkMs: st.firstDownstreamChunkMs,
-        durationMs,
-      });
+      // Detect empty upstream responses at the outer layer: 0 completion tokens
+      // means the upstream returned no useful content despite a 200 status.
+      const isEmptyResponse = st.finalUsage &&
+        (st.finalUsage.completion_tokens ?? 0) === 0 &&
+        (st.finalUsage.prompt_tokens ?? 0) === 0 &&
+        st.downstreamChunkCount <= 5;
+
+      if (isEmptyResponse) {
+        log.stream(ctx, "OUTER_ERROR", {
+          provider,
+          model,
+          error: "Empty upstream response: 0 tokens received",
+          closeReason: "upstream_error" as CloseReason,
+          downstreamChunkCount: st.downstreamChunkCount,
+          firstDownstreamChunkMs: st.firstDownstreamChunkMs,
+          durationMs,
+        });
+      } else {
+        log.stream(ctx, "OUTER_COMPLETE", {
+          provider,
+          model,
+          usage: st.finalUsage,
+          closeReason: "normal" as CloseReason,
+          downstreamChunkCount: st.downstreamChunkCount,
+          firstDownstreamChunkMs: st.firstDownstreamChunkMs,
+          durationMs,
+        });
+      }
     } else if (closeReason === "upstream_error" || st.upstreamErrorMsg) {
       log.stream(ctx, "OUTER_ERROR", {
         provider,
