@@ -211,10 +211,6 @@ export default function ProviderDetail() {
   }, []);
 
   useEffect(() => {
-    fetchPredefinedModels();
-  }, [fetchPredefinedModels]);
-
-  useEffect(() => {
     loadModelStats();
   }, [loadModelStats]);
 
