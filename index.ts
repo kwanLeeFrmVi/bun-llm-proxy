@@ -6,6 +6,18 @@ import { corsResponse } from "./lib/cors.ts";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+// ── Defense-in-depth: catch unhandled errors so they don't crash the process ──
+// Without these, any unhandled promise rejection or uncaught exception in a
+// ReadableStream start()/pull()/cancel() callback terminates Bun (and PM2 restarts).
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  console.error(`[FATAL-GUARD] unhandledRejection: ${msg}${stack ? `\n${stack}` : ""}`);
+});
+process.on("uncaughtException", (err) => {
+  console.error(`[FATAL-GUARD] uncaughtException: ${err.message}\n${err.stack}`);
+});
+
 // Initialize DB (creates tables, opens WAL connection)
 openDb();
 

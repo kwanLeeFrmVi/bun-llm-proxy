@@ -4,6 +4,13 @@
 
 import * as log from "./logger.ts";
 
+// ─── TTL Constants ───────────────────────────────────────────────────────────────
+
+const TTL_24HOURS = 86400; // 24 hours in seconds
+const TTL_48HOURS = 48 * 3600; // 48 hours in seconds
+const TTL_VERTEX_TOKEN_MIN = 60; // minimum 60 seconds for vertex token
+const TTL_VERTEX_TOKEN_BUFFER = 300; // 5-minute buffer for vertex token
+
 // ─── Connection ──────────────────────────────────────────────────────────────────
 
 let redis: InstanceType<typeof Bun.RedisClient> | null = null;
@@ -54,7 +61,7 @@ export async function acquireLock(
   const lockValue = `${process.pid}:${Date.now()}`;
 
   try {
-    // Bun.redis uses positional args: SET key value EX seconds NX
+    // Bun.redis uses positional args: SET key value EX seconds NX !note: this is different from redis-cli with this method override ttlSeconds need to be in string
     const result = await client.set(lockKey, lockValue, "EX", String(ttlSeconds), "NX");
 
     if (result === "OK") {
@@ -138,13 +145,13 @@ export async function setSessionModel(
   comboName: string,
   sessionId: string,
   model: string,
-  ttlSeconds = 86400
+  ttlSeconds = TTL_24HOURS
 ): Promise<void> {
   const client = getRedis();
   if (!client) return;
   try {
     const value = JSON.stringify({ model, assignedAt: Date.now() });
-    await client.set(`${SESSION_PREFIX}${comboName}:${sessionId}`, value, "EX", String(ttlSeconds));
+    await client.set(`${SESSION_PREFIX}${comboName}:${sessionId}`, value, "EX", ttlSeconds);
   } catch (err) {
     log.debug("REDIS", `setSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`);
   }
@@ -163,7 +170,7 @@ export async function incrementSessionCounter(comboName: string): Promise<number
     const val = await client.incr(key);
     // Set a 48h TTL on the counter so it doesn't linger forever
     if (val === 1) {
-      await client.expire(key, String(48 * 3600));
+      await client.expire(key, TTL_48HOURS);
     }
     return val - 1; // return 0-based index
   } catch (err) {
@@ -202,7 +209,7 @@ export async function setRRState(
   const client = getRedis();
   if (!client) return;
   try {
-    await client.set(`${RR_PREFIX}${comboName}`, JSON.stringify(state), "EX", String(48 * 3600));
+    await client.set(`${RR_PREFIX}${comboName}`, JSON.stringify(state), "EX", TTL_48HOURS);
   } catch (err) {
     log.debug("REDIS", `setRRState error for ${comboName}: ${(err as Error).message}`);
   }
@@ -238,7 +245,7 @@ export async function setSpeedState(
   const client = getRedis();
   if (!client) return;
   try {
-    await client.set(`${SPEED_PREFIX}${comboName}`, JSON.stringify(state), "EX", String(48 * 3600));
+    await client.set(`${SPEED_PREFIX}${comboName}`, JSON.stringify(state), "EX", TTL_48HOURS);
   } catch (err) {
     log.debug("REDIS", `setSpeedState error for ${comboName}: ${(err as Error).message}`);
   }
@@ -279,12 +286,12 @@ export async function setVertexToken(
   const client = getRedis();
   if (!client) return;
   try {
-    const ttlSec = Math.max(60, Math.floor((expiresAt - Date.now()) / 1000) - 300);
+    const ttlSec = Math.max(TTL_VERTEX_TOKEN_MIN, Math.floor((expiresAt - Date.now()) / 1000) - TTL_VERTEX_TOKEN_BUFFER);
     await client.set(
       `${VERTEX_TOKEN_PREFIX}${clientEmail}`,
       JSON.stringify({ token, expiresAt }),
       "EX",
-      String(ttlSec)
+      ttlSec
     );
   } catch (err) {
     log.debug("REDIS", `setVertexToken error for ${clientEmail}: ${(err as Error).message}`);
@@ -320,7 +327,7 @@ export async function getCachedClaudeHeadersRedis(
 export async function setCachedClaudeHeadersRedis(
   cacheKey: string,
   headers: Record<string, string>,
-  ttlSeconds = 86400
+  ttlSeconds = TTL_24HOURS
 ): Promise<void> {
   const client = getRedis();
   if (!client) return;
@@ -330,7 +337,7 @@ export async function setCachedClaudeHeadersRedis(
       `${CLAUDE_HEADER_PREFIX}${cacheKey}`,
       JSON.stringify({ headers, timestamp: now, lastAccess: now }),
       "EX",
-      String(ttlSeconds)
+      ttlSeconds
     );
   } catch (err) {
     log.debug("REDIS", `setCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
@@ -350,7 +357,7 @@ export async function touchCachedClaudeHeadersRedis(cacheKey: string): Promise<v
         `${CLAUDE_HEADER_PREFIX}${cacheKey}`,
         JSON.stringify({ ...existing, lastAccess: Date.now() }),
         "EX",
-        String(86400) // reset TTL on access
+        TTL_24HOURS // reset TTL on access
       );
     }
   } catch (err) {
@@ -388,7 +395,7 @@ export async function setRedisCache(
   if (!client) return;
   try {
     if (ttlSeconds) {
-      await client.set(`${CACHE_PREFIX}${key}`, value, "EX", String(ttlSeconds));
+      await client.set(`${CACHE_PREFIX}${key}`, value, "EX", ttlSeconds);
     } else {
       await client.set(`${CACHE_PREFIX}${key}`, value);
     }
