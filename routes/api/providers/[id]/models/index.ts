@@ -4,7 +4,6 @@ import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
 import { getProviderConnections, getProviderEnabledModels, getProviderNodeById, getProviderExcludedModels } from "db/index.ts";
-import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -114,75 +113,9 @@ export async function GET(req: Request): Promise<Response> {
     // Get excluded models (models the user has deleted/hidden)
     const excludedModels = await getProviderExcludedModels(providerName);
 
-    // For compatible providers, try fetching models from the remote endpoint
-    if (isCompatible) {
-      let baseUrl = typeof psd.baseUrl === "string" ? psd.baseUrl.trim().replace(/\/$/, "") : "";
-      if (!baseUrl) {
-        const node = await getProviderNodeById(id);
-        if (node?.baseUrl) {
-          baseUrl = node.baseUrl.trim().replace(/\/$/, "");
-        }
-      }
-      const apiKey = typeof activeConn?.apiKey === "string" ? activeConn.apiKey : "";
-
-      if (baseUrl && apiKey) {
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-        if (isOpenAICompatibleProvider(id)) {
-          headers.Authorization = `Bearer ${apiKey}`;
-        } else {
-          headers["x-api-key"] = apiKey;
-          headers["anthropic-version"] = ANTHROPIC_API_VERSION;
-          headers.Authorization = `Bearer ${apiKey}`;
-        }
-
-        try {
-          const response = await fetch(`${baseUrl}/models`, {
-            method: "GET",
-            headers,
-            cache: "no-store",
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const rawModels = Array.isArray(data)
-              ? data
-              : ((data as Record<string, unknown>)?.data ??
-                (data as Record<string, unknown>)?.models ??
-                []);
-
-            const remoteModels = (
-              rawModels as Array<{ id?: string; name?: string; model?: string }>
-            )
-              .map((m) => {
-                const modelId = m?.id ?? m?.name ?? m?.model ?? "";
-                return modelId
-                  ? {
-                      id: `${outputAlias}/${modelId}`,
-                      name: m?.name ?? m?.id,
-                      type: undefined,
-                    }
-                  : null;
-              })
-              .filter((m): m is NonNullable<typeof m> => m !== null);
-
-            const prefixes = [outputAlias, alias, id].filter(
-              (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
-            );
-            const merged = mergeModels(remoteModels, enabledModels, outputAlias, id, alias);
-            const models = filterExcludedModels(merged, excludedModels, prefixes);
-
-            return Response.json(
-              { provider: id, alias: outputAlias, models },
-              { headers: CORS_HEADERS }
-            );
-          }
-        } catch {
-          // Fetch failed, fall through to static models (which will be empty for compat providers)
-        }
-      }
-    }
-
-    // Fallback: return static/predefined models
+    // Return stored enabled models merged with static/predefined models.
+    // Remote fetching from the provider's /models endpoint is NOT performed here
+    // and must be triggered explicitly via POST /api/providers/:id/fetch-models.
     const fallbackPrefixes = [outputAlias, alias, id].filter(
       (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
     );
