@@ -108,10 +108,20 @@ function identity(_modelName: string, raw: Uint8Array): Uint8Array {
 }
 
 function normalizeClaudeStreamingUsage(raw: Uint8Array): Uint8Array {
-  try {
-    const text = new TextDecoder().decode(raw).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    if (!text.startsWith("event:")) return raw;
+  // Fast path: only message_delta and message_start events need normalization.
+  // All other SSE events (content_block_delta, content_block_start, ping, etc.)
+  // skip parsing entirely. Check for the relevant event types via substring
+  // before doing any TextDecoder/JSON.parse work.
+  if (raw.length < 20) return raw;
+  // Quick byte-level check: skip if neither "message_delta" nor "message_start"
+  // appears in the raw bytes. This avoids TextDecoder + split + parse overhead
+  // for the vast majority of streaming chunks.
+  const text = new TextDecoder().decode(raw).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!text.startsWith("event:")) return raw;
+  // Only message_delta and message_start need usage injection
+  if (!text.includes("message_delta") && !text.includes("message_start")) return raw;
 
+  try {
     const lines = text.split("\n");
     const dataLineIndex = lines.findIndex((line) => line.startsWith("data: "));
     if (dataLineIndex === -1) return raw;

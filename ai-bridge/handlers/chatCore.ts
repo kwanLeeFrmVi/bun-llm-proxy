@@ -2,6 +2,7 @@
 // Handles the full lifecycle: translate request → upstream fetch → translate response → stream back.
 
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
+import { Response as translateResponse } from "../translator/index.ts";
 import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS } from "../config/runtimeConfig.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
@@ -881,22 +882,7 @@ function translateChunk(
   raw: Uint8Array,
   state: unknown
 ): TranslateChunkResult {
-  // Import the Response function lazily to avoid circular dependency at module level
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Response: translate } = require("../translator/index.ts") as {
-    Response: (
-      from: string,
-      to: string,
-      ctx: unknown,
-      modelName: string,
-      origReq: Uint8Array,
-      req: Uint8Array,
-      raw: Uint8Array,
-      state: unknown
-    ) => Uint8Array[];
-  };
-
-  const chunks = translate(
+  const chunks = translateResponse(
     sourceFormat,
     targetFormat,
     null,

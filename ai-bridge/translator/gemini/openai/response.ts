@@ -10,6 +10,10 @@ export interface GeminiStreamingState {
   messageStarted: boolean;
   messageStopSent: boolean;
   contentAccumulator: string;
+  // Tool call tracking
+  toolCallIndex: number;
+  sawFunctionCall: boolean;
+  lastFinishReason: string | null;
 }
 
 export function newState(): GeminiStreamingState {
@@ -22,6 +26,9 @@ export function newState(): GeminiStreamingState {
     messageStarted: false,
     messageStopSent: false,
     contentAccumulator: "",
+    toolCallIndex: 0,
+    sawFunctionCall: false,
+    lastFinishReason: null,
   };
 }
 
@@ -100,7 +107,8 @@ export function convertGeminiResponseToOpenAI(
           if (part.functionCall) {
             const fc = part.functionCall as Record<string, unknown>;
             const args = fc.args;
-            const toolCallIndex = state.nextBlockIndex++;
+            const tcIdx = state.toolCallIndex++;
+            state.sawFunctionCall = true;
 
             results.push(
               new TextEncoder().encode(
@@ -110,12 +118,12 @@ export function convertGeminiResponseToOpenAI(
                   model: state.model,
                   choices: [
                     {
-                      index: toolCallIndex,
+                      index: 0,
                       delta: {
                         tool_calls: [
                           {
-                            index: toolCallIndex,
-                            id: `${fc.name ?? "tool"}_${Date.now()}`,
+                            index: tcIdx,
+                            id: `call_${(fc.name as string ?? "tool").slice(0, 8)}_${tcIdx}`,
                             type: "function",
                             function: {
                               name: fc.name ?? "",
@@ -144,6 +152,12 @@ export function convertGeminiResponseToOpenAI(
   const finishReason = firstCandidate
     ? ((firstCandidate as Record<string, unknown>).finishReason as string | undefined)
     : undefined;
+
+  // Track the last finish reason for buildDoneEvents
+  if (finishReason) {
+    state.lastFinishReason = finishReason;
+  }
+
   if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
     const mapped = mapGeminiFinishReason(finishReason);
     const usage = parsed.usageMetadata as Record<string, unknown> | undefined;
@@ -267,13 +281,25 @@ function mapGeminiFinishReason(reason: string): string {
 function buildDoneEvents(state: GeminiStreamingState): Uint8Array[] {
   const results: Uint8Array[] = [];
   if (!state.messageStopSent) {
+    // Determine the correct finish_reason:
+    // - If function calls were present → "tool_calls"
+    // - Otherwise use the mapped Gemini finish reason (STOP → "stop", MAX_TOKENS → "length")
+    let finishReason: string;
+    if (state.sawFunctionCall) {
+      finishReason = "tool_calls";
+    } else if (state.lastFinishReason) {
+      finishReason = mapGeminiFinishReason(state.lastFinishReason);
+    } else {
+      finishReason = "stop";
+    }
+
     results.push(
       new TextEncoder().encode(
         `data: ${JSON.stringify({
           id: state.messageId,
           object: "chat.completion.chunk",
           model: state.model,
-          choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+          choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
           usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
         })}\n\n`
       )

@@ -544,7 +544,7 @@ export default function Models() {
                     <TableCell className="pl-6 py-3">
                       <div className="flex items-center">
                         <Badge variant="endpoint">{modelName}</Badge>
-                        <CopyModelButton modelName={modelName} />
+                        <CopyModelButton modelName={m.id} />
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-3">

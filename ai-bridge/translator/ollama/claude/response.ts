@@ -14,6 +14,8 @@ export interface OllamaStreamingState {
   // Tool call support
   toolBlockIndex: number;
   nextToolIndex: number;
+  // Track open tool block indices that need content_block_stop
+  openToolBlocks: number[];
 }
 
 export function newState(): OllamaStreamingState {
@@ -28,6 +30,7 @@ export function newState(): OllamaStreamingState {
     contentAccumulator: "",
     toolBlockIndex: -1,
     nextToolIndex: 0,
+    openToolBlocks: [],
   };
 }
 
@@ -117,6 +120,15 @@ export function convertOllamaResponseToClaude(
           type: "content_block_delta",
           index: state.toolBlockIndex,
           delta: { type: "input_json_delta", partial_json: rawArgs },
+        })
+      );
+
+      // content_block_stop: close the tool block immediately since Ollama
+      // sends complete tool call arguments in a single chunk (non-incremental).
+      results.push(
+        buildSSEEvent("content_block_stop", {
+          type: "content_block_stop",
+          index: state.toolBlockIndex,
         })
       );
     }
@@ -281,11 +293,22 @@ function buildDoneEvents(state: OllamaStreamingState): Uint8Array[] {
       })
     );
   }
+  // Close any tool blocks that weren't closed inline
+  for (const toolBlockIdx of state.openToolBlocks) {
+    results.push(
+      buildSSEEvent("content_block_stop", {
+        type: "content_block_stop",
+        index: toolBlockIdx,
+      })
+    );
+  }
   if (!state.messageStopSent) {
+    // Determine stop_reason based on whether tool calls were present
+    const stopReason = state.nextToolIndex > 0 ? "tool_use" : "end_turn";
     results.push(
       buildSSEEvent("message_delta", {
         type: "message_delta",
-        delta: { stop_reason: "end_turn", stop_sequence: null },
+        delta: { stop_reason: stopReason, stop_sequence: null },
         usage: { input_tokens: 0, output_tokens: 0 },
       })
     );
