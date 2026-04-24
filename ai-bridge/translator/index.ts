@@ -166,8 +166,25 @@ function identityResponse(
   _r: Uint8Array,
   raw: Uint8Array
 ): Uint8Array[] {
-  // For streaming, pass through as-is but ensure usage data is added if present
+  // Claude-aware identity: passes bytes through but ensures message_start /
+  // message_delta SSE events carry a `usage` field (required by strict Claude
+  // Code clients). Non-Claude SSE shapes (`data: {…}` without `event:` prefix)
+  // return unchanged via the early guard inside normalizeClaudeStreamingUsage.
   return [normalizeClaudeStreamingUsage(raw)];
+}
+
+function identityResponsePassthrough(
+  _ctx: unknown,
+  _m: string,
+  _o: Uint8Array,
+  _r: Uint8Array,
+  raw: Uint8Array
+): Uint8Array[] {
+  // Pure pass-through for non-Claude formats (openai, ollama, gemini, …).
+  // Avoids running Claude-specific SSE parsing on every chunk of unrelated
+  // formats, which was both wasteful and a footgun if Claude's guards ever
+  // regress.
+  return [raw];
 }
 
 function identityResponseNS(
@@ -197,7 +214,10 @@ function identityResponseNS(
 }
 
 function registerIdentity(format: string): void {
-  register(format, format, identity, identityResponse, identityResponseNS);
+  // Only the Claude identity pair needs the Claude-specific usage normalizer.
+  // All other identity pairs (openai, ollama, gemini, etc.) are pure pass-through.
+  const responseFn = format === FORMATS.CLAUDE ? identityResponse : identityResponsePassthrough;
+  register(format, format, identity, responseFn, identityResponseNS);
 }
 
 // ─── Initialize all pairs ───────────────────────────────────────────────────────

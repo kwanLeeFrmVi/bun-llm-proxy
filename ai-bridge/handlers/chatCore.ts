@@ -158,7 +158,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       return { success: true, response };
     } else {
       const responseBody = await upstream.text();
-      const translated = NeedsTranslation(targetFormat, sourceFormat)
+      const needsTranslation = NeedsTranslation(targetFormat, sourceFormat);
+      const translated = needsTranslation
         ? ResponseNonStream(
             targetFormat,
             sourceFormat,
@@ -169,6 +170,17 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
             new TextEncoder().encode(responseBody)
           )
         : new TextEncoder().encode(responseBody);
+
+      // Byte-level diagnostic: surface exactly how many bytes the proxy is
+      // about to ship back, so "client sees nothing" cases can be bisected
+      // between "upstream returned empty" and "proxy dropped bytes".
+      log.info(
+        ctx ?? null,
+        "UPSTREAM",
+        `non-stream response: status=${upstream.status} upstreamBytes=${responseBody.length} ` +
+          `returnBytes=${translated.byteLength} translated=${needsTranslation} ` +
+          `contentLength=${upstream.headers.get("content-length") ?? "?"}`
+      );
 
       // Extract usage from non-streaming response
       let usageData: {
@@ -309,7 +321,9 @@ async function handleStreamingResponse(
   // If the upstream is returning OpenAI-format events instead, we log a clear
   // warning immediately rather than letting the client see garbage silently.
   const isClaudeIdentityPassthrough = sourceFormat === "claude" && targetFormat === "claude";
+  const isOpenAIIdentityPassthrough = sourceFormat === "openai" && targetFormat === "openai";
   let firstSseDataValidated = false; // fire once on the first parseable data: line
+  let loggedOpenAIIdentityEngaged = false;
 
   log.debug(
     opts.ctx ?? null,
@@ -462,6 +476,26 @@ async function handleStreamingResponse(
             if (rawText.includes("message_start")) sawMessageStart = true;
             if (rawText.includes("message_stop")) sawMessageStop = true;
             if (rawText.includes("message_delta") && rawText.includes("usage")) sawValidMessageDelta = true;
+            safeEnqueue(raw);
+            continue;
+          }
+
+          // ── Identity passthrough: openai→openai (OpenAI-compatible providers) ───
+          // The upstream sends OpenAI SSE and the client expects OpenAI SSE — no
+          // translation needed. Skipping the SSE buffer + translateChunk pipeline
+          // avoids per-event buffering (which holds chunks until `\n\n` boundaries
+          // land in a single transform) and the needless Claude-specific
+          // `normalizeClaudeStreamingUsage` pass the identity translator runs.
+          if (isOpenAIIdentityPassthrough) {
+            if (streamAbort.signal.aborted) break;
+            if (!loggedOpenAIIdentityEngaged) {
+              loggedOpenAIIdentityEngaged = true;
+              log.debug(
+                opts.ctx ?? null,
+                "STREAM",
+                `openai identity passthrough engaged (provider=${opts.modelInfo.provider})`
+              );
+            }
             safeEnqueue(raw);
             continue;
           }
@@ -694,7 +728,12 @@ async function handleStreamingResponse(
         // Forwarding `data: [DONE]` to a Claude client (e.g. via identity
         // passthrough) causes the client to see an invalid terminator and
         // abort the socket ("socket connection was closed unexpectedly").
-        if (sourceFormat !== "claude") {
+        //
+        // Skip for openai identity passthrough — the upstream already emitted
+        // its own `data: [DONE]`, so injecting another synthetic one duplicates
+        // the terminator (and runs translateChunk purely for the side-effect
+        // of re-encoding a literal we already forwarded).
+        if (sourceFormat !== "claude" && !isOpenAIIdentityPassthrough) {
           const doneChunks = translateChunk(
             targetFormat,
             sourceFormat,

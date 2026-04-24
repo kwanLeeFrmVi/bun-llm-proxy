@@ -662,4 +662,129 @@ describe("handleChatCore", () => {
       globalThis.fetch = origFetch;
     }
   });
+
+  it("openai-compatible: streaming passthrough forwards upstream SSE byte-for-byte with a single [DONE]", async () => {
+    // Regression: openai-compatible-* providers use sourceFormat=openai, targetFormat=openai
+    // (identity passthrough). The proxy must forward every upstream SSE event unchanged and
+    // NOT inject a duplicate synthetic `data: [DONE]\n\n` after the upstream's own terminator.
+    const openAIEvents = [
+      'data: {"id":"chatcmpl-x","object":"chat.completion.chunk","model":"m","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n',
+      'data: {"id":"chatcmpl-x","object":"chat.completion.chunk","model":"m","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}\n\n',
+      'data: {"id":"chatcmpl-x","object":"chat.completion.chunk","model":"m","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}\n\n',
+      'data: {"id":"chatcmpl-x","object":"chat.completion.chunk","model":"m","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      "data: [DONE]\n\n",
+    ];
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      const body = new ReadableStream({
+        start(controller) {
+          for (const e of openAIEvents) {
+            controller.enqueue(new TextEncoder().encode(e));
+          }
+          controller.close();
+        },
+      });
+      return Promise.resolve(
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "openai-compatible-myprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "openai-compatible-myprovider", model: "some-model" },
+        credentials: { apiKey: "test-key", providerSpecificData: { baseUrl: "https://example.test/v1" } },
+        sourceFormatOverride: "openai",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+      expect(result.response!.headers.get("Content-Type")).toBe("text/event-stream");
+
+      const reader = result.response!.body!.getReader();
+      const chunks: string[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(new TextDecoder().decode(value));
+      }
+      reader.releaseLock();
+      const full = chunks.join("");
+
+      // Every upstream event must appear verbatim
+      expect(full).toContain('"content":"Hello"');
+      expect(full).toContain('"content":" world"');
+      expect(full).toContain('"finish_reason":"stop"');
+
+      // Exactly ONE `data: [DONE]` — no synthetic duplicate injected by the proxy.
+      const doneMatches = full.match(/data: \[DONE\]/g) ?? [];
+      expect(doneMatches.length).toBe(1);
+
+      // No Claude termination events leaked into an OpenAI stream
+      expect(full).not.toContain("message_start");
+      expect(full).not.toContain("message_stop");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("openai-compatible: non-streaming passthrough returns upstream JSON body unchanged", async () => {
+    // Regression: with openai-compatible-* providers the non-streaming path should be pure
+    // passthrough. The response body must round-trip back to the same JSON object and the
+    // Content-Type must be application/json.
+    const upstreamJson = {
+      id: "chatcmpl-xyz",
+      object: "chat.completion",
+      created: 1_234_567_890,
+      model: "some-model",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "hello from upstream" },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 5, completion_tokens: 4, total_tokens: 9 },
+    };
+
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new globalThis.Response(JSON.stringify(upstreamJson), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "openai-compatible-myprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: false,
+        },
+        modelInfo: { provider: "openai-compatible-myprovider", model: "some-model" },
+        credentials: { apiKey: "test-key", providerSpecificData: { baseUrl: "https://example.test/v1" } },
+        sourceFormatOverride: "openai",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+      expect(result.response!.headers.get("Content-Type")).toBe("application/json");
+
+      const bodyText = await result.response!.text();
+      const parsed = JSON.parse(bodyText);
+      expect(parsed).toEqual(upstreamJson);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });

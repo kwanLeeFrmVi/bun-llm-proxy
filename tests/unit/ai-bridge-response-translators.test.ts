@@ -20,7 +20,10 @@ import {
   convertOpenAIResponseToGeminiNonStream,
 } from "../../ai-bridge/translator/openai/gemini/response.ts";
 // Import identity passthrough functions for testing
-import { ResponseNonStream as IdentityResponseNS } from "../../ai-bridge/translator/index.ts";
+import {
+  ResponseNonStream as IdentityResponseNS,
+  Response as TranslatorResponse,
+} from "../../ai-bridge/translator/index.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -935,6 +938,66 @@ describe("Identity passthrough (non-streaming) - adds usage when missing", () =>
     const raw = encode("not json");
     const result = IdentityResponseNS("openai", "openai", null, "", NO_RAW, NO_RAW, raw);
     expect(new TextDecoder().decode(result)).toBe("not json");
+  });
+});
+
+// ─── Identity response: streaming passthrough ────────────────────────────────
+
+describe("Identity passthrough (streaming) - pure pass-through for non-Claude formats", () => {
+  it("openai identity returns OpenAI SSE bytes unchanged", () => {
+    const raw = encode(
+      'data: {"id":"c","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hi"}}]}\n\n'
+    );
+    const chunks = TranslatorResponse(
+      "openai",
+      "openai",
+      null,
+      "gpt-4o",
+      NO_RAW,
+      NO_RAW,
+      raw,
+      undefined
+    );
+    expect(chunks.length).toBe(1);
+    // Exact byte equality — no re-encoding, no Claude-specific pass.
+    expect(chunks[0]).toBe(raw);
+  });
+
+  it("ollama identity returns NDJSON bytes unchanged", () => {
+    const raw = encode('{"model":"llama3","message":{"content":"hi"},"done":false}\n');
+    const chunks = TranslatorResponse(
+      "ollama",
+      "ollama",
+      null,
+      "llama3",
+      NO_RAW,
+      NO_RAW,
+      raw,
+      undefined
+    );
+    expect(chunks.length).toBe(1);
+    expect(chunks[0]).toBe(raw);
+  });
+
+  it("claude identity still runs Claude-specific usage normalization (sanity)", () => {
+    // Claude event without usage — the Claude-aware identity should inject one.
+    const raw = encode(
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n'
+    );
+    const chunks = TranslatorResponse(
+      "claude",
+      "claude",
+      null,
+      "claude-sonnet",
+      NO_RAW,
+      NO_RAW,
+      raw,
+      undefined
+    );
+    expect(chunks.length).toBe(1);
+    const text = new TextDecoder().decode(chunks[0]!);
+    expect(text).toContain('"usage"');
+    expect(text).toContain("input_tokens");
   });
 });
 

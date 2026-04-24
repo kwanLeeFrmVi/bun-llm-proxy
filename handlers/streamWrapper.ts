@@ -101,6 +101,7 @@ export function wrapStreamingResponseV2(
         log.stream(ctx, "OUTER_ERROR", {
           provider,
           model,
+          sourceFormat,
           error: "Empty upstream response: 0 tokens received",
           closeReason: "upstream_error" as CloseReason,
           downstreamChunkCount: st.downstreamChunkCount,
@@ -111,6 +112,7 @@ export function wrapStreamingResponseV2(
         log.stream(ctx, "OUTER_COMPLETE", {
           provider,
           model,
+          sourceFormat,
           usage: st.finalUsage,
           closeReason: "normal" as CloseReason,
           downstreamChunkCount: st.downstreamChunkCount,
@@ -122,6 +124,7 @@ export function wrapStreamingResponseV2(
       log.stream(ctx, "OUTER_ERROR", {
         provider,
         model,
+        sourceFormat,
         error: `Upstream stream truncated: ${st.upstreamErrorMsg ?? error ?? "unknown"}`,
         closeReason: "upstream_error" as CloseReason,
         downstreamChunkCount: st.downstreamChunkCount,
@@ -132,6 +135,7 @@ export function wrapStreamingResponseV2(
       log.stream(ctx, "OUTER_CANCELED", {
         provider,
         model,
+        sourceFormat,
         error: error ?? "client disconnected",
         closeReason: "downstream_canceled" as CloseReason,
         downstreamChunkCount: st.downstreamChunkCount,
@@ -142,6 +146,7 @@ export function wrapStreamingResponseV2(
       log.stream(ctx, "OUTER_ERROR", {
         provider,
         model,
+        sourceFormat,
         error: error ?? "unknown error",
         closeReason,
         downstreamChunkCount: st.downstreamChunkCount,
