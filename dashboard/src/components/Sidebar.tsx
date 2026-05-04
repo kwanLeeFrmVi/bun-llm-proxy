@@ -9,11 +9,9 @@ import {
   LogOut,
   Users,
   KeyRound,
-  Cloud,
-  Zap,
   Trophy,
   Sparkles,
-  Ghost,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,15 +25,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const isAdmin = role === "admin";
 
   const NAV = [
+    { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
     ...(isAdmin ? [{ to: "/providers", label: "Providers", Icon: Network }] : []),
     { to: "/keys", label: "API Keys", Icon: Key },
     { to: "/leaderboard", label: "Leaderboard", Icon: Trophy },
     { to: "/models", label: "Models", Icon: Box },
     { to: "/usage", label: "Usage", Icon: BarChart2 },
-    { to: "/mavis-usage", label: "Mavis", Icon: Cloud },
     { to: "/zai-usage", label: "ZAI", Icon: Sparkles },
-    { to: "/prox-usage", label: "Pro-X", Icon: Zap },
-    { to: "/troll-usage", label: "TrollLLM", Icon: Ghost },
+    { to: "/claudible-usage", label: "Claudible", Icon: Sparkles },
     { to: "/logs", label: "Console", Icon: Terminal },
     ...(isAdmin ? [{ to: "/users", label: "Users", Icon: Users }] : []),
   ];

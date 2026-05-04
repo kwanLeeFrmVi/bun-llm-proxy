@@ -16,14 +16,14 @@ const OAuthCallback = lazy(() => import("@/pages/OAuthCallback"));
 // Lazy-load heavy secondary routes to reduce initial bundle
 const Providers = lazy(() => import("@/pages/Providers"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
-const MavisUsage = lazy(() => import("@/pages/MavisUsage"));
 const ZaiUsage = lazy(() => import("@/pages/ZaiUsage"));
 const ProxUsage = lazy(() => import("@/pages/ProxUsage"));
-const TrollUsage = lazy(() => import("@/pages/TrollUsage"));
 const ApiKeys = lazy(() => import("@/pages/ApiKeys"));
 const Users = lazy(() => import("@/pages/Users"));
 const UserDetail = lazy(() => import("@/pages/UserDetail"));
 const ModelStats = lazy(() => import("@/pages/ModelStats"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const ClaudibleUsage = lazy(() => import("@/pages/ClaudibleUsage"));
 
 function ProtectedLayout() {
   const { token, role, loading } = useAuth();
@@ -123,6 +123,14 @@ function ProtectedLayout() {
             )}
             {/* Shared routes */}
             <Route
+              path="/claudible-usage"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <ClaudibleUsage />
+                </Suspense>
+              }
+            />
+            <Route
               path="/keys"
               element={
                 <Suspense fallback={<Loader />}>
@@ -147,14 +155,6 @@ function ProtectedLayout() {
               }
             />
             <Route
-              path="/mavis-usage"
-              element={
-                <Suspense fallback={<Loader />}>
-                  <MavisUsage />
-                </Suspense>
-              }
-            />
-            <Route
               path="/zai-usage"
               element={
                 <Suspense fallback={<Loader />}>
@@ -167,14 +167,6 @@ function ProtectedLayout() {
               element={
                 <Suspense fallback={<Loader />}>
                   <ProxUsage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/troll-usage"
-              element={
-                <Suspense fallback={<Loader />}>
-                  <TrollUsage />
                 </Suspense>
               }
             />

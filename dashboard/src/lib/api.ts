@@ -491,4 +491,13 @@ export const api = {
         body: JSON.stringify({ discordId }),
       }),
   },
+
+  // ─── Dashboard (claudible replica) ─────────────────────────────────────────
+  dashboard: {
+    lookup: (key: string) =>
+      request<any>("/api/dashboard/lookup", {
+        method: "POST",
+        body: JSON.stringify({ key }),
+      }),
+  },
 };
