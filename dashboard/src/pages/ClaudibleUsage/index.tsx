@@ -76,9 +76,20 @@ interface CldbLookupData {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Sum all costUSD values from the usage array (this is the real spend today) */
+/** Get total cost for a single usage item, summing all components if costUSD is missing */
+function getUsageCost(u: CldbUsageItem): number {
+  if (u.costUSD && u.costUSD > 0) return u.costUSD;
+  return (
+    (u.costInputUSD ?? 0) +
+    (u.costOutputUSD ?? 0) +
+    (u.costCacheReadUSD ?? 0) +
+    (u.costCacheWriteUSD ?? 0)
+  );
+}
+
+/** Sum all costs from the usage array */
 function totalSpendFromUsage(usage: CldbUsageItem[]): number {
-  return usage.reduce((sum, u) => sum + (u.costUSD ?? 0), 0);
+  return usage.reduce((sum, u) => sum + getUsageCost(u), 0);
 }
 
 /** Aggregate model breakdown from usage list */
@@ -87,8 +98,12 @@ function buildModelBreakdown(usage: CldbUsageItem[]) {
   for (const u of usage) {
     const existing = map.get(u.model) ?? { model: u.model, requests: 0, tokens: 0, cost: 0 };
     existing.requests += 1;
-    existing.tokens += (u.promptTokens ?? 0) + (u.completionTokens ?? 0);
-    existing.cost += u.costUSD ?? 0;
+    existing.tokens +=
+      (u.promptTokens ?? 0) +
+      (u.completionTokens ?? 0) +
+      (u.cacheReadTokens ?? 0) +
+      (u.cacheWriteTokens ?? 0);
+    existing.cost += getUsageCost(u);
     map.set(u.model, existing);
   }
   return [...map.values()].sort((a, b) => b.cost - a.cost);
@@ -157,7 +172,18 @@ export default function ClaudibleUsage() {
   };
 
   // Derived values from real data
-  const totalSpend = data ? totalSpendFromUsage(data.usage) : 0;
+  // Preference: 
+  // 1. stats.totalCost (if server provides it)
+  // 2. sum of usage list (at least what we can see)
+  // 3. (dailyQuota - balance) - In Claudible, if balance < quota on a daily plan, the difference is usually what was spent today.
+  const sumFromList = data ? totalSpendFromUsage(data.usage) : 0;
+  let totalSpend = data ? Math.max(data.stats.totalCost, sumFromList) : 0;
+  
+  if (data && totalSpend < (data.dailyQuota - data.balance) && data.balance < data.dailyQuota) {
+    // If the inferred spend is higher than what we see in the list or stats, use it.
+    totalSpend = data.dailyQuota - data.balance;
+  }
+
   const modelBreakdown = data ? buildModelBreakdown(data.usage) : [];
   const totalCacheRead = data?.usage.reduce((s, u) => s + (u.cacheReadTokens ?? 0), 0) ?? 0;
   const totalCacheWrite = data?.usage.reduce((s, u) => s + (u.cacheWriteTokens ?? 0), 0) ?? 0;
@@ -347,7 +373,13 @@ export default function ClaudibleUsage() {
             <QuotaCard
               label="Total Spend"
               value={"$" + totalSpend.toFixed(4)}
-              sub="From usage list"
+              sub={
+                data.stats.totalCost > 0
+                  ? "From account stats"
+                  : totalSpend > sumFromList
+                  ? "Inferred from balance"
+                  : "From usage list"
+              }
               color="#f97316"
             />
           </div>
