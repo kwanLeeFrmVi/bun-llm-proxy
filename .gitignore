@@ -36,3 +36,5 @@ ecosystem.config.cjs
 scripts/sync-db-local.sh
 scripts/sync-db-remote.sh
 scripts/deploy.sh
+scripts/deploy-g.sh
+scripts/sync-bunllm-gcp.sh
