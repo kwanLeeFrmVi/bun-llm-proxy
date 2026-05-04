@@ -426,7 +426,6 @@ async function testAnthropicCompatible(
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        Authorization: `Bearer ${apiKey}`,
       },
     });
 
@@ -439,7 +438,6 @@ async function testAnthropicCompatible(
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: modelToTry,
@@ -449,15 +447,15 @@ async function testAnthropicCompatible(
       });
     }
 
-    // If /messages fails, try /status
-    if (!res.ok) {
-      res = await fetch(`${url.split("/v1")[0]}/api/user/status`, {
+    // If /messages fails with something other than 401/403, try /status as last resort
+    if (!res.ok && res.status !== 401 && res.status !== 403) {
+      const statusRes = await fetch(`${url.split("/v1")[0]}/api/user/status`, {
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
-          Authorization: `Bearer ${apiKey}`,
         },
       });
+      if (statusRes.ok) res = statusRes;
     }
 
     if (res.ok) return { valid: true, error: null };

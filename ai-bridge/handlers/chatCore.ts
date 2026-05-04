@@ -56,7 +56,7 @@ export interface ChatCoreResult {
 }
 
 export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreResult> {
-  const { body, modelInfo, credentials, ctx, sourceFormatOverride } = opts;
+  const { body, modelInfo, credentials, ctx, sourceFormatOverride, clientRawRequest } = opts;
   const { provider, model } = modelInfo;
 
   // Detect source format
@@ -100,7 +100,7 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
     };
   }
 
-  const headers = buildUpstreamHeaders(provider, credentials);
+  const headers = buildUpstreamHeaders(provider, credentials, clientRawRequest?.headers);
 
   // Calculate message count for upstream logging
   const messages =
@@ -127,10 +127,9 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
 
     if (!upstream.ok) {
       const errorText = await upstream.text().catch(() => "");
+      log.warn(ctx ?? null, "UPSTREAM", `[${provider}] HTTP ${upstream.status}: ${errorText}`);
       const errResult = handleUpstreamError(upstream.status, errorText, provider);
       if (errResult) return errResult;
-      // Log the raw upstream error body for debugging (helps diagnose 400s from providers)
-      log.warn(ctx ?? null, "UPSTREAM", `[${provider}] HTTP ${upstream.status}: ${errorText}`);
       const errorMsg = errorText || `Upstream error: ${upstream.status}`;
       return {
         success: false,

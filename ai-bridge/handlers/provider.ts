@@ -13,6 +13,16 @@ import {
 } from "../../lib/constants.ts";
 import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.ts";
 
+function isClaudeCodeRequest(headers?: Record<string, string>): boolean {
+  if (!headers) return false;
+  const normalized = Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value])
+  );
+  const ua = (normalized["user-agent"] || "").toLowerCase();
+  const xApp = (normalized["x-app"] || "").toLowerCase();
+  return ua.includes("claude-cli") || ua.includes("claude-code") || xApp === "cli";
+}
+
 /** Quick check if a string looks like a Vertex AI Service Account JSON key */
 function isVertexSaJson(apiKey: string): boolean {
   return apiKey.startsWith('{"') && apiKey.includes('"service_account"');
@@ -375,7 +385,8 @@ export function buildUpstreamUrl(
  */
 export function buildUpstreamHeaders(
   provider: string,
-  credentials: Record<string, unknown>
+  credentials: Record<string, unknown>,
+  clientHeaders?: Record<string, string>
 ): Record<string, string> {
   const apiKey = credentials.apiKey as string | undefined;
   const accessToken = credentials.accessToken as string | undefined;
@@ -393,10 +404,13 @@ export function buildUpstreamHeaders(
       ...CLAUDE_API_HEADERS,
     };
 
-    // Overlay cached Claude headers if available
-    const cached = getCachedClaudeHeaders();
-    if (cached) {
-      overlayCachedHeaders(headers, cached);
+    const shouldForwardClaudeCodeIdentity = isClaudeCodeRequest(clientHeaders);
+
+    if (shouldForwardClaudeCodeIdentity) {
+      const cached = getCachedClaudeHeaders();
+      if (cached) {
+        overlayCachedHeaders(headers, cached);
+      }
     }
 
     if (apiKey) {
@@ -405,10 +419,7 @@ export function buildUpstreamHeaders(
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
 
-    // Strip first-party Claude Code identity headers for non-Anthropic upstreams
-    const baseUrl = (providerSpecificData?.baseUrl as string | undefined) ?? PROVIDERS[provider]?.baseUrl ?? "";
-    const isOfficialAnthropic = baseUrl === "" || baseUrl.includes("api.anthropic.com");
-    if (!isOfficialAnthropic) {
+    if (!shouldForwardClaudeCodeIdentity) {
       stripClaudeCodeHeaders(headers);
     }
 
