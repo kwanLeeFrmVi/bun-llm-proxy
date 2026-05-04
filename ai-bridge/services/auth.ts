@@ -40,6 +40,15 @@ export function checkFallbackError(
     if (lowerError.includes("improperly formed request")) {
       return { shouldFallback: true, cooldownMs: COOLDOWN_MS.paymentRequired };
     }
+    // Provider-wide account availability errors (not account-specific) — use short lock
+    // Examples: "no account available", "all accounts unavailable", "no sssaicode account available"
+    if (
+      (lowerError.includes("account") && (lowerError.includes("available") || lowerError.includes("unavailable"))) ||
+      lowerError.includes("no account")
+    ) {
+      // Use very short lock (1-5 seconds) since this is provider-wide, not account-specific
+      return { shouldFallback: true, cooldownMs: 3000 }; // 3 seconds
+    }
     // Quota exhaustion keywords — hours-long lockout
     if (QUOTA_EXHAUSTION_KEYWORDS.some((kw) => lowerError.includes(kw))) {
       const cooldown = Math.min(

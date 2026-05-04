@@ -20,6 +20,7 @@ const STRIP_SUFFIXES = [
   "-instruct",
   "-preview",
   "-latest",
+  ":cloud",
 ];
 const KNOWN_BASES = ["claude-sonnet", "claude-opus", "gpt-4", "gpt-3.5", "gemini"];
 

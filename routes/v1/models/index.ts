@@ -12,7 +12,7 @@ import {
   getProviderNodeById,
   type Combo,
 } from "db/index.ts";
-import { getAvailableComboModelConfigs } from "services/model.ts";
+import { getAvailableComboModelConfigs, getFilteredComboModelConfigs } from "services/model.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
 import { parseOpenAIStyleModels, extractModelIds, normalizeBaseUrl } from "lib/utils.ts";
@@ -123,23 +123,19 @@ export async function GET(_req: Request): Promise<Response> {
     const timestamp = Math.floor(Date.now() / 1000);
 
     for (const combo of combos) {
-      // Use direct models for the dashboard to show unexpanded view
-      // but only if the combo has at least one available model (via expansion)
-      const filteredComboModels = await getAvailableComboModelConfigs(combo.name);
-      if (filteredComboModels && filteredComboModels.length > 0) {
-        modelsMap.set(combo.name, {
-          id: combo.name,
-          object: "model",
-          created: timestamp,
-          owned_by: "combo",
-          permission: [],
-          root: combo.name,
-          parent: null,
-          combo_id: combo.id,
-          // Use direct models from the combos table for unexpanded view in dashboard
-          combo_models: combo.models,
-        });
-      }
+      const filteredComboModels = await getFilteredComboModelConfigs(combo.name);
+      modelsMap.set(combo.name, {
+        id: combo.name,
+        object: "model",
+        created: timestamp,
+        owned_by: "combo",
+        permission: [],
+        root: combo.name,
+        parent: null,
+        combo_id: combo.id,
+        // Only currently available direct members for dashboard display
+        combo_models: filteredComboModels?.map((m) => m.model) ?? [],
+      });
     }
 
     if (connections.length === 0) {

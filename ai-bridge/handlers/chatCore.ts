@@ -125,7 +125,8 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       signal: controller.signal,
     });
 
-    if (!upstream.ok) {
+    // For streaming requests, let handleStreamingResponse handle the error to return proper SSE error response
+    if (!upstream.ok && !stream) {
       const errorText = await upstream.text().catch(() => "");
       log.warn(ctx ?? null, "UPSTREAM", `[${provider}] HTTP ${upstream.status}: ${errorText}`);
       const errResult = handleUpstreamError(upstream.status, errorText, provider);
@@ -1055,7 +1056,7 @@ function handleUpstreamError(
     };
   }
   if (status >= 500) {
-    const errorMsg = `Upstream error: ${status}`;
+    const errorMsg = errorText || `Upstream error: ${status}`;
     return {
       success: false,
       status,

@@ -22,6 +22,7 @@ const STRIP_SUFFIXES = [
   "-instruct",
   "-preview",
   "-latest",
+  ":cloud",
 ];
 
 // In-memory cache of normalized model name → { id, input, output }

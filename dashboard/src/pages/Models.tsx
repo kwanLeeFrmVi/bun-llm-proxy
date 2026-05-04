@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api.ts";
 import { useAuth } from "@/lib/auth.tsx";
 import { useComboStore } from "@/lib/comboStore.ts";
@@ -67,17 +67,40 @@ type ModelEntry = {
 
 export default function Models() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { role } = useAuth();
   const isAdmin = role === "admin";
   const { combos, deleteCombo: deleteComboFromStore } = useComboStore();
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
-  const [providerFilter, setProviderFilter] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("provider");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // Read initial values from URL search params
+  const [page, setPage] = useState(() => {
+    const p = searchParams.get("page");
+    return p ? Math.max(0, parseInt(p, 10) - 1) : 0;
+  });
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [providerFilter, setProviderFilter] = useState<string | null>(
+    () => searchParams.get("provider") ?? null
+  );
+  const [sortKey, setSortKey] = useState<SortKey>(
+    () => (searchParams.get("sort") as SortKey) ?? "provider"
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(
+    () => (searchParams.get("dir") as SortDir) ?? "asc"
+  );
+
+  // Sync state changes back to URL search params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (providerFilter) params.set("provider", providerFilter);
+    if (page > 0) params.set("page", String(page + 1));
+    if (sortKey !== "provider") params.set("sort", sortKey);
+    if (sortDir !== "asc") params.set("dir", sortDir);
+    setSearchParams(params, { replace: true });
+  }, [search, providerFilter, page, sortKey, sortDir, setSearchParams]);
 
   // Latest streaming stats per model
   const [latestStats, setLatestStats] = useState<
@@ -456,7 +479,7 @@ export default function Models() {
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setPage((page) => 0);
+                    setPage(0);
                   }}
                   className="pl-9 h-8 text-sm bg-background border-input shadow-none"
                 />
@@ -553,12 +576,7 @@ export default function Models() {
                     <TableCell className="text-sm text-muted-foreground py-3 max-w-xs">
                       {(() => {
                         if (!isCombo) return <span className="text-muted-foreground/50">—</span>;
-                        const storeCombo = combos.find(
-                          (c) => (m.combo_id && c.id === m.combo_id) || c.name === m.id
-                        );
-                        const displayModels = storeCombo
-                          ? storeCombo.models.map((cm) => cm.model)
-                          : (m.combo_models ?? []);
+                        const displayModels = m.combo_models ?? [];
 
                         if (displayModels.length === 0)
                           return <span className="text-muted-foreground/50">—</span>;

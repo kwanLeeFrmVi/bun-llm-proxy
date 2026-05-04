@@ -49,6 +49,16 @@ export async function routeIfCombo(opts: RouteIfComboOpts): Promise<Response | n
     "ROUTING",
     `${modelStr} → combo (${comboModels.length} models, strategy: ${comboStrategy})`
   );
+
+  // Warn if combo has only one model with fallback strategy (no actual fallback possible)
+  if (comboModels.length === 1 && comboStrategy === "fallback") {
+    log.warn(
+      ctx,
+      "COMBO",
+      `Combo ${modelStr} has only 1 model with fallback strategy — no fallback available`
+    );
+  }
+
   const sessionId = request?.headers?.get("x-claude-code-session-id") ?? null;
   return handleComboModelWithDB({
     ctx,

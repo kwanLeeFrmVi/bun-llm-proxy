@@ -787,4 +787,107 @@ describe("handleChatCore", () => {
       globalThis.fetch = origFetch;
     }
   });
+
+  it("preserves upstream error message for 503 in non-streaming requests", async () => {
+    const upstreamErrorMsg = "Không có sssaicode account nào available";
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new globalThis.Response(
+          JSON.stringify({ error: { message: upstreamErrorMsg, type: "service_unavailable" } }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        )
+      )) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "anthropic-compatible-myprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: false,
+        },
+        modelInfo: { provider: "anthropic-compatible-myprovider", model: "some-model" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "claude",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe(503);
+      expect(result.error).toContain(upstreamErrorMsg);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("preserves upstream error message in streaming SSE error response", async () => {
+    const upstreamErrorMsg = "Không có sssaicode account nào available";
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new globalThis.Response(
+          JSON.stringify({ error: { message: upstreamErrorMsg, type: "service_unavailable" } }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        )
+      )) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "anthropic-compatible-myprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "anthropic-compatible-myprovider", model: "some-model" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "claude",
+      });
+
+      // For streaming errors, handleChatCore returns success=true with SSE error response
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+      expect(result.response!.headers.get("X-Proxy-Error")).toBe("503");
+
+      // Verify the SSE stream contains the error message in Claude format
+      const bodyText = await result.response!.text();
+      expect(bodyText).toContain(upstreamErrorMsg);
+      expect(bodyText).toContain("event: message_start"); // Claude format
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it("OpenAI endpoint streaming preserves upstream error message in SSE error response", async () => {
+    const upstreamErrorMsg = "Service temporarily unavailable";
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new globalThis.Response(
+          JSON.stringify({ error: { message: upstreamErrorMsg, type: "service_unavailable" } }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        )
+      )) as unknown as typeof globalThis.fetch;
+
+    try {
+      const result = await handleChatCore({
+        body: {
+          model: "openai-compatible-myprovider/some-model",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+        modelInfo: { provider: "openai-compatible-myprovider", model: "some-model" },
+        credentials: { apiKey: "test-key" },
+        sourceFormatOverride: "openai",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
+      expect(result.response!.headers.get("X-Proxy-Error")).toBe("503");
+
+      // Verify the SSE stream contains the error message
+      const bodyText = await result.response!.text();
+      expect(bodyText).toContain(upstreamErrorMsg);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
