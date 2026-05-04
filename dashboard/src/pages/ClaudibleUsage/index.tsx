@@ -7,7 +7,7 @@ import { fmt } from "@/lib/formatters.ts";
 import { CldbRecentTable } from "./components/CldbRecentTable.tsx";
 import { CldbModelTable } from "./components/CldbModelTable.tsx";
 
-// ─── Types ──────────────────────────────────────────────────────────────────────
+// ─── Types — matching the real claudible.io /dashboard/lookup response ──────────
 
 export interface CldbUsageItem {
   id: number;
@@ -25,6 +25,39 @@ export interface CldbUsageItem {
   hasBreakdown: boolean;
 }
 
+interface CldbAnalytics {
+  dailyUsage: { date: string; cost: number; requests: number }[];
+  modelBreakdown: { model: string; cost: number }[];
+  daysRemaining: {
+    runwayMinutes: number;
+    avgCostPerMinute: number;
+    totalActiveMinutes: number;
+    currentBalance: number;
+    daysRemaining: number;
+    avgDailyCost7d: number;
+    avgDailyCost30d: number;
+  };
+  tokenEfficiency: {
+    avgTokensPerRequest: number;
+    avgInputTokens: number;
+    avgOutputTokens: number;
+    inputOutputRatio: number;
+    totalRequests: number;
+  };
+  hourlyDistribution: { hour: number; requests: number }[];
+}
+
+interface CldbStats {
+  breakdownAvailableSince: string | null;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  completionTokens: number;
+  inputTokensRaw: number;
+  promptTokens: number;
+  totalCost: number;
+  totalRequests: number;
+}
+
 interface CldbLookupData {
   valid: boolean;
   balance: number;
@@ -36,31 +69,50 @@ interface CldbLookupData {
   subscriptionActive: boolean;
   userEmail: string;
   userName: string;
-  stats: {
-    totalRequests: number;
-    totalCost: number;
-    promptTokens: number;
-    completionTokens: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-  };
+  stats: CldbStats;
   usage: CldbUsageItem[];
-  analytics: {
-    modelBreakdown: { model: string; requests: number; tokens: number; cost: number }[];
-    daysRemaining: {
-      currentBalance: number;
-      daysRemaining: number;
-      avgDailyCost7d: number;
-      avgDailyCost30d: number;
-    };
-    tokenEfficiency: {
-      avgTokensPerRequest: number;
-      avgInputTokens: number;
-      avgOutputTokens: number;
-      inputOutputRatio: number;
-      totalRequests: number;
-    };
-  };
+  analytics: CldbAnalytics;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Sum all costUSD values from the usage array (this is the real spend today) */
+function totalSpendFromUsage(usage: CldbUsageItem[]): number {
+  return usage.reduce((sum, u) => sum + (u.costUSD ?? 0), 0);
+}
+
+/** Aggregate model breakdown from usage list */
+function buildModelBreakdown(usage: CldbUsageItem[]) {
+  const map = new Map<string, { model: string; requests: number; tokens: number; cost: number }>();
+  for (const u of usage) {
+    const existing = map.get(u.model) ?? { model: u.model, requests: 0, tokens: 0, cost: 0 };
+    existing.requests += 1;
+    existing.tokens += (u.promptTokens ?? 0) + (u.completionTokens ?? 0);
+    existing.cost += u.costUSD ?? 0;
+    map.set(u.model, existing);
+  }
+  return [...map.values()].sort((a, b) => b.cost - a.cost);
+}
+
+/** Calculate subscription expiry label */
+function expiresLabel(isoDate: string): string {
+  const diff = new Date(isoDate).getTime() - Date.now();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Expired";
+  if (days < 7) return `${days} days`;
+  if (days < 30) return `${Math.ceil(days / 7)} weeks`;
+  return `${Math.ceil(days / 30)} months`;
+}
+
+/** Calculate resets-in label from daily reset time */
+function resetsInLabel(): string {
+  const now = new Date();
+  const resetUTC = new Date();
+  resetUTC.setUTCHours(24, 0, 0, 0); // next midnight UTC
+  const diff = resetUTC.getTime() - now.getTime();
+  const h = Math.floor(diff / (1000 * 60 * 60));
+  const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${h}h ${m}m`;
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
@@ -74,11 +126,9 @@ export default function ClaudibleUsage() {
 
   const fetchData = async () => {
     try {
-      const { connections } = await api.providers.list();
-      const cldbConn = connections.find((c) => c.provider === "anthropic-compatible-cldb");
-      const result = (await api.dashboard.lookup(
-        (cldbConn?.apiKey as string) || "sk-placeholder"
-      )) as CldbLookupData;
+      // The backend now auto-fetches the key from DB — pass empty string
+      const result = (await api.dashboard.lookup()) as CldbLookupData;
+      if (!result.valid) throw new Error("Claudible returned invalid=false");
       setData(result);
       setLastUpdated(new Date());
       setError(null);
@@ -105,6 +155,14 @@ export default function ClaudibleUsage() {
     await fetchData();
     setRefreshing(false);
   };
+
+  // Derived values from real data
+  const totalSpend = data ? totalSpendFromUsage(data.usage) : 0;
+  const modelBreakdown = data ? buildModelBreakdown(data.usage) : [];
+  const totalCacheRead = data?.usage.reduce((s, u) => s + (u.cacheReadTokens ?? 0), 0) ?? 0;
+  const totalCacheWrite = data?.usage.reduce((s, u) => s + (u.cacheWriteTokens ?? 0), 0) ?? 0;
+  const totalInput = data?.usage.reduce((s, u) => s + (u.promptTokens ?? 0), 0) ?? 0;
+  const totalOutput = data?.usage.reduce((s, u) => s + (u.completionTokens ?? 0), 0) ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -168,24 +226,109 @@ export default function ClaudibleUsage() {
         </div>
       ) : (
         <>
-          {/* Budget Card */}
+          {/* Budget Card — balance + daily quota progress */}
           <BudgetCard
             source={{
-              type: "troll",
-              tier: data.accountType,
-              credits: data.balance,
-              creditsUsed: data.stats.totalCost,
-              creditsBonus: 0,
-              creditsBonusUsed: 0,
-              planDailyAllocation: data.dailyQuota,
-              planDailyUsed: data.stats.totalCost,
-              planDailyResetDate: new Date(Date.now() + 11 * 60 * 60 * 1000).toISOString(),
-              planExpiresAt: data.subscriptionExpiresAt,
+              type: "claudible",
+              balance: data.balance,
+              dailyQuota: data.dailyQuota,
+              dailyUsed: totalSpend,
+              accountType: data.accountType,
+              subscriptionExpiresAt: data.subscriptionExpiresAt,
             }}
           />
 
+          {/* Subscription info bar (mimics claudible.io) */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              background: "var(--surface-container-lowest)",
+              borderRadius: "12px",
+              padding: "14px 24px",
+              border: "1px solid rgba(203,213,225,0.6)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>⭐</span>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--on-surface)" }}>
+                {data.accountType.charAt(0).toUpperCase() + data.accountType.slice(1)} Subscription
+              </span>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  background: data.subscriptionActive
+                    ? "rgba(16,185,129,0.15)"
+                    : "rgba(239,68,68,0.15)",
+                  color: data.subscriptionActive ? "#10b981" : "#ef4444",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {data.status}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "32px" }}>
+              <div style={{ textAlign: "right" }}>
+                <p
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--on-surface-variant)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    fontWeight: 600,
+                  }}
+                >
+                  Daily Quota
+                </p>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--on-surface)" }}>
+                  {data.dailyQuota.toFixed(2)} credits
+                </p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--on-surface-variant)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    fontWeight: 600,
+                  }}
+                >
+                  Resets In
+                </p>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--on-surface)" }}>
+                  {resetsInLabel()}
+                </p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--on-surface-variant)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    fontWeight: 600,
+                  }}
+                >
+                  Expires
+                </p>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--on-surface)" }}>
+                  {expiresLabel(data.subscriptionExpiresAt)}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Quota Cards */}
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
             <QuotaCard
               label="Balance"
               value={`${data.balance.toFixed(2)} cr`}
@@ -194,36 +337,25 @@ export default function ClaudibleUsage() {
             />
             <QuotaCard
               label="Total Requests"
-              value={fmt(data.stats.totalRequests)}
-              sub="All time"
+              value={fmt(data.stats.totalRequests || data.usage.length)}
+              sub="All time (stats)"
             />
+            <QuotaCard label="Input Tokens" value={fmt(totalInput)} sub="From usage list" />
+            <QuotaCard label="Output Tokens" value={fmt(totalOutput)} sub="From usage list" />
+            <QuotaCard label="Cache Read" value={fmt(totalCacheRead)} sub="Cache hit tokens" />
+            <QuotaCard label="Cache Write" value={fmt(totalCacheWrite)} sub="Cache write tokens" />
             <QuotaCard
-              label="Input Tokens"
-              value={fmt(data.stats.promptTokens)}
-              sub="Prompt tokens"
-            />
-            <QuotaCard
-              label="Output Tokens"
-              value={fmt(data.stats.completionTokens)}
-              sub="Completion tokens"
-            />
-            <QuotaCard
-              label="Cache Read"
-              value={fmt(data.stats.cacheReadTokens)}
-              sub="Cache hit tokens"
-            />
-            <QuotaCard
-              label="Total Cost"
-              value={"$" + data.stats.totalCost.toFixed(2)}
-              sub="Spend"
+              label="Total Spend"
+              value={"$" + totalSpend.toFixed(4)}
+              sub="From usage list"
               color="#f97316"
             />
           </div>
 
           {/* Model Breakdown */}
-          <CldbModelTable summary={data.analytics.modelBreakdown} />
+          <CldbModelTable summary={modelBreakdown} />
 
-          {/* Recent Table */}
+          {/* Recent Activity */}
           <CldbRecentTable usage={data.usage} loading={loading} />
         </>
       )}

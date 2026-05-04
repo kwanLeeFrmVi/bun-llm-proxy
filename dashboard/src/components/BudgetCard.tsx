@@ -35,6 +35,14 @@ export type BudgetSource =
       planDailyUsed: number;
       planDailyResetDate: string;
       planExpiresAt: string;
+    }
+  | {
+      type: "claudible";
+      balance: number;
+      dailyQuota: number;
+      dailyUsed: number;
+      accountType: string;
+      subscriptionExpiresAt: string;
     };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -308,6 +316,79 @@ export function BudgetCard({ source }: BudgetCardProps) {
             ${planDailyUsed.toFixed(2)} / ${planDailyAllocation.toFixed(2)} today
           </span>
           <CountdownCard target={nextResetDate(planDailyResetDate)} compact={true} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Claudible ──────────────────────────────────────────────────────────────
+  if (source.type === "claudible") {
+    const { balance, dailyQuota, dailyUsed, accountType, subscriptionExpiresAt } = source;
+    const dailyPct = Math.min(100, dailyQuota > 0 ? (dailyUsed / dailyQuota) * 100 : 0);
+
+    return (
+      <div
+        style={{
+          background: "var(--surface-container-lowest)",
+          borderRadius: "12px",
+          padding: "20px 24px",
+          border: "1px solid rgba(203,213,225,0.6)",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "12px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--on-surface)",
+              }}
+            >
+              Daily Quota
+            </span>
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: "9999px",
+                background: "rgba(16, 185, 129, 0.15)",
+                color: "#10b981",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {accountType}
+            </span>
+          </div>
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+            Balance: <strong style={{ color: "var(--on-surface)" }}>{balance.toFixed(2)} credits</strong>
+          </span>
+        </div>
+
+        <ProgressBar value={dailyPct} color={"#10b981"} />
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: "8px",
+          }}
+        >
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+            {dailyUsed.toFixed(2)} / {dailyQuota.toFixed(2)} credits today
+          </span>
+          <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
+            Expires: {new Date(subscriptionExpiresAt).toLocaleDateString()}
+          </span>
         </div>
       </div>
     );

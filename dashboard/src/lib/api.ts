@@ -494,10 +494,10 @@ export const api = {
 
   // ─── Dashboard (claudible replica) ─────────────────────────────────────────
   dashboard: {
-    lookup: (key: string) =>
+    lookup: () =>
       request<any>("/api/dashboard/lookup", {
         method: "POST",
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({}),
       }),
   },
 };

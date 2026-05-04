@@ -1,92 +1,61 @@
-import { getUsageStats, getUsageDetails } from "stubs/usageDb.ts";
 import { getProviderConnections } from "db/index.ts";
+import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
 
+const CLAUDIBLE_LOOKUP_URL = "https://claudible.io/dashboard/lookup";
+
 export async function POST(req: Request): Promise<Response> {
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
-  }
+  // Require dashboard auth
+  const auth = await checkAdminAuth(req);
+  if (!auth.ok) return auth.response;
 
-  const { key } = body;
-  // In a real app, we would validate 'key' against our database or use it to identify the user.
-  // For this replica, we'll return the dashboard data matching the claudible.io format.
-
-  const stats = getUsageStats("24h");
-  const { rows: recentUsage } = getUsageDetails({ limit: 50 });
-
-  // Try to find the provider info
-  const connections = await getProviderConnections({ provider: 'anthropic-compatible-cldb' });
+  // Find the anthropic-compatible-cldb connection to get the API key
+  const connections = await getProviderConnections({ provider: "anthropic-compatible-cldb" });
   const conn = connections[0];
 
-  const response = {
-    valid: true,
-    balance: 766.2933624999997, // Mocked to match user's screenshot
-    status: "active",
-    createdAt: conn?.createdAt || "2026-05-04T02:41:20Z",
-    stats: {
-      breakdownAvailableSince: null,
-      cacheReadTokens: stats.totalPromptTokens * 0.1, // Mocked
-      cacheWriteTokens: stats.totalPromptTokens * 0.2, // Mocked
-      completionTokens: stats.totalCompletionTokens,
-      inputTokensRaw: stats.totalPromptTokens,
-      promptTokens: stats.totalPromptTokens,
-      totalCost: stats.totalCost,
-      totalRequests: stats.totalRequests
-    },
-    usage: recentUsage.map(u => ({
-      id: u.id,
-      model: u.model,
-      promptTokens: u.promptTokens,
-      completionTokens: u.completionTokens,
-      cacheReadTokens: u.cachedTokens, // Assuming cachedTokens is read
-      cacheWriteTokens: Math.floor(u.promptTokens * 0.3), // Mocked
-      costUSD: u.cost,
-      costInputUSD: u.cost * 0.4,
-      costOutputUSD: u.cost * 0.6,
-      costCacheReadUSD: 0,
-      costCacheWriteUSD: 0,
-      createdAt: u.timestamp,
-      hasBreakdown: true
-    })),
-    accountType: "monthly",
-    dailyQuota: 1000,
-    subscriptionExpiresAt: "2026-05-31T16:59:59Z",
-    subscriptionActive: true,
-    userEmail: conn?.email || "thanvaquy1996@gmail.com",
-    userName: "Quan Le Minh",
-    analytics: {
-      dailyUsage: [],
-      modelBreakdown: stats.byModel.map(m => ({
-        model: m.model,
-        cost: m.cost,
-        tokens: m.tokens,
-        requests: m.requests
-      })),
-      daysRemaining: {
-        runwayMinutes: 0,
-        avgCostPerMinute: 0,
-        totalActiveMinutes: 0,
-        currentBalance: 766.2933624999997,
-        daysRemaining: 0,
-        avgDailyCost7d: 0,
-        avgDailyCost30d: 0
+  if (!conn || !conn.apiKey) {
+    return Response.json(
+      {
+        error: "No Claudible provider connection found. Add an 'anthropic-compatible-cldb' provider with a valid API key.",
       },
-      tokenEfficiency: {
-        avgTokensPerRequest: stats.totalRequests ? (stats.totalPromptTokens + stats.totalCompletionTokens) / stats.totalRequests : 0,
-        avgInputTokens: stats.totalRequests ? stats.totalPromptTokens / stats.totalRequests : 0,
-        avgOutputTokens: stats.totalRequests ? stats.totalCompletionTokens / stats.totalRequests : 0,
-        inputOutputRatio: stats.totalCompletionTokens ? stats.totalPromptTokens / stats.totalCompletionTokens : 0,
-        totalRequests: stats.totalRequests
-      },
-      hourlyDistribution: []
-    }
-  };
+      { status: 404, headers: CORS_HEADERS }
+    );
+  }
 
-  return Response.json(response, { headers: CORS_HEADERS });
+  const apiKey = conn.apiKey as string;
+
+  try {
+    const upstream = await fetch(CLAUDIBLE_LOOKUP_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "*/*",
+        "Origin": "https://claudible.io",
+        "Referer": "https://claudible.io/dashboard",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+      },
+      body: JSON.stringify({ key: apiKey }),
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => upstream.statusText);
+      return Response.json(
+        { error: `Claudible API error ${upstream.status}: ${text}` },
+        { status: upstream.status, headers: CORS_HEADERS }
+      );
+    }
+
+    const data = await upstream.json();
+    return Response.json(data, { headers: CORS_HEADERS });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return Response.json(
+      { error: `Failed to reach claudible.io: ${msg}` },
+      { status: 502, headers: CORS_HEADERS }
+    );
+  }
 }
 
 export function OPTIONS(): Response {

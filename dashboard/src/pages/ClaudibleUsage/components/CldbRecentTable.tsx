@@ -88,45 +88,56 @@ export function CldbRecentTable({ usage, loading }: CldbRecentTableProps) {
               </tr>
             </thead>
             <tbody>
-              {usage.map((item, i) => (
-                <tr key={item.id ?? i} style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}>
-                  <td style={{ padding: "8px 10px", color: "var(--on-surface-variant)", fontSize: "11px" }}>
-                    {fmtDate(item.createdAt)}
-                  </td>
-                  <td
-                    style={{
-                      padding: "8px 10px",
-                      color: "var(--on-surface)",
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                    }}
-                  >
-                    {item.model}
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
-                    {fmt(item.promptTokens)}
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
-                    {fmt(item.completionTokens)}
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
-                    {fmt(item.cacheReadTokens)}
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
-                    {fmt(item.cacheWriteTokens)}
-                  </td>
-                  <td
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "right",
-                      color: "#f97316",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ${item.costUSD.toFixed(4)}
-                  </td>
-                </tr>
-              ))}
+              {usage.map((item, i) => {
+                // costUSD is the total; fall back to summing sub-costs if it's missing/0
+                const cost =
+                  (item.costUSD && item.costUSD > 0)
+                    ? item.costUSD
+                    : (item.costInputUSD ?? 0) +
+                      (item.costOutputUSD ?? 0) +
+                      (item.costCacheReadUSD ?? 0) +
+                      (item.costCacheWriteUSD ?? 0);
+
+                return (
+                  <tr key={item.id ?? i} style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}>
+                    <td style={{ padding: "8px 10px", color: "var(--on-surface-variant)", fontSize: "11px" }}>
+                      {fmtDate(item.createdAt)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        color: "var(--on-surface)",
+                        fontFamily: "monospace",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {item.model}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                      {fmt(item.promptTokens)}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                      {fmt(item.completionTokens)}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                      {fmt(item.cacheReadTokens)}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                      {fmt(item.cacheWriteTokens)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        color: cost > 0 ? "#f97316" : "var(--on-surface-variant)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ${cost.toFixed(4)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
