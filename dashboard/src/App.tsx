@@ -22,7 +22,6 @@ const ApiKeys = lazy(() => import("@/pages/ApiKeys"));
 const Users = lazy(() => import("@/pages/Users"));
 const UserDetail = lazy(() => import("@/pages/UserDetail"));
 const ModelStats = lazy(() => import("@/pages/ModelStats"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ClaudibleUsage = lazy(() => import("@/pages/ClaudibleUsage"));
 
 function ProtectedLayout() {
