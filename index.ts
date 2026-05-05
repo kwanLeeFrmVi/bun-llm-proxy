@@ -25,6 +25,10 @@ openDb();
 import { startBackgroundTokenRefresh } from "./services/tokenRefresh.ts";
 startBackgroundTokenRefresh();
 
+// Start chat cron (07:30, 11:30, 15:30 on weekdays)
+import { startChatCron } from "./services/chatCron.ts";
+startChatCron();
+
 // Capture server-side console logs for the dashboard log panel
 initConsoleLogCapture();
 
