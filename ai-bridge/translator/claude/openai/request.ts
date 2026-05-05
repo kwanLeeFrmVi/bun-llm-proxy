@@ -21,10 +21,8 @@ export function convertClaudeRequestToOpenAI(
     messages: [],
   };
 
-  // max_tokens
-  if (raw.max_tokens !== undefined) {
-    out.max_tokens = raw.max_tokens;
-  }
+  // max_tokens — default to GPT-5.4's official max output (128K) when omitted
+  out.max_tokens = raw.max_tokens !== undefined ? raw.max_tokens : 128000;
 
   // temperature → temperature; top_p → top_p (as fallback)
   if (raw.temperature !== undefined) {
