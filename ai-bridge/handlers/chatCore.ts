@@ -3,7 +3,7 @@
 
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
 import { Response as translateResponse } from "../translator/index.ts";
-import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS } from "../config/runtimeConfig.ts";
+import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS, PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES } from "../config/runtimeConfig.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import {
@@ -86,6 +86,16 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
   // vertex-partner uses OpenAI-compatible endpoint which needs model in body
   if (provider !== "vertex") {
     translatedBody.model = model;
+  }
+
+  // Apply provider/model-specific min max_tokens overrides
+  const minMaxTokens = PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES[`${provider}/${model}`];
+  const requestMaxTokens = translatedBody.max_tokens;
+  if (
+    minMaxTokens !== undefined &&
+    (typeof requestMaxTokens !== "number" || requestMaxTokens < minMaxTokens)
+  ) {
+    translatedBody.max_tokens = minMaxTokens;
   }
 
   // Build upstream URL and headers

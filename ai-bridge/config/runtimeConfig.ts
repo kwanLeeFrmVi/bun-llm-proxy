@@ -51,6 +51,13 @@ export const DEFAULT_MAX_TOKENS = 64000;
 export const DEFAULT_MIN_TOKENS = 32000;
 export const DEFAULT_BUDGET_TOKENS = 10000;
 
+// Provider/model-specific min max_tokens overrides for upstreams with unusually low defaults.
+// Key format: "providerId/modelId"
+export const PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES: Record<string, number> = {
+  "openai-compatible-trl2/gpt-5.4": 128000, // GPT-5.4 official max output (128K)
+  "openai-compatible-trll/gpt-5.4": 128000, // GPT-5.4 official max output (128K)
+};
+
 export const BACKOFF_CONFIG = {
   base: 200, // 200ms - faster recovery
   max: 10_000, // 10s max (was 2min)
