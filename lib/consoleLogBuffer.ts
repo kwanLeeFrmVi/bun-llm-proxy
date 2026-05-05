@@ -78,9 +78,13 @@ function appendEntry(entry: ConsoleLogEntry): void {
 // ─── Patch ─────────────────────────────────────────────────────────────────────
 
 function patchConsole(): void {
-  if (state.patched) return;
+  // Check if already patched by verifying originals exist (survives hot reload)
+  if (state.patched && Object.keys(state.originals).length > 0) return;
 
   for (const level of CONSOLE_LEVELS) {
+    // Skip if already patched for this level
+    if (state.originals[level]) continue;
+
     const original = console[level].bind(console) as ConsoleMethod;
     state.originals[level] = original;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
