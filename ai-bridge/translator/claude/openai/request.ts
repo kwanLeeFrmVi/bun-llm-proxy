@@ -86,7 +86,12 @@ export function convertClaudeRequestToOpenAI(
         // Emit tool results first (they respond to previous assistant tool_calls)
         messages.push(...toolResults);
         if (openaiContent) {
-          messages.push({ role, content: openaiContent });
+          if (role === "assistant") {
+            // processClaudeContent already builds full assistant message objects
+            messages.push(...openaiContent);
+          } else {
+            messages.push({ role, content: openaiContent });
+          }
         }
       } else if (typeof content === "string" && content) {
         messages.push({ role, content });
