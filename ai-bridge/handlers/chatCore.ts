@@ -878,9 +878,16 @@ async function handleStreamingResponse(
         // on missing input_tokens when the upstream connection drops mid-stream.
         // NOTE: use controller.close() instead of controller.error() — error()
         // closes the controller immediately and discards all enqueued chunks.
-        if (state !== undefined ) {
-          // Skip for claude source — Claude SSE streams terminate with
-          // `event: message_stop`, not `data: [DONE]`.
+        //
+        // Skip for claude source — Claude SSE streams terminate with
+        // `event: message_stop`, not `data: [DONE]`. Injecting `data: [DONE]`
+        // into the Claude→OpenAI translator would crash because the state is an
+        // OpenAIStreamingState, not StreamingState with toolCalls.
+        //
+        // Skip for openai identity passthrough — the upstream already emitted
+        // its own `data: [DONE]`, so injecting another synthetic one duplicates
+        // the terminator.
+        if (state !== undefined && sourceFormat !== "claude" && !isOpenAIIdentityPassthrough) {
           try {
             const doneChunks = translateChunk(
               targetFormat,

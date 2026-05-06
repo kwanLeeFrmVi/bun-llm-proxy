@@ -321,8 +321,8 @@ function init(): void {
   );
 
   // State factory registry — maps response translator keys to their initial state factories
-  stateFactoryRegistry.set(`${FORMATS.CLAUDE}:${FORMATS.OPENAI}`, newClaudeToOpenAIState);
-  stateFactoryRegistry.set(`${FORMATS.OPENAI}:${FORMATS.CLAUDE}`, newOpenAIToClaudeState);
+  stateFactoryRegistry.set(`${FORMATS.CLAUDE}:${FORMATS.OPENAI}`, newOpenAIToClaudeState);
+  stateFactoryRegistry.set(`${FORMATS.OPENAI}:${FORMATS.CLAUDE}`, newClaudeToOpenAIState);
   stateFactoryRegistry.set(`${FORMATS.OLLAMA}:${FORMATS.CLAUDE}`, newOllamaToClaudeState);
   stateFactoryRegistry.set(`${FORMATS.OLLAMA}:${FORMATS.OPENAI}`, newOllamaToOpenAIState);
   stateFactoryRegistry.set(`${FORMATS.GEMINI}:${FORMATS.OPENAI}`, newGeminiToOpenAIState);

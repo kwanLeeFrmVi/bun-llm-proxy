@@ -427,6 +427,21 @@ describe("OpenAI → Claude: mid-stream termination", () => {
     expect(tDone).toContain("event: message_stop");
   });
 
+  it("emits message_delta and message_stop on [DONE] with empty state (stream error before first chunk)", () => {
+    // Regression: chatCore error-path flush must not invoke this translator
+    // with the wrong state type (OpenAIStreamingState instead of StreamingState).
+    // When invoked correctly with an empty StreamingState, [DONE] must still
+    // emit a complete termination sequence so the client doesn't hang.
+    const state = newStreamingState();
+    const cDone = enc.encode("data: [DONE]\n\n");
+    const rDone = convertOpenAIResponseToClaude(null, "gpt-4o", NO_RAW, NO_RAW, cDone, state);
+    const tDone = decodeAll(rDone);
+    expect(tDone).toContain("event: message_delta");
+    expect(tDone).toContain('"input_tokens":0');
+    expect(tDone).toContain('"output_tokens":0');
+    expect(tDone).toContain("event: message_stop");
+  });
+
   it("does not double-send message_delta when finish_reason+usage were already received", () => {
     const state = newStreamingState();
 
