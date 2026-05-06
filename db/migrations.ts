@@ -6,7 +6,7 @@
 import type { Database } from "bun:sqlite";
 import { PRICING_SEED_ENTRIES, FALLBACK_PRICING } from "../lib/pricing.ts";
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export interface Migration {
   version: number;

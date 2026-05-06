@@ -43,6 +43,10 @@ export const FALLBACK_PRICING: Record<string, PricingEntry> = {
   "MiniMax-M2-7": { input: 0.5, output: 2 },
   "MiniMax-M2-5": { input: 0.5, output: 2 },
   "MiniMax-M2-1": { input: 0.5, output: 2 },
+
+  // Kimi models
+  "kimi-x": { input: 0.95, output: 4 },
+  "kimi-k2.6": { input: 0.95, output: 4 },
 };
 
 // ─── DB seed entries for migration v5 ──────────────────────────────────────────
@@ -72,4 +76,7 @@ export const PRICING_SEED_ENTRIES: SeedEntry[] = [
   { provider: "ag", model: "claude-sonnet-4-6", input: 3, output: 15 },
   { provider: "gh", model: "claude-sonnet-4-6", input: 3, output: 15 },
   { provider: "cu", model: "claude-4.6-sonnet-medium-thinking", input: 3, output: 15 },
+
+  // Kimi models
+  { provider: "kimi", model: "kimi-x", input: 0.95, output: 4 },
 ];
