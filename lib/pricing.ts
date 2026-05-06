@@ -34,6 +34,7 @@ export const FALLBACK_PRICING: Record<string, PricingEntry> = {
   "claude-opus-4-6": { input: 5, output: 25 },
   "gpt-55": { input: 5, output: 30 },
   "gpt-5.5": { input: 5, output: 30 },
+  "gpt-5-5": { input: 5, output: 30 },
 
   // MiniMax models (keys must match post-normalization, i.e. dots → dashes)
   "minimax-m2-7": { input: 0.5, output: 2 },
@@ -52,6 +53,7 @@ export const FALLBACK_PRICING: Record<string, PricingEntry> = {
 export const PRICING_SEED_ENTRIES: SeedEntry[] = [
   // Claudible custom models (same pricing as Anthropic equivalents)
   { provider: "anthropic-compatible-cldb", model: "claude-opus-4-7", input: 5, output: 25 },
+  { provider: "anthropic-compatible-cldb", model: "claude-opus-4-6", input: 5, output: 25 },
   { provider: "anthropic-compatible-cldb", model: "claudible-claude-opus-4-7", input: 5, output: 25 },
   { provider: "anthropic-compatible-cldb", model: "claudible-claude-sonnet-4-6", input: 3, output: 15 },
   { provider: "anthropic-compatible-cldb", model: "claudible-claude-haiku-4-5-20251001", input: 0.25, output: 1.25 },
