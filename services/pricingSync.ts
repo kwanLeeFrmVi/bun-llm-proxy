@@ -23,11 +23,33 @@ const STRIP_SUFFIXES = [
   "-preview",
   "-latest",
   ":cloud",
+  "-highspeed",
 ];
 
 // In-memory cache of normalized model name → { id, input, output }
 type ORCacheEntry = { id: string; input: number; output: number };
 let orModelCache: Record<string, ORCacheEntry> | null = null;
+
+// Hardcoded fallback pricing for models not available in OpenRouter.
+// These are used as a last resort when no pricing is found in the DB or cache.
+// Values are per 1M tokens ($/1M).
+export const FALLBACK_PRICING: Record<string, { input: number; output: number }> = {
+  // Claudible custom models (same as Anthropic equivalent)
+  "claude-opus-4-7": { input: 5, output: 25 },
+  "claudible-claude-opus-4-7": { input: 5, output: 25 },
+  "claudible-claude-sonnet-4-6": { input: 3, output: 15 },
+  "claudible-claude-haiku-4-5-20251001": { input: 0.25, output: 1.25 },
+  "claude-sonnet-4-6": { input: 3, output: 15 },
+  "claude-opus-4-6": { input: 5, output: 25 },
+
+  // MiniMax models (keys must match post-normalization, i.e. dots→dashes)
+  "minimax-m2-7": { input: 0.5, output: 2 },
+  "minimax-m2-5": { input: 0.5, output: 2 },
+  "minimax-m2-1": { input: 0.5, output: 2 },
+  "MiniMax-M2-7": { input: 0.5, output: 2 },
+  "MiniMax-M2-5": { input: 0.5, output: 2 },
+  "MiniMax-M2-1": { input: 0.5, output: 2 },
+};
 
 /**
  * Normalize a model name for matching:

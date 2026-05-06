@@ -5,7 +5,7 @@
 
 import type { Database } from "bun:sqlite";
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export interface Migration {
   version: number;
@@ -691,5 +691,68 @@ const migrationV4: Migration = {
   },
 };
 
+/**
+ * Migration v5: Seed pricing for custom models not available in OpenRouter.
+ * These models (Claudible custom models, MiniMax variants) need hardcoded
+ * pricing entries since they don't exist in the OpenRouter pricing feed.
+ * Values are per 1M tokens ($/1M).
+ */
+const migrationV5: Migration = {
+  version: 5,
+  name: "seed-custom-model-pricing",
+  up: (db: Database) => {
+    console.log("[Migration v5] Seeding pricing for custom models not in OpenRouter");
+
+    // Ensure pricing table exists (defensive — may have been dropped or schema was modified)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS pricing (
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        input REAL NOT NULL DEFAULT 0,
+        output REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY (provider, model)
+      )
+    `);
+
+    const pricingEntries = [
+      // Claudible custom models (same pricing as Anthropic equivalents)
+      { provider: "anthropic-compatible-cldb", model: "claude-opus-4-7", input: 5, output: 25 },
+      { provider: "anthropic-compatible-cldb", model: "claudible-claude-opus-4-7", input: 5, output: 25 },
+      { provider: "anthropic-compatible-cldb", model: "claudible-claude-sonnet-4-6", input: 3, output: 15 },
+      { provider: "anthropic-compatible-cldb", model: "claudible-claude-haiku-4-5-20251001", input: 0.25, output: 1.25 },
+
+      // MiniMax models across various providers
+      { provider: "minimax", model: "MiniMax-M2.7", input: 0.5, output: 2 },
+      { provider: "minimax-cn", model: "MiniMax-M2.7", input: 0.5, output: 2 },
+      { provider: "alicode", model: "MiniMax-M2.7", input: 0.5, output: 2 },
+      { provider: "alicode-intl", model: "MiniMax-M2.7", input: 0.5, output: 2 },
+      { provider: "ollama", model: "minimax-m2.7:cloud", input: 0.5, output: 2 },
+      { provider: "ollama", model: "minimax-m2.7", input: 0.5, output: 2 },
+
+      // Claude Sonnet 4.6 across various providers
+      { provider: "cc", model: "claude-sonnet-4-6", input: 3, output: 15 },
+      { provider: "cc", model: "claude-sonnet-4.6", input: 3, output: 15 },
+      { provider: "ag", model: "claude-sonnet-4-6", input: 3, output: 15 },
+      { provider: "gh", model: "claude-sonnet-4-6", input: 3, output: 15 },
+      { provider: "cu", model: "claude-4.6-sonnet-medium-thinking", input: 3, output: 15 },
+    ];
+
+    let seededCount = 0;
+    for (const entry of pricingEntries) {
+      try {
+        db.run(
+          "INSERT INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?) ON CONFLICT(provider, model) DO NOTHING",
+          [entry.provider, entry.model, entry.input, entry.output]
+        );
+        seededCount++;
+      } catch (err) {
+        console.error(`[Migration v5] Failed to seed pricing for ${entry.provider}/${entry.model}:`, err);
+      }
+    }
+
+    console.log(`[Migration v5] Completed: seeded ${seededCount} pricing entries`);
+  },
+};
+
 // All migrations in order
-export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4];
+export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5];

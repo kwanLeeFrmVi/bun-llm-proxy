@@ -7,6 +7,7 @@ import {
   stripSuffixes,
   baseModelName,
   getORModelCache,
+  FALLBACK_PRICING,
 } from "services/pricingSync.ts";
 import type { Database } from "bun:sqlite";
 import { getRawDb } from "db/connection.ts";
@@ -317,6 +318,14 @@ async function findPricing(
       ) {
         return { input: value.input, output: value.output };
       }
+    }
+  }
+
+  // 7. Hardcoded fallback for models not available in OpenRouter
+  for (const key of [model, normalized, stripped, base]) {
+    const entry = FALLBACK_PRICING[key];
+    if (entry) {
+      return { input: entry.input, output: entry.output };
     }
   }
 

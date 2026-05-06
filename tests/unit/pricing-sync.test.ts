@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { normalizeModelName, stripSuffixes, baseModelName } from "../../services/pricingSync.ts";
+import {
+  normalizeModelName,
+  stripSuffixes,
+  baseModelName,
+  FALLBACK_PRICING,
+} from "../../services/pricingSync.ts";
 
 // Module-level constants matching services/pricingSync.ts
 const STRIP_SUFFIXES = [
@@ -21,6 +26,7 @@ const STRIP_SUFFIXES = [
   "-preview",
   "-latest",
   ":cloud",
+  "-highspeed",
 ];
 const KNOWN_BASES = ["claude-sonnet", "claude-opus", "gpt-4", "gpt-3.5", "gemini"];
 
@@ -61,8 +67,16 @@ describe("normalizeModelName", () => {
   });
 
   it("is case-insensitive for suffix stripping", () => {
-    expect(normalizeModelName("MODEL-Turbo")).toBe("MODEL");
-    expect(normalizeModelName("model-MINI")).toBe("model");
+    expect(normalizeModelName("GPT-4-TURBO")).toBe("GPT-4");
+    expect(normalizeModelName("glm-5.1-CODE")).toBe("glm-5-1");
+  });
+
+  it("strips :cloud suffix", () => {
+    expect(normalizeModelName("minimax-m2.7:cloud")).toBe("minimax-m2-7");
+  });
+
+  it("strips -highspeed suffix", () => {
+    expect(normalizeModelName("MiniMax-M2.7-highspeed")).toBe("MiniMax-M2-7");
   });
 
   it("handles model names with no matching patterns", () => {
@@ -332,6 +346,12 @@ describe("findPricing & calculateCost", () => {
       if (entry) return { input: entry.input, output: entry.output };
     }
 
+    // 6. Fallback pricing for models not in OpenRouter
+    for (const key of [model, normalized, stripped, baseModel]) {
+      const entry = FALLBACK_PRICING[key];
+      if (entry) return { input: entry.input, output: entry.output };
+    }
+
     return null;
   }
 
@@ -387,6 +407,36 @@ describe("findPricing & calculateCost", () => {
       expect(findPricing(pricing, "anthropic", "claude-sonnet-4-5", orCache)).toEqual({
         input: 3,
         output: 15,
+      });
+    });
+
+    it("5b - FALLBACK_PRICING used when no DB or cache match", () => {
+      const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+        openai: {},
+      };
+      expect(findPricing(pricing, "any-provider", "claudible-claude-opus-4-7")).toEqual({
+        input: 5,
+        output: 25,
+      });
+    });
+
+    it("5c - FALLBACK_PRICING matches after :cloud suffix stripping", () => {
+      const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+        ollama: {},
+      };
+      expect(findPricing(pricing, "ollama", "minimax-m2.7:cloud")).toEqual({
+        input: 0.5,
+        output: 2,
+      });
+    });
+
+    it("5d - FALLBACK_PRICING matches after -highspeed suffix stripping", () => {
+      const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+        "openai-compatible": {},
+      };
+      expect(findPricing(pricing, "openai-compatible", "MiniMax-M2.7-highspeed")).toEqual({
+        input: 0.5,
+        output: 2,
       });
     });
 

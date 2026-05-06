@@ -6,7 +6,12 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { getRawDb } from "./connection.ts";
-import { normalizeModelName, stripSuffixes, baseModelName } from "../services/pricingSync.ts";
+import {
+  normalizeModelName,
+  stripSuffixes,
+  baseModelName,
+  FALLBACK_PRICING,
+} from "../services/pricingSync.ts";
 
 const DATA_DIR = process.env.DATA_DIR ?? join(homedir(), ".bunLLM");
 const DB_PATH = join(DATA_DIR, "router.db");
@@ -103,6 +108,19 @@ async function main() {
           cost =
             (prompt_tokens * value.input) / 1_000_000 +
             (completion_tokens * value.output) / 1_000_000;
+          break;
+        }
+      }
+    }
+
+    // 6. Hardcoded fallback for models not available in OpenRouter
+    if (cost === 0) {
+      for (const key of [model, normalizeModelName(model), stripSuffixes(model), baseModelName(model)]) {
+        const entry = FALLBACK_PRICING[key];
+        if (entry) {
+          cost =
+            (prompt_tokens * entry.input) / 1_000_000 +
+            (completion_tokens * entry.output) / 1_000_000;
           break;
         }
       }
