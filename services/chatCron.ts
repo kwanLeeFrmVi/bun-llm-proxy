@@ -12,7 +12,7 @@ const CRON_BODY: Record<string, unknown> = {
   max_tokens: 1024,
 };
 
-const CRON_SCHEDULE = "30 7,11,15 * * 1-5";
+const CRON_SCHEDULE = "30 0,4,8 * * 1-5"; // 07:30, 11:30, 15:30 GMT+7
 
 let nextTimer: ReturnType<typeof setTimeout> | null = null;
 let isStarted = false;
