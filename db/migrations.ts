@@ -4,8 +4,9 @@
  */
 
 import type { Database } from "bun:sqlite";
+import { PRICING_SEED_ENTRIES } from "../lib/pricing.ts";
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export interface Migration {
   version: number;
@@ -714,31 +715,10 @@ const migrationV5: Migration = {
       )
     `);
 
-    const pricingEntries = [
-      // Claudible custom models (same pricing as Anthropic equivalents)
-      { provider: "anthropic-compatible-cldb", model: "claude-opus-4-7", input: 5, output: 25 },
-      { provider: "anthropic-compatible-cldb", model: "claudible-claude-opus-4-7", input: 5, output: 25 },
-      { provider: "anthropic-compatible-cldb", model: "claudible-claude-sonnet-4-6", input: 3, output: 15 },
-      { provider: "anthropic-compatible-cldb", model: "claudible-claude-haiku-4-5-20251001", input: 0.25, output: 1.25 },
-
-      // MiniMax models across various providers
-      { provider: "minimax", model: "MiniMax-M2.7", input: 0.5, output: 2 },
-      { provider: "minimax-cn", model: "MiniMax-M2.7", input: 0.5, output: 2 },
-      { provider: "alicode", model: "MiniMax-M2.7", input: 0.5, output: 2 },
-      { provider: "alicode-intl", model: "MiniMax-M2.7", input: 0.5, output: 2 },
-      { provider: "ollama", model: "minimax-m2.7:cloud", input: 0.5, output: 2 },
-      { provider: "ollama", model: "minimax-m2.7", input: 0.5, output: 2 },
-
-      // Claude Sonnet 4.6 across various providers
-      { provider: "cc", model: "claude-sonnet-4-6", input: 3, output: 15 },
-      { provider: "cc", model: "claude-sonnet-4.6", input: 3, output: 15 },
-      { provider: "ag", model: "claude-sonnet-4-6", input: 3, output: 15 },
-      { provider: "gh", model: "claude-sonnet-4-6", input: 3, output: 15 },
-      { provider: "cu", model: "claude-4.6-sonnet-medium-thinking", input: 3, output: 15 },
-    ];
+    // Seed entries imported from lib/pricing.ts (single source of truth)
 
     let seededCount = 0;
-    for (const entry of pricingEntries) {
+    for (const entry of PRICING_SEED_ENTRIES) {
       try {
         db.run(
           "INSERT INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?) ON CONFLICT(provider, model) DO NOTHING",
@@ -754,5 +734,193 @@ const migrationV5: Migration = {
   },
 };
 
+/**
+ * Migration v6: Recalculate costs for usage_log entries that have tokens but cost=0.
+ * This fixes historical data after v5 seeded the missing pricing entries.
+ */
+const migrationV6: Migration = {
+  version: 6,
+  name: "recalculate-zero-cost-usage",
+  up: (db: Database) => {
+    console.log("[Migration v6] Recalculating zero-cost usage_log entries");
+
+    // Defensive: skip if usage_log doesn't exist (shouldn't happen, but safe)
+    const tableCheck = db
+      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table' AND name='usage_log'")
+      .get();
+    if (!tableCheck) {
+      console.log("[Migration v6] usage_log table not found, skipping");
+      return;
+    }
+
+    // ── Inline helpers (avoid circular import from services/pricingSync.ts) ──
+    const STRIP_SUFFIXES = [
+      "-turbo", "-maas", "-fast", "-ultra", "-large", "-mini",
+      "-hd", "-code", "-instruct", "-preview", "-latest", ":cloud", "-highspeed",
+    ];
+
+    function stripProviderPrefix(name: string): string {
+      return name.includes("/") ? name.split("/").slice(1).join("/") : name;
+    }
+
+    function normalizeModelName(model: string): string {
+      let name = stripProviderPrefix(model);
+      name = name.replace(/(\d+)\.(\d+)/g, "$1-$2");
+      for (const suffix of STRIP_SUFFIXES) {
+        if (name.toLowerCase().endsWith(suffix)) {
+          name = name.slice(0, -suffix.length);
+        }
+      }
+      name = name.replace(/-?\d{8,14}$/, "");
+      return name;
+    }
+
+    function stripSuffixes(model: string): string {
+      let name = model;
+      for (const suffix of STRIP_SUFFIXES) {
+        if (name.toLowerCase().endsWith(suffix)) {
+          name = name.slice(0, -suffix.length);
+        }
+      }
+      return name;
+    }
+
+    function baseModelName(model: string): string {
+      const normalized = normalizeModelName(model);
+      const knownBases = [
+        "claude-opus", "claude-sonnet", "claude-haiku",
+        "gpt-4", "gpt-3.5", "glm-5", "minimax",
+      ];
+      for (const b of knownBases) {
+        if (normalized.toLowerCase().startsWith(b)) return b;
+      }
+      const idx = normalized.lastIndexOf("-");
+      if (idx > 0) {
+        const candidate = normalized.slice(0, idx);
+        if (candidate.length > 2) return candidate;
+      }
+      return normalized;
+    }
+
+    // Hardcoded fallback (mirrors lib/pricing.ts FALLBACK_PRICING)
+    const FALLBACK_PRICING: Record<string, { input: number; output: number }> = {
+      "claude-opus-4-7": { input: 5, output: 25 },
+      "claudible-claude-opus-4-7": { input: 5, output: 25 },
+      "claudible-claude-sonnet-4-6": { input: 3, output: 15 },
+      "claudible-claude-haiku-4-5-20251001": { input: 0.25, output: 1.25 },
+      "claude-sonnet-4-6": { input: 3, output: 15 },
+      "claude-opus-4-6": { input: 5, output: 25 },
+      "minimax-m2-7": { input: 0.5, output: 2 },
+      "minimax-m2-5": { input: 0.5, output: 2 },
+      "minimax-m2-1": { input: 0.5, output: 2 },
+      "MiniMax-M2-7": { input: 0.5, output: 2 },
+      "MiniMax-M2-5": { input: 0.5, output: 2 },
+      "MiniMax-M2-1": { input: 0.5, output: 2 },
+    };
+
+    // ── Build pricing map from DB ──
+    const pricingRows = db
+      .query<{ provider: string; model: string; input: number; output: number }, []>(
+        "SELECT provider, model, input, output FROM pricing"
+      )
+      .all();
+
+    const pricing: Record<string, Record<string, { input: number; output: number }>> = {};
+    for (const row of pricingRows) {
+      if (!pricing[row.provider]) pricing[row.provider] = {};
+      pricing[row.provider]![row.model] = { input: row.input, output: row.output };
+    }
+
+    // ── Find zero-cost entries ──
+    const entries = db
+      .query<
+        { id: string; provider: string; model: string; prompt_tokens: number; completion_tokens: number },
+        []
+      >(
+        `SELECT id, provider, model, prompt_tokens, completion_tokens
+         FROM usage_log
+         WHERE cost = 0 AND (prompt_tokens > 0 OR completion_tokens > 0)`
+      )
+      .all();
+
+    console.log(`[Migration v6] Found ${entries.length} entries to recalculate`);
+
+    let updated = 0;
+    let notFound = 0;
+
+    for (const entry of entries) {
+      const { id, provider, model, prompt_tokens, completion_tokens } = entry;
+      const normalized = normalizeModelName(model);
+      const stripped = stripSuffixes(model);
+      const base = baseModelName(model);
+
+      let cost = 0;
+      let found = false;
+
+      // 1. Exact match
+      if (pricing[provider]?.[model]) {
+        const p = pricing[provider]![model]!;
+        cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
+        found = true;
+      }
+      // 2. Normalized match
+      else if (pricing[provider]?.[normalized]) {
+        const p = pricing[provider]![normalized]!;
+        cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
+        found = true;
+      }
+      // 3. Stripped match
+      else if (pricing[provider]?.[stripped]) {
+        const p = pricing[provider]![stripped]!;
+        cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
+        found = true;
+      }
+      // 4. Base model match
+      else if (pricing[provider]?.[base]) {
+        const p = pricing[provider]![base]!;
+        cost = (prompt_tokens * p.input) / 1_000_000 + (completion_tokens * p.output) / 1_000_000;
+        found = true;
+      }
+      // 5. openrouter provider fallback
+      else if (pricing.openrouter) {
+        for (const [key, value] of Object.entries(pricing.openrouter)) {
+          if (
+            key === model ||
+            key === normalized ||
+            key === stripped ||
+            key === base ||
+            normalizeModelName(key) === normalized
+          ) {
+            cost = (prompt_tokens * value.input) / 1_000_000 + (completion_tokens * value.output) / 1_000_000;
+            found = true;
+            break;
+          }
+        }
+      }
+
+      // 6. Hardcoded fallback
+      if (!found) {
+        for (const key of [model, normalized, stripped, base]) {
+          const entry = FALLBACK_PRICING[key];
+          if (entry) {
+            cost = (prompt_tokens * entry.input) / 1_000_000 + (completion_tokens * entry.output) / 1_000_000;
+            found = true;
+            break;
+          }
+        }
+      }
+
+      if (found && cost > 0) {
+        db.run("UPDATE usage_log SET cost = ? WHERE id = ?", [cost, id]);
+        updated++;
+      } else {
+        notFound++;
+      }
+    }
+
+    console.log(`[Migration v6] Updated ${updated} entries, ${notFound} still without pricing`);
+  },
+};
+
 // All migrations in order
-export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5];
+export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5, migrationV6];
