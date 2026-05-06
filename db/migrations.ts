@@ -1095,5 +1095,53 @@ const migrationV7: Migration = {
   },
 };
 
+/**
+ * Migration v8: Seed kimi-x pricing and recalculate zero-cost entries
+ */
+const migrationV8: Migration = {
+  version: 8,
+  name: "seed-kimi-x-pricing",
+  up: (db: Database) => {
+    console.log("[Migration v8] Seeding kimi-x pricing and recalculating costs");
+
+    // ── Seed kimi-x pricing ──
+    try {
+      db.run(
+        "INSERT INTO pricing (provider, model, input, output) VALUES (?, ?, ?, ?) ON CONFLICT(provider, model) DO NOTHING",
+        ["kimi", "kimi-x", 0.95, 4]
+      );
+      console.log("[Migration v8] Seeded kimi-x pricing");
+    } catch (err) {
+      console.error("[Migration v8] Failed to seed kimi-x pricing:", err);
+    }
+
+    // ── Recalculate zero-cost entries for kimi-x ──
+    const entries = db
+      .query<
+        { id: string; provider: string; model: string; prompt_tokens: number; completion_tokens: number },
+        []
+      >(
+        `SELECT id, provider, model, prompt_tokens, completion_tokens
+         FROM usage_log
+         WHERE cost = 0
+           AND (prompt_tokens > 0 OR completion_tokens > 0)
+           AND model LIKE '%kimi-x%'`
+      )
+      .all();
+
+    console.log(`[Migration v8] Found ${entries.length} kimi-x entries to recalculate`);
+
+    let updated = 0;
+    for (const entry of entries) {
+      const { id, prompt_tokens, completion_tokens } = entry;
+      const cost = (prompt_tokens * 0.95) / 1_000_000 + (completion_tokens * 4) / 1_000_000;
+      db.run("UPDATE usage_log SET cost = ? WHERE id = ?", [cost, id]);
+      updated++;
+    }
+
+    console.log(`[Migration v8] Updated ${updated} kimi-x entries`);
+  },
+};
+
 // All migrations in order
-export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7];
+export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8];
