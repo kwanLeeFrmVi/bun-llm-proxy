@@ -101,7 +101,8 @@ export async function executeWithAccountFallback(opts: AccountFallbackOpts): Pro
           startTime,
           ctx,
           sourceFormat,
-          request?.signal
+          request?.signal,
+          body
         );
       }
       return result.response!;

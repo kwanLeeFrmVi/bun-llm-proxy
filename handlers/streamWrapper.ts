@@ -17,6 +17,7 @@ import { getComboMetadata } from "../services/comboRouting.ts";
 import { recordComboTTFT } from "../db/index.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../ai-bridge/translator/common/sse.ts";
 import { STREAM_HEARTBEAT_INTERVAL_MS } from "../ai-bridge/config/runtimeConfig.ts";
+import { countTokens, extractPromptText } from "../lib/tokenCounter.ts";
 
 // Marker to detect responses already wrapped by wrapStreamingResponse.
 // Prevents double-wrapping when a combo model resolves to another combo model.
@@ -36,7 +37,8 @@ export function wrapStreamingResponseV2(
   startTime: number,
   ctx: RequestContext,
   sourceFormat: string,
-  clientSignal?: AbortSignal
+  clientSignal?: AbortSignal,
+  requestBody?: Record<string, unknown>
 ): Response {
   if (!response.body) return response;
 
@@ -155,9 +157,32 @@ export function wrapStreamingResponseV2(
       });
     }
 
+    // Fallback token counting when upstream doesn't provide counts
+    let finalUsage = st.finalUsage ? { ...st.finalUsage } : null;
+    const needsPromptTokens = !finalUsage || (finalUsage.prompt_tokens ?? 0) === 0;
+    const needsCompletionTokens = !finalUsage || (finalUsage.completion_tokens ?? 0) === 0;
+
+    if (needsPromptTokens && requestBody) {
+      const promptText = extractPromptText(requestBody);
+      const counted = countTokens(promptText, model);
+      finalUsage = {
+        ...(finalUsage ?? {}),
+        prompt_tokens: counted,
+      };
+    }
+
+    if (needsCompletionTokens) {
+      const responseText = st.accumulatedResponseText;
+      const counted = countTokens(responseText, model);
+      finalUsage = {
+        ...(finalUsage ?? {}),
+        completion_tokens: counted,
+      };
+    }
+
     // Save usage (fire-and-forget with catch)
     const ttftMs = st.firstChunkTime ? st.firstChunkTime - startTime : undefined;
-    const completionTokens = st.finalUsage?.completion_tokens ?? 0;
+    const completionTokens = finalUsage?.completion_tokens ?? 0;
     const tokensPerSecond =
       ttftMs && completionTokens > 0 && durationMs > ttftMs
         ? (completionTokens / (durationMs - ttftMs)) * 1000
@@ -165,7 +190,7 @@ export function wrapStreamingResponseV2(
     saveRequestUsage(
       requestId,
       {
-        ...(st.finalUsage ?? {}),
+        ...(finalUsage ?? {}),
         provider,
         model,
         ttft_ms: ttftMs,

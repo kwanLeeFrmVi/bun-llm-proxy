@@ -19,6 +19,7 @@ export interface DiagnosticState {
     cached_tokens?: number;
   } | null;
   firstChunkTime: number | null;
+  accumulatedResponseText: string;
 }
 
 export interface DiagnosticTransformOpts {
@@ -55,6 +56,7 @@ export function createDiagnosticTransform(
   let upstreamErrorMsg: string | null = null;
   let finalUsage: DiagnosticState["finalUsage"] = null;
   let sseBuffer = "";
+  let responseTextParts: string[] = [];
 
   const state: DiagnosticState = {
     get downstreamChunkCount() { return downstreamChunkCount; },
@@ -62,6 +64,7 @@ export function createDiagnosticTransform(
     get upstreamErrorMsg() { return upstreamErrorMsg; },
     get finalUsage() { return finalUsage; },
     get firstChunkTime() { return firstChunkTime; },
+    get accumulatedResponseText() { return responseTextParts.join(""); },
   };
 
   const encoder = new TextEncoder();
@@ -138,8 +141,8 @@ export function createDiagnosticTransform(
 
         const dataLines: string[] = [];
         for (const line of eventText.split("\n")) {
-          if (line.startsWith("data: ")) {
-            dataLines.push(line.slice(6));
+          if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5));
           }
         }
         if (dataLines.length > 0) {
@@ -161,6 +164,16 @@ export function createDiagnosticTransform(
                   usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
                 cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
               };
+            }
+
+            // Accumulate response text for fallback token counting
+            const deltaContent = data.choices?.[0]?.delta?.content;
+            if (typeof deltaContent === "string") {
+              responseTextParts.push(deltaContent);
+            }
+            const claudeDeltaText = data.delta?.text;
+            if (typeof claudeDeltaText === "string") {
+              responseTextParts.push(claudeDeltaText);
             }
           } catch {
             // Non-JSON SSE event (e.g. [DONE]) — ignore
@@ -188,8 +201,8 @@ export function createDiagnosticTransform(
         const remaining = sseBuffer.trim();
         const dataLines: string[] = [];
         for (const line of remaining.split("\n")) {
-          if (line.startsWith("data: ")) {
-            dataLines.push(line.slice(6));
+          if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5));
           }
         }
         if (dataLines.length > 0) {
@@ -210,6 +223,16 @@ export function createDiagnosticTransform(
                   usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
                 cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
               };
+            }
+
+            // Accumulate response text for fallback token counting
+            const deltaContent = data.choices?.[0]?.delta?.content;
+            if (typeof deltaContent === "string") {
+              responseTextParts.push(deltaContent);
+            }
+            const claudeDeltaText = data.delta?.text;
+            if (typeof claudeDeltaText === "string") {
+              responseTextParts.push(claudeDeltaText);
             }
           } catch {
             // ignore

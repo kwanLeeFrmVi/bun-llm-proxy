@@ -37,7 +37,8 @@ describe("streamDiagnostics", () => {
   }
 
   it("should extract usage from OpenAI SSE chunks", async () => {
-    const event = `data: ${JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 20 } })}\n\n`;
+    const event = `data: ${JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 20 } })}
+\n`;
     const { output, getState } = await pipeThrough([enc.encode(event)]);
 
     const state = getState();
@@ -47,7 +48,8 @@ describe("streamDiagnostics", () => {
   });
 
   it("should extract usage from Claude SSE chunks", async () => {
-    const event = `event: message_start\ndata: ${JSON.stringify({ message: { usage: { input_tokens: 5, output_tokens: 15 } } })}\n\n`;
+    const event = `event: message_start\ndata: ${JSON.stringify({ message: { usage: { input_tokens: 5, output_tokens: 15 } } })}
+\n`;
     const { output, getState } = await pipeThrough([enc.encode(event)]);
 
     const state = getState();
@@ -78,7 +80,8 @@ describe("streamDiagnostics", () => {
   });
 
   it("should parse usage even if sentinel is in the same chunk", async () => {
-    const usageEvent = `data: ${JSON.stringify({ usage: { prompt_tokens: 100 } })}\n\n`;
+    const usageEvent = `data: ${JSON.stringify({ usage: { prompt_tokens: 100 } })}
+\n`;
     const chunk = usageEvent + UPSTREAM_ERROR_SENTINEL + " oops\n";
 
     const { output, getState } = await pipeThrough([enc.encode(chunk)]);
@@ -86,5 +89,40 @@ describe("streamDiagnostics", () => {
     const state = getState();
     expect(state.finalUsage?.prompt_tokens).toBe(100);
     expect(state.upstreamErrorMsg).toBe("oops");
+  });
+
+  it("should accumulate OpenAI streaming content text", async () => {
+    const event1 = `data: ${JSON.stringify({ choices: [{ delta: { content: "Hello" } }] })}
+\n`;
+    const event2 = `data: ${JSON.stringify({ choices: [{ delta: { content: " world" } }] })}
+\n`;
+    const { getState } = await pipeThrough([enc.encode(event1), enc.encode(event2)]);
+
+    const state = getState();
+    expect(state.accumulatedResponseText).toBe("Hello world");
+  });
+
+  it("should accumulate Claude streaming delta text", async () => {
+    const event1 = `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Bonjour" } })}
+\n`;
+    const event2 = `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: " le monde" } })}
+\n`;
+    const { getState } = await pipeThrough([enc.encode(event1), enc.encode(event2)]);
+
+    const state = getState();
+    expect(state.accumulatedResponseText).toBe("Bonjour le monde");
+  });
+
+  it("should accumulate text across chunks split mid-event", async () => {
+    const event = `data: ${JSON.stringify({ choices: [{ delta: { content: "abc" } }] })}
+\n`;
+    const half = Math.floor(event.length / 2);
+    const { getState } = await pipeThrough([
+      enc.encode(event.slice(0, half)),
+      enc.encode(event.slice(half)),
+    ]);
+
+    const state = getState();
+    expect(state.accumulatedResponseText).toBe("abc");
   });
 });

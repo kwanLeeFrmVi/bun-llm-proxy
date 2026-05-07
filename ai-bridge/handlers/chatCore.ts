@@ -15,6 +15,7 @@ import {
 import { errorResponse, sseErrorResponse } from "../utils/error.ts";
 import * as log from "../../lib/logger.ts";
 import type { RequestContext } from "../../lib/requestContext.ts";
+import { countTokens, extractPromptText, extractCompletionText } from "../../lib/tokenCounter.ts";
 
 export interface ChatCoreOptions {
   ctx?: RequestContext;
@@ -199,18 +200,34 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         reasoning_tokens?: number;
         cached_tokens?: number;
       } = {};
+      let parsedBody: Record<string, unknown> | null = null;
       try {
-        const parsed = JSON.parse(responseBody);
-        if (parsed.usage) {
+        parsedBody = JSON.parse(responseBody) as Record<string, unknown>;
+        const usage = parsedBody.usage as Record<string, unknown> | undefined;
+        if (usage) {
           usageData = {
-            prompt_tokens: parsed.usage.prompt_tokens ?? parsed.usage.input_tokens,
-            completion_tokens: parsed.usage.completion_tokens ?? parsed.usage.output_tokens,
-            reasoning_tokens: parsed.usage.reasoning_tokens ?? parsed.usage.thinking_tokens,
-            cached_tokens: parsed.usage.prompt_tokens_details?.cached_tokens,
+            prompt_tokens: usage.prompt_tokens as number | undefined ?? usage.input_tokens as number | undefined,
+            completion_tokens: usage.completion_tokens as number | undefined ?? usage.output_tokens as number | undefined,
+            reasoning_tokens: usage.reasoning_tokens as number | undefined ?? usage.thinking_tokens as number | undefined,
+            cached_tokens: (usage.prompt_tokens_details as Record<string, unknown> | undefined)?.cached_tokens as number | undefined,
           };
         }
       } catch (e) {
         log.debug(ctx ?? null, "USAGE", `Non-JSON response body, skipping usage extraction: ${e instanceof Error ? e.message : String(e)}`);
+      }
+
+      // Fallback token counting when upstream doesn't provide counts
+      const needsPromptTokens = (usageData.prompt_tokens ?? 0) === 0;
+      const needsCompletionTokens = (usageData.completion_tokens ?? 0) === 0;
+
+      if (needsPromptTokens) {
+        const promptText = extractPromptText(body);
+        usageData.prompt_tokens = countTokens(promptText, model);
+      }
+
+      if (needsCompletionTokens && parsedBody) {
+        const completionText = extractCompletionText(parsedBody);
+        usageData.completion_tokens = countTokens(completionText, model);
       }
 
       const response = new globalThis.Response(translated, {
@@ -338,7 +355,7 @@ async function handleStreamingResponse(
   log.debug(
     opts.ctx ?? null,
     "STREAM",
-    `Starting stream: ${sourceFormat} → ${targetFormat} | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`
+    `Starting stream: ${targetFormat} → ${sourceFormat} (response) | provider=${opts.modelInfo.provider} | isSSE=${isSSE}`
   );
 
   // AbortController shared between cancel() and start() so that downstream
