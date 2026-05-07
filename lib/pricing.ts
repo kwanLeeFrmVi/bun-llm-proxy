@@ -47,6 +47,7 @@ export const FALLBACK_PRICING: Record<string, PricingEntry> = {
   // Kimi models
   "kimi-x": { input: 0.95, output: 4 },
   "kimi-k2.6": { input: 0.95, output: 4 },
+  "kimi-for-coding": { input: 0.95, output: 4 },
 };
 
 // ─── DB seed entries for migration v5 ──────────────────────────────────────────
@@ -79,4 +80,5 @@ export const PRICING_SEED_ENTRIES: SeedEntry[] = [
 
   // Kimi models
   { provider: "kimi", model: "kimi-x", input: 0.95, output: 4 },
+  { provider: "kimi", model: "kimi-for-coding", input: 0.95, output: 4 },
 ];
