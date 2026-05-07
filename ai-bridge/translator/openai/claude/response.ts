@@ -75,8 +75,8 @@ export function convertClaudeResponseToOpenAI(
   for (const line of lines) {
     if (line.startsWith("event:")) {
       _eventType = line.slice(5).trim();
-    } else if (line.startsWith("data: ")) {
-      dataLines.push(line.slice(6));
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5));
     }
   }
 

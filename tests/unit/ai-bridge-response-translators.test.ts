@@ -216,6 +216,28 @@ describe("claude → openai (streaming)", () => {
     // Should have [DONE]
     expect(raw).toContain("data: [DONE]");
   });
+
+  it("tolerates data: lines without a trailing space (Kimi regression)", () => {
+    // Some providers (e.g. Kimi) emit SSE data lines as data:{...} without a space.
+    // The translator must still parse them correctly.
+    const sse1 = 'event: message_start\ndata:{"type":"message_start","message":{"id":"msg_kimi","type":"message","role":"assistant","model":"kimi-for-coding","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n\n';
+    const sse2 = 'event: content_block_delta\ndata:{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}\n\n';
+    const sse3 = 'event: message_delta\ndata:{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":10,"output_tokens":5}}\n\n';
+    const sse4 = 'event: message_stop\ndata:{"type":"message_stop"}\n\n';
+
+    const combined = sse1 + sse2 + sse3 + sse4;
+    const chunks = decodeAll(
+      convertClaudeResponseToOpenAI(null, "kimi-for-coding", NO_RAW, NO_RAW, encode(combined), undefined)
+    );
+    const raw = chunks.join("");
+
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(raw).toContain('"role":"assistant"');
+    expect(raw).toContain('"content":"hello"');
+    expect(raw).toContain('"finish_reason":"stop"');
+    expect(raw).toContain('"prompt_tokens":10');
+    expect(raw).toContain("data: [DONE]");
+  });
 });
 
 // ─── Streaming: gemini → openai ──────────────────────────────────────────────

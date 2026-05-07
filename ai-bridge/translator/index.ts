@@ -123,13 +123,13 @@ function normalizeClaudeStreamingUsage(raw: Uint8Array): Uint8Array {
 
   try {
     const lines = text.split("\n");
-    const dataLineIndex = lines.findIndex((line) => line.startsWith("data: "));
+    const dataLineIndex = lines.findIndex((line) => line.startsWith("data:"));
     if (dataLineIndex === -1) return raw;
 
     const dataLine = lines[dataLineIndex];
     if (!dataLine) return raw;
 
-    const parsed = JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
+    const parsed = JSON.parse(dataLine.slice(5)) as Record<string, unknown>;
 
     if (parsed.type === "message_delta" && !("usage" in parsed)) {
       lines[dataLineIndex] = `data: ${JSON.stringify({
