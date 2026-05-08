@@ -26,6 +26,7 @@ export interface ConnectionRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onTest: (id: string) => void;
+  onClearLocks?: () => void;
 }
 
 export interface AddApiKeyModalProps {

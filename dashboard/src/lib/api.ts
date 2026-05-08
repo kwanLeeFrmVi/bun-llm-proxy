@@ -212,6 +212,11 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ models }),
       }),
+    clearLocks: (id: string) =>
+      request<{ success: boolean; connection: ProviderConnection }>(
+        `/api/providers/${id}/clear-locks`,
+        { method: "POST" }
+      ),
   },
 
   // ─── Provider Nodes ─────────────────────────────────────────────────────────

@@ -332,6 +332,16 @@ export default function ProviderDetail() {
     }
   }
 
+  async function handleClearLocks(connId: string) {
+    try {
+      await api.providers.clearLocks(connId);
+      toast.success("Model locks cleared");
+      await fetchData();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to clear locks");
+    }
+  }
+
   async function handleTestAllConnections() {
     setTestingAll(true);
     const results = [];
@@ -919,6 +929,7 @@ export default function ProviderDetail() {
                 }}
                 onDelete={() => handleDeleteConfirm(conn)}
                 onTest={handleTestConnection}
+                onClearLocks={() => handleClearLocks(conn.id)}
               />
             ))}
           </div>

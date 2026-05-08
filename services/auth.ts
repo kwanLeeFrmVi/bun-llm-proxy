@@ -242,7 +242,14 @@ export async function markAccountUnavailable(
 ): Promise<{ shouldFallback: boolean; cooldownMs: number }> {
   const connections = await getProviderConnections({ provider: provider ?? undefined });
   const conn = connections.find((c: Record<string, unknown>) => c.id === connectionId);
-  const backoffLevel = (conn?.backoffLevel as number) || 0;
+
+  // Reset backoff if all previous model locks have expired — prevents
+  // escalation from accumulating across separate incident windows.
+  let backoffLevel = (conn?.backoffLevel as number) || 0;
+  const earliestLock = getEarliestModelLockUntil(conn as Record<string, unknown>);
+  if (!earliestLock) {
+    backoffLevel = 0;
+  }
 
   const { shouldFallback, cooldownMs, newBackoffLevel } = checkFallbackError(
     status,

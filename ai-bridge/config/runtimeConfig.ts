@@ -65,10 +65,10 @@ export const BACKOFF_CONFIG = {
 } as const;
 
 // Provider quota exhaustion: long lockouts (hours)
-// Escalation: 2h → 4h → 8h → 12h(cap)
+// Escalation: 1h → 2h → 4h → 5h(cap)
 export const QUOTA_BACKOFF_CONFIG = {
-  base: 2 * 60 * 60 * 1000, // 2 hours
-  max: 12 * 60 * 60 * 1000, // 12 hours max
+  base: 1 * 60 * 60 * 1000, // 1 hours
+  max: 5 * 60 * 60 * 1000,  // 5 hours max (matches GLM reset cycle)
   maxLevel: 3, // 3 escalation levels
 } as const;
 
