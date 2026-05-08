@@ -84,12 +84,13 @@ export async function getProviderCredentials(
     connections.forEach((c: Record<string, unknown>) => {
       const excluded = excludeSet.has(c.id as string);
       const locked = isModelLockActive(c, model);
-      if (excluded || locked) {
+      const allLockKeys = Object.keys(c).filter((k) => k.startsWith("modelLock_"));
+      if (excluded || locked || allLockKeys.length > 0) {
         const lockUntil = getEarliestModelLockUntil(c);
         log.debug(
           ctx ?? null,
           "AUTH",
-          `  → ${(c.id as string)?.slice(0, 8)} | ${excluded ? "excluded" : ""} ${locked ? `modelLocked(${model}) until ${lockUntil}` : ""}`
+          `  → ${(c.id as string)?.slice(0, 8)} | ${excluded ? "excluded" : ""} ${locked ? `modelLocked(${model}) until ${lockUntil}` : ""} locks=[${allLockKeys.join(",")}]`
         );
       }
     });
