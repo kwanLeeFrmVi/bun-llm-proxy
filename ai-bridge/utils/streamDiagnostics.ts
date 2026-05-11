@@ -56,7 +56,7 @@ export function createDiagnosticTransform(
   let upstreamErrorMsg: string | null = null;
   let finalUsage: DiagnosticState["finalUsage"] = null;
   let sseBuffer = "";
-  let responseTextParts: string[] = [];
+  let responseText = "";
 
   const state: DiagnosticState = {
     get downstreamChunkCount() { return downstreamChunkCount; },
@@ -64,7 +64,7 @@ export function createDiagnosticTransform(
     get upstreamErrorMsg() { return upstreamErrorMsg; },
     get finalUsage() { return finalUsage; },
     get firstChunkTime() { return firstChunkTime; },
-    get accumulatedResponseText() { return responseTextParts.join(""); },
+    get accumulatedResponseText() { return responseText; },
   };
 
   const encoder = new TextEncoder();
@@ -166,14 +166,14 @@ export function createDiagnosticTransform(
               };
             }
 
-            // Accumulate response text for fallback token counting
+            // Accumulate response text for fallback token estimation
             const deltaContent = data.choices?.[0]?.delta?.content;
             if (typeof deltaContent === "string") {
-              responseTextParts.push(deltaContent);
+              responseText += deltaContent;
             }
             const claudeDeltaText = data.delta?.text;
             if (typeof claudeDeltaText === "string") {
-              responseTextParts.push(claudeDeltaText);
+              responseText += claudeDeltaText;
             }
           } catch {
             // Non-JSON SSE event (e.g. [DONE]) — ignore
@@ -225,14 +225,14 @@ export function createDiagnosticTransform(
               };
             }
 
-            // Accumulate response text for fallback token counting
+            // Accumulate response text for fallback token estimation
             const deltaContent = data.choices?.[0]?.delta?.content;
             if (typeof deltaContent === "string") {
-              responseTextParts.push(deltaContent);
+              responseText += deltaContent;
             }
             const claudeDeltaText = data.delta?.text;
             if (typeof claudeDeltaText === "string") {
-              responseTextParts.push(claudeDeltaText);
+              responseText += claudeDeltaText;
             }
           } catch {
             // ignore

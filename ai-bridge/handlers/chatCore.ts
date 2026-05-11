@@ -3,7 +3,7 @@
 
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
 import { Response as translateResponse } from "../translator/index.ts";
-import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS, PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES } from "../config/runtimeConfig.ts";
+import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS, STREAM_FIRST_CHUNK_TIMEOUT_MS, PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES } from "../config/runtimeConfig.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import {
@@ -418,7 +418,10 @@ async function handleStreamingResponse(
 
       const makeStallPromise = () => new Promise<typeof STALL_SYMBOL>((resolve) => {
         stallResolve = () => resolve(STALL_SYMBOL);
-        stallTimer = setTimeout(() => stallResolve?.(), STREAM_STALL_TIMEOUT_MS);
+        // Before first chunk: use a shorter timeout to fail fast on slow/overloaded upstreams.
+        // After first chunk: use the longer stall timeout for silence detection.
+        const timeout = firstUpstreamChunkMs === null ? STREAM_FIRST_CHUNK_TIMEOUT_MS : STREAM_STALL_TIMEOUT_MS;
+        stallTimer = setTimeout(() => stallResolve?.(), timeout);
       });
 
       try {
@@ -466,7 +469,9 @@ async function handleStreamingResponse(
           }
 
           if (result.kind === "stall") {
-            const stallMsg = `Upstream stalled: no data received for ${STREAM_STALL_TIMEOUT_MS / 1000}s`;
+            const stallMsg = firstUpstreamChunkMs === null
+              ? `Upstream timeout: no first chunk within ${STREAM_FIRST_CHUNK_TIMEOUT_MS / 1000}s`
+              : `Upstream stalled: no data received for ${STREAM_STALL_TIMEOUT_MS / 1000}s`;
             log.warn(opts.ctx ?? null, "STREAM", stallMsg);
             reader.cancel().catch(() => {});
             throw new Error(stallMsg);

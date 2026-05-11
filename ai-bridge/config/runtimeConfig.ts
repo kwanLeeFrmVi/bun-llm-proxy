@@ -115,4 +115,5 @@ export const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry 
 
 // SSE streaming keep-alive: prevent client ECONNRESET on slow upstreams
 export const STREAM_HEARTBEAT_INTERVAL_MS = 5_000; // 5s between SSE comment pings
-export const STREAM_STALL_TIMEOUT_MS = 300_000; // 5min max silence before aborting
+export const STREAM_STALL_TIMEOUT_MS = 300_000; // 5min max silence after first chunk
+export const STREAM_FIRST_CHUNK_TIMEOUT_MS = 60_000; // 60s max wait for first chunk

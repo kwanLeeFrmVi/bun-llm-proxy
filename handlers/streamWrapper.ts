@@ -172,11 +172,9 @@ export function wrapStreamingResponseV2(
     }
 
     if (needsCompletionTokens) {
-      const responseText = st.accumulatedResponseText;
-      const counted = countTokens(responseText, model);
       finalUsage = {
         ...(finalUsage ?? {}),
-        completion_tokens: counted,
+        completion_tokens: countTokens(st.accumulatedResponseText, model),
       };
     }
 
