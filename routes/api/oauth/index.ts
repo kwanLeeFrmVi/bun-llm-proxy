@@ -18,6 +18,12 @@ import {
   saveOAuthConnection,
 } from "../../../lib/oauthHandlers.ts";
 import { createProviderConnection } from "../../../db/index.ts";
+import {
+  storePendingFlow,
+  getPendingFlow,
+  deletePendingFlow,
+  type PendingOAuthFlow,
+} from "../../../lib/redis.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 
@@ -78,10 +84,22 @@ async function handlePoll(provider: string, req: Request): Promise<Response> {
 
 async function handleAuthorize(provider: string, req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const redirectUri = url.searchParams.get("redirect_uri") || `${url.origin}/oauth/callback`;
+  const redirectUri = url.searchParams.get("redirect_uri") || undefined; // Let default be used for Claude
 
   try {
     const result = await buildAuthorizeUrl(provider as any, redirectUri);
+
+    // For Claude, store pending flow data in Redis for paste exchange
+    if (provider === "claude") {
+      const now = Date.now();
+      await storePendingFlow(result.state, {
+        codeVerifier: result.codeVerifier,
+        redirectUri: result.redirectUri,
+        createdAt: now,
+        expiresAt: now + 300000, // 5 minutes
+      });
+    }
+
     return Response.json(result, { headers: CORS_HEADERS });
   } catch (err: any) {
     return Response.json({ error: err.message }, { status: 500, headers: CORS_HEADERS });
@@ -114,6 +132,115 @@ async function handleExchange(provider: string, req: Request): Promise<Response>
     return Response.json({ success: true }, { headers: CORS_HEADERS });
   } catch (err: any) {
     return Response.json({ error: err.message }, { status: 500, headers: CORS_HEADERS });
+  }
+}
+
+async function handleExchangePaste(provider: string, req: Request): Promise<Response> {
+  if (provider !== "claude") {
+    return Response.json(
+      { error: "Paste flow only supported for Claude provider" },
+      { status: 400, headers: CORS_HEADERS }
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = asObjectRecord(await req.json()) ?? {};
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  const { callbackUrl } = body;
+  if (!callbackUrl || typeof callbackUrl !== "string") {
+    return Response.json({ error: "callbackUrl is required" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  try {
+    // Parse the callback URL
+    const url = new URL(callbackUrl);
+
+    // Validate it's from localhost
+    if (!url.hostname.includes("localhost") && !url.hostname.includes("127.0.0.1")) {
+      return Response.json(
+        { error: "Callback URL must be from localhost" },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    // Extract code and state
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const error = url.searchParams.get("error");
+
+    if (error) {
+      return Response.json(
+        {
+          error: "OAuth authorization failed",
+          errorDescription: url.searchParams.get("error_description") || error,
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    if (!code || !state) {
+      return Response.json(
+        {
+          error: "Invalid callback URL",
+          message: "URL must contain code and state parameters",
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    // Retrieve pending flow data
+    const pendingFlow = await getPendingFlow(state);
+    if (!pendingFlow) {
+      return Response.json(
+        {
+          error: "Invalid or expired state",
+          message: "Please start the authorization flow again",
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    // Validate state matches
+    if (pendingFlow.state !== state) {
+      await deletePendingFlow(state);
+      return Response.json({ error: "State mismatch" }, { status: 400, headers: CORS_HEADERS });
+    }
+
+    // Exchange code for tokens
+    const result = await exchangeCode(
+      provider,
+      code,
+      pendingFlow.redirectUri,
+      pendingFlow.codeVerifier,
+      state
+    );
+
+    // Save to database
+    await saveOAuthConnection(provider, result);
+
+    // Cleanup
+    await deletePendingFlow(state);
+
+    return Response.json(
+      {
+        success: true,
+        connection: {
+          provider,
+          email: result.email,
+          scopes: result.scope,
+        },
+      },
+      { headers: CORS_HEADERS }
+    );
+  } catch (err: any) {
+    return Response.json(
+      { error: "Failed to exchange authorization code", message: err.message },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 }
 
@@ -246,6 +373,7 @@ export async function POST(req: Request): Promise<Response> {
   // ─── Authorization Code Flow ───────────────────────────────────────────────
   if (action === "authorize") return handleAuthorize(provider, req);
   if (action === "exchange") return handleExchange(provider, req);
+  if (action === "exchange-paste") return handleExchangePaste(provider, req);
 
   // ─── Kiro-specific ─────────────────────────────────────────────────────────
   if (provider === "kiro" && action === "social-authorize") return handleKiroSocialAuthorize(req);

@@ -278,39 +278,40 @@ export interface AuthorizeResult {
 
 export async function buildAuthorizeUrl(
   provider: OAuthProviderId,
-  redirectUri: string
+  redirectUri?: string
 ): Promise<AuthorizeResult> {
   if (provider === "claude") {
     return buildClaudeAuthorizeUrl(OAUTH_CONFIGS.claude, redirectUri);
   }
   if (provider === "codex") {
-    return buildCodexAuthorizeUrl(OAUTH_CONFIGS.codex, redirectUri);
+    return buildCodexAuthorizeUrl(OAUTH_CONFIGS.codex, redirectUri || "");
   }
   if (provider === "openai") {
-    return buildOpenAIAuthorizeUrl(OAUTH_CONFIGS.openai, redirectUri);
+    return buildOpenAIAuthorizeUrl(OAUTH_CONFIGS.openai, redirectUri || "");
   }
   if (provider === "gemini-cli") {
-    return buildGeminiAuthorizeUrl(OAUTH_CONFIGS["gemini-cli"], redirectUri);
+    return buildGeminiAuthorizeUrl(OAUTH_CONFIGS["gemini-cli"], redirectUri || "");
   }
   if (provider === "iflow") {
-    return buildIflowAuthorizeUrl(OAUTH_CONFIGS.iflow, redirectUri);
+    return buildIflowAuthorizeUrl(OAUTH_CONFIGS.iflow, redirectUri || "");
   }
   if (provider === "antigravity") {
-    return buildAntigravityAuthorizeUrl(OAUTH_CONFIGS.antigravity, redirectUri);
+    return buildAntigravityAuthorizeUrl(OAUTH_CONFIGS.antigravity, redirectUri || "");
   }
   throw new Error(`Provider ${provider} does not support authorization code flow`);
 }
 
 function buildClaudeAuthorizeUrl(
   config: typeof OAUTH_CONFIGS.claude,
-  redirectUri: string
+  redirectUri?: string
 ): AuthorizeResult {
   const { codeVerifier, codeChallenge, state } = generatePKCE();
+  const finalRedirectUri = redirectUri || config.redirectUri;
   const params = new URLSearchParams({
     code: "true",
     client_id: config.clientId,
     response_type: "code",
-    redirect_uri: redirectUri,
+    redirect_uri: finalRedirectUri,
     scope: config.scopes.join(" "),
     code_challenge: codeChallenge,
     code_challenge_method: config.codeChallengeMethod,
@@ -320,7 +321,7 @@ function buildClaudeAuthorizeUrl(
     authUrl: `${config.authorizeUrl}?${params.toString()}`,
     state,
     codeVerifier,
-    redirectUri,
+    redirectUri: finalRedirectUri,
   };
 }
 

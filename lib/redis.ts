@@ -387,6 +387,66 @@ export async function touchCachedClaudeHeadersRedis(cacheKey: string): Promise<v
   }
 }
 
+// ─── OAuth Pending Flow helpers ───────────────────────────────────────────────────
+
+const OAUTH_PENDING_PREFIX = "oauth:pending:";
+
+export interface PendingOAuthFlow {
+  state: string;
+  codeVerifier: string;
+  redirectUri: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+/**
+ * Store pending OAuth flow data with 5-minute expiration.
+ */
+export async function storePendingFlow(
+  state: string,
+  data: Omit<PendingOAuthFlow, "state">
+): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const key = `${OAUTH_PENDING_PREFIX}${state}`;
+    await client.set(key, JSON.stringify({ state, ...data }), "EX", 300); // 5 minutes
+  } catch (err) {
+    log.debug("REDIS", `storePendingFlow error for ${state}: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Retrieve pending OAuth flow data by state.
+ */
+export async function getPendingFlow(state: string): Promise<PendingOAuthFlow | null> {
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    const key = `${OAUTH_PENDING_PREFIX}${state}`;
+    const raw = await client.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingOAuthFlow;
+  } catch (err) {
+    log.debug("REDIS", `getPendingFlow error for ${state}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Delete pending OAuth flow data after successful exchange.
+ */
+export async function deletePendingFlow(state: string): Promise<void> {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    const key = `${OAUTH_PENDING_PREFIX}${state}`;
+    await client.del(key);
+  } catch (err) {
+    log.debug("REDIS", `deletePendingFlow error for ${state}: ${(err as Error).message}`);
+  }
+}
+
 // ─── Cache helpers ──────────────────────────────────────────────────────────────
 
 const CACHE_PREFIX = "cache:";

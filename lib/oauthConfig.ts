@@ -99,6 +99,7 @@ export interface ClaudeConfig {
   tokenUrl: string;
   scopes: string[];
   codeChallengeMethod: string;
+  redirectUri: string;
 }
 
 export interface CodexConfig {
@@ -188,8 +189,9 @@ export const OAUTH_CONFIGS = {
     clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
     authorizeUrl: "https://claude.ai/oauth/authorize",
     tokenUrl: "https://api.anthropic.com/v1/oauth/token",
-    scopes: ["org:create_api_key", "user:profile", "user:inference"],
+    scopes: ["user:profile", "user:inference", "user:sessions:claude_code", "user:mcp_servers", "user:file_upload"],
     codeChallengeMethod: "S256",
+    redirectUri: "http://localhost:54545/callback",
   },
 
   // ─── Codex (OpenAI) — Authorization Code Flow with PKCE ─────────────────────────
