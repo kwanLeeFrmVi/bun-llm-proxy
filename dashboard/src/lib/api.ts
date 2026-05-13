@@ -309,6 +309,18 @@ export const api = {
           requestCount: number;
         }>;
       }>(`/api/usage/leaderboard?period=${period}`),
+    userStats: (userId: string, period = "24h") =>
+      request<{
+        byModel: Array<{
+          model: string;
+          provider: string;
+          promptTokens: number;
+          completionTokens: number;
+          totalTokens: number;
+          cost: number;
+          requestCount: number;
+        }>;
+      }>(`/api/usage/user-stats?userId=${encodeURIComponent(userId)}&period=${period}`),
     modelStats: (model: string, period = "7d", page = 1, limit = 50) =>
       request<{
         model: string;

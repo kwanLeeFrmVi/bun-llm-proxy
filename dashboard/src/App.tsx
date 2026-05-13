@@ -16,6 +16,7 @@ const OAuthCallback = lazy(() => import("@/pages/OAuthCallback"));
 // Lazy-load heavy secondary routes to reduce initial bundle
 const Providers = lazy(() => import("@/pages/Providers"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const LeaderboardUserDetail = lazy(() => import("@/pages/LeaderboardUserDetail"));
 const ZaiUsage = lazy(() => import("@/pages/ZaiUsage"));
 const ProxUsage = lazy(() => import("@/pages/ProxUsage"));
 const ApiKeys = lazy(() => import("@/pages/ApiKeys"));
@@ -150,6 +151,14 @@ function ProtectedLayout() {
               element={
                 <Suspense fallback={<Loader />}>
                   <Leaderboard />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/leaderboard/:userId"
+              element={
+                <Suspense fallback={<Loader />}>
+                  <LeaderboardUserDetail />
                 </Suspense>
               }
             />

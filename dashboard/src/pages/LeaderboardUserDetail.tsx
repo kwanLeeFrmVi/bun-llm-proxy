@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api.ts";
-import { Trophy, TrendingUp, MessageSquare, DollarSign } from "lucide-react";
+import { ArrowLeft, TrendingUp, MessageSquare, DollarSign, User } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
-interface LeaderboardEntry {
-  userId: string;
-  username: string;
-  role: string;
-  totalTokens: number;
+interface ModelUsage {
+  model: string;
+  provider: string;
   promptTokens: number;
   completionTokens: number;
-  reasoningTokens: number;
-  totalCost: number;
+  totalTokens: number;
+  cost: number;
   requestCount: number;
 }
 
@@ -55,46 +52,27 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-function RankBadge({ rank }: { rank: number }) {
-  const colors = [
-    "bg-gradient-to-br from-yellow-400 to-amber-500 text-white",
-    "bg-gradient-to-br from-slate-300 to-slate-400 text-white",
-    "bg-gradient-to-br from-amber-600 to-amber-700 text-white",
-  ];
-
-  if (rank <= 3) {
-    return (
-      <div
-        className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-sm",
-          colors[rank - 1]
-        )}
-      >
-        {rank}
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-8 h-8 rounded-full bg-[--surface-container-high] flex items-center justify-center font-semibold text-sm text-[--on-surface-variant]">
-      {rank}
-    </div>
-  );
-}
-
-export default function Leaderboard() {
+export default function LeaderboardUserDetail() {
+  const { userId } = useParams<{ userId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const state = location.state as { username?: string; role?: string } | null;
+
+  const username = state?.username ?? userId ?? "Unknown";
+  const role = state?.role ?? "user";
+
   const [period, setPeriod] = useState<Period>("24h");
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [byModel, setByModel] = useState<ModelUsage[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
+    if (!userId) return;
     setLoading(true);
     try {
-      const data = await api.usage.leaderboard(period);
-      setLeaderboard(data.leaderboard);
+      const data = await api.usage.userStats(userId, period);
+      setByModel(data.byModel);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to load leaderboard");
+      toast.error(e instanceof Error ? e.message : "Failed to load user stats");
     } finally {
       setLoading(false);
     }
@@ -102,24 +80,33 @@ export default function Leaderboard() {
 
   useEffect(() => {
     load();
-  }, [period]);
+  }, [userId, period]);
 
-  // Calculate totals
-  const totalTokens = leaderboard.reduce((sum, e) => sum + e.totalTokens, 0);
-  const totalCost = leaderboard.reduce((sum, e) => sum + e.totalCost, 0);
-  const totalRequests = leaderboard.reduce((sum, e) => sum + e.requestCount, 0);
+  const totalTokens = byModel.reduce((s, r) => s + r.totalTokens, 0);
+  const totalCost = byModel.reduce((s, r) => s + r.cost, 0);
+  const totalRequests = byModel.reduce((s, r) => s + r.requestCount, 0);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface] flex items-center gap-3">
-          <Trophy className="w-8 h-8 text-amber-500" />
-          Leaderboard
-        </h1>
-        <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 font-medium">
-          User token usage rankings
-        </p>
+      <div className="flex items-start gap-4">
+        <button
+          onClick={() => navigate("/leaderboard")}
+          className="mt-1 p-1.5 rounded-lg hover:bg-[--surface-container-high] transition-colors text-[--on-surface-variant]"
+          aria-label="Back to leaderboard"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight text-[--on-surface] flex items-center gap-3">
+            <User className="w-7 h-7 text-[--primary]" />
+            {username}
+            <RoleBadge role={role} />
+          </h1>
+          <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] mt-1 font-medium">
+            Usage by model
+          </p>
+        </div>
       </div>
 
       {/* Period Selector */}
@@ -140,7 +127,7 @@ export default function Leaderboard() {
         ))}
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={cardStyle + " p-6"}>
           <p className="text-xs uppercase tracking-[0.12em] text-[--on-surface-variant] font-semibold">
@@ -168,13 +155,13 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* Leaderboard Table */}
+      {/* Model Breakdown Table */}
       <div className={cardStyle}>
         <div className="px-6 py-4 border-b border-[rgba(203,213,225,0.4)]">
           <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-amber-500" />
+            <TrendingUp className="w-4 h-4 text-[--primary]" />
             <span className="text-sm font-semibold text-[--on-surface]">
-              Rankings — {PERIODS.find((p) => p.value === period)?.label}
+              Model breakdown — {PERIODS.find((p) => p.value === period)?.label}
             </span>
           </div>
         </div>
@@ -183,9 +170,9 @@ export default function Leaderboard() {
           <div className="p-12 text-center">
             <p className="text-[--on-surface-variant] text-sm">Loading…</p>
           </div>
-        ) : leaderboard.length === 0 ? (
+        ) : byModel.length === 0 ? (
           <div className="p-12 text-center">
-            <Trophy className="w-12 h-12 text-[--on-surface-variant] mx-auto mb-3 opacity-50" />
+            <TrendingUp className="w-12 h-12 text-[--on-surface-variant] mx-auto mb-3 opacity-50" />
             <p className="text-[--on-surface-variant] text-sm">No usage data for this period</p>
           </div>
         ) : (
@@ -194,19 +181,22 @@ export default function Leaderboard() {
               <thead>
                 <tr className="border-b border-[rgba(203,213,225,0.4)]">
                   <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 pl-6 text-left">
-                    Rank
+                    Model
                   </th>
-                  <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-left">
-                    User
+                  <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-left hidden sm:table-cell">
+                    Provider
+                  </th>
+                  <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-right hidden md:table-cell">
+                    Input
+                  </th>
+                  <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-right hidden md:table-cell">
+                    Output
                   </th>
                   <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-right">
                     <TrendingUp className="w-3.5 h-3.5 inline mr-1" />
-                    Total Tokens
+                    Tokens
                   </th>
                   <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-right hidden sm:table-cell">
-                    Prompt / Completion
-                  </th>
-                  <th className="uppercase text-xs tracking-widest font-semibold text-[--on-surface-variant] py-3 text-right hidden md:table-cell">
                     <DollarSign className="w-3.5 h-3.5 inline mr-1" />
                     Cost
                   </th>
@@ -217,63 +207,43 @@ export default function Leaderboard() {
                 </tr>
               </thead>
               <tbody>
-                {leaderboard.map((entry, i) => (
+                {byModel.map((row, i) => (
                   <tr
-                    key={entry.userId}
-                    onClick={() =>
-                      navigate(`/leaderboard/${entry.userId}`, {
-                        state: { username: entry.username, role: entry.role },
-                      })
-                    }
+                    key={`${row.model}-${row.provider}`}
                     className={cn(
-                      "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors cursor-pointer",
+                      "border-b border-[rgba(203,213,225,0.25)] hover:bg-[--surface-container-low]/50 transition-colors",
                       i % 2 === 1 && "bg-[--surface-container-low]/40"
                     )}
                   >
                     <td className="pl-6 py-4">
-                      <RankBadge rank={i + 1} />
+                      <span className="text-sm font-semibold text-[--on-surface]">{row.model}</span>
                     </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-sm font-semibold text-[--on-surface]">
-                          {entry.username}
-                        </span>
-                        <RoleBadge role={entry.role} />
-                      </div>
+                    <td className="py-4 hidden sm:table-cell">
+                      <span className="text-xs text-[--on-surface-variant]">{row.provider}</span>
                     </td>
-                    <td className="text-right py-4">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="text-sm font-bold text-[--on-surface] cursor-default">
-                            {formatNumber(entry.totalTokens)}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="text-xs">
-                          <div>Input: {entry.promptTokens.toLocaleString()}</div>
-                          <div>Output: {entry.completionTokens.toLocaleString()}</div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </td>
-                    <td className="text-right py-4 hidden sm:table-cell">
+                    <td className="text-right py-4 hidden md:table-cell">
                       <span className="text-xs text-[--on-surface-variant]">
-                        {formatNumber(entry.promptTokens)} / {formatNumber(entry.completionTokens)}
+                        {formatNumber(row.promptTokens)}
                       </span>
                     </td>
                     <td className="text-right py-4 hidden md:table-cell">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="text-sm text-[--on-surface-variant] cursor-default">
-                            {formatCost(entry.totalCost)}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="text-xs">
-                          ${entry.totalCost.toFixed(6)}
-                        </TooltipContent>
-                      </Tooltip>
+                      <span className="text-xs text-[--on-surface-variant]">
+                        {formatNumber(row.completionTokens)}
+                      </span>
+                    </td>
+                    <td className="text-right py-4">
+                      <span className="text-sm font-bold text-[--on-surface]">
+                        {formatNumber(row.totalTokens)}
+                      </span>
+                    </td>
+                    <td className="text-right py-4 hidden sm:table-cell">
+                      <span className="text-sm text-[--on-surface-variant]">
+                        {formatCost(row.cost)}
+                      </span>
                     </td>
                     <td className="pr-6 text-right py-4">
                       <span className="text-sm text-[--on-surface-variant]">
-                        {formatNumber(entry.requestCount)}
+                        {formatNumber(row.requestCount)}
                       </span>
                     </td>
                   </tr>

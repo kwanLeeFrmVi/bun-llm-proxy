@@ -584,6 +584,68 @@ export function getLeaderboard(period: string): LeaderboardEntry[] {
   }));
 }
 
+// ─── Per-user model breakdown ────────────────────────────────────────────────
+
+export interface UserModelUsage {
+  model: string;
+  provider: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cost: number;
+  requestCount: number;
+}
+
+export function getUserUsageByModel(userId: string, period: string): UserModelUsage[] {
+  const db = getDb();
+  const since = periodToTimestamp(period);
+  const baseFilter = since ? `ul.timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
+  const SYSTEM_ID = "00000000-0000-0000-0000-000000000000";
+  const userFilter =
+    userId === SYSTEM_ID
+      ? `ak.user_id IS NULL`
+      : `u.id = '${userId.replace(/'/g, "''")}'`;
+
+  const rows = db
+    .query<
+      {
+        model: string;
+        provider: string;
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+        cost: number;
+        request_count: number;
+      },
+      []
+    >(
+      `SELECT COALESCE(ul.model, 'unknown') as model,
+              COALESCE(ul.provider, 'unknown') as provider,
+              SUM(ul.prompt_tokens) AS prompt_tokens,
+              SUM(ul.completion_tokens) AS completion_tokens,
+              SUM(ul.prompt_tokens + ul.completion_tokens) AS total_tokens,
+              COALESCE(SUM(ul.cost), 0) AS cost,
+              COUNT(*) AS request_count
+       FROM usage_log ul
+       LEFT JOIN api_keys ak ON ul.api_key_id = ak.id
+       LEFT JOIN users u ON ak.user_id = u.id
+       WHERE ${baseFilter} AND ul.status != 'pending' AND ${userFilter}
+       GROUP BY ul.model, ul.provider
+       ORDER BY total_tokens DESC`
+    )
+    .all();
+
+  return rows.map((r) => ({
+    model: r.model,
+    provider: r.provider,
+    promptTokens: r.prompt_tokens ?? 0,
+    completionTokens: r.completion_tokens ?? 0,
+    totalTokens: r.total_tokens ?? 0,
+    cost: r.cost ?? 0,
+    requestCount: r.request_count ?? 0,
+  }));
+}
+
 // ─── Per-model stats helpers ─────────────────────────────────────────────────
 
 export interface ModelStatsSummary {
