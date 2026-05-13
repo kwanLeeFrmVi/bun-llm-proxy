@@ -21,6 +21,7 @@ Claude Code received a "complete" but empty response and hung because there was 
 ```
 
 Key indicators:
+
 - `1 upstreamChunks` — upstream sent essentially nothing
 - `sawMessageStart=false` — no real Claude message was ever started
 - `prompt_tokens: 0, completion_tokens: 0` — zero content
@@ -35,6 +36,7 @@ await Promise.race([readPromise, heartbeatPromise, stallPromise]);
 ```
 
 `streamAbort.abort()` only sets a flag checked at the **top** of the while-loop. If the loop was currently awaiting the `Promise.race`, it wouldn't wake up until:
+
 1. The heartbeat timer fired (15 seconds later)
 2. The upstream sent more data
 3. The stall timer fired (5 minutes later)
@@ -51,6 +53,7 @@ This caused a **6-15 second delay** between the client disconnecting and the inn
 ```
 
 Key indicators:
+
 - 6-second gap between `OUTER_CANCELED` and `INNER complete`
 - `closeReason=normal` even though client disconnected (misleading)
 - `safeEnqueue` failures after downstream closed
@@ -63,18 +66,21 @@ Key indicators:
 Added detection in the normal completion path (after upstream finishes). When the upstream returned a 200 stream with no real content:
 
 **Detection criteria** (all must be true):
+
 - `sourceFormat === "claude"`
 - `sawMessageStart === false` (upstream never sent `message_start`)
 - `sawMessageStop === false` (upstream never sent `message_stop`)
 - `chunkCount <= 2` (very few raw TCP chunks from upstream)
 
 **What happens on detection:**
+
 1. Emits `__UPSTREAM_ERROR__` sentinel so the outer wrapper logs `OUTER_ERROR` instead of `OUTER_COMPLETE`
 2. Emits a Claude `error` event (`type: "api_error"`) so Claude Code can trigger its retry mechanism
 3. Still emits minimal termination sequence (`message_start` + `message_delta` + `message_stop`) so the client doesn't hang waiting for SSE events
 4. Sets `closeReason = "upstream_error"` for correct log classification
 
 **New log signature:**
+
 ```
 [STREAM] EMPTY_UPSTREAM: upstream returned 200 with empty stream
   (chunks=1, sawMessageStart=false, sawMessageStop=false, provider=...).
@@ -111,6 +117,7 @@ When the client disconnects → outer `cancel()` → inner `cancel()` → `strea
 Added a check at the start of the normal completion path: if `downstreamCanceled` is true (client already disconnected), skip all termination event injection and close immediately. The outer wrapper already logged `OUTER_CANCELED`; injecting events into a closed controller is pointless and just produces "Controller is already closed" errors.
 
 **New log signature:**
+
 ```
 INNER complete: 5 upstreamChunks, 6 translatedChunks, ... closeReason=downstream_canceled, totalMs=...
 ```
@@ -122,6 +129,7 @@ Instead of the misleading `closeReason=normal`.
 Added outer-layer detection for empty responses that slip through. When the stream completes "normally" but the diagnostics show 0 tokens and very few chunks:
 
 **Detection criteria:**
+
 - `finalUsage` exists
 - `completion_tokens === 0` AND `prompt_tokens === 0`
 - `downstreamChunkCount <= 5`

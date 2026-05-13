@@ -395,10 +395,7 @@ export function buildUpstreamHeaders(
     | undefined;
 
   // Handle anthropic-compatible-* dynamically
-  if (
-    provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX) ||
-    provider.includes("glm")
-  ) {
+  if (provider.startsWith(ANTHROPIC_COMPATIBLE_PREFIX) || provider.includes("glm")) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...CLAUDE_API_HEADERS,

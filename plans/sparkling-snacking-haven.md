@@ -12,6 +12,7 @@ stream error received: unexpected internal error encountered
 ```
 
 **Root cause chain:**
+
 1. `handlers/chat.ts` line 342: `onStreamError: (status, msg) => sseErrorResponse(status, msg)` — always uses Claude SSE format
 2. `chatCore.ts` calls `opts.onStreamError` when the upstream returns an error HTTP status during streaming
 3. `wrapStreamingResponse` in `handlers/chat.ts` (line 576–582) emits `data: {error: {...}}` (raw JSON, not valid SSE at all)
@@ -19,6 +20,7 @@ stream error received: unexpected internal error encountered
 5. `sseErrorResponse` in `ai-bridge/utils/error.ts` always emits Claude SSE events
 
 **Key files involved:**
+
 - `ai-bridge/utils/error.ts` — `sseErrorResponse` only emits Claude SSE
 - `ai-bridge/handlers/chatCore.ts` — calls `opts.onStreamError` for upstream HTTP errors
 - `handlers/chat.ts` — `onStreamError` is hardcoded to `sseErrorResponse`; `wrapStreamingResponse` has mixed SSE issues
@@ -42,12 +44,14 @@ export function openaiSseErrorResponse(status: number, message: string): Respons
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
     model: "",
-    choices: [{
-      index: 0,
-      delta: {},
-      finish_reason: "error",
-      logprobs: null,
-    }],
+    choices: [
+      {
+        index: 0,
+        delta: {},
+        finish_reason: "error",
+        logprobs: null,
+      },
+    ],
   });
   const errorData = JSON.stringify({
     error: {
@@ -57,9 +61,7 @@ export function openaiSseErrorResponse(status: number, message: string): Respons
     },
   });
 
-  const body =
-    `data: ${errorChunk}\n\n` +
-    `data: [DONE]\n\n`;
+  const body = `data: ${errorChunk}\n\n` + `data: [DONE]\n\n`;
 
   return new Response(body, {
     status: 200, // OpenAI SSE errors are 200 with error in chunk body
@@ -96,6 +98,7 @@ onStreamError: (status: number, msg: string) =>
 **Fix `wrapStreamingResponse` error path (lines 429–433):**
 
 Currently:
+
 ```typescript
 if (isStreaming && isClaudeStreamingClient(body, request)) {
   return sseErrorResponse(...)
@@ -113,10 +116,10 @@ Check all call sites of `sseErrorResponse` in `handlers/chat.ts` — all other c
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `ai-bridge/utils/error.ts` | Add `openaiSseErrorResponse()` function |
-| `handlers/chat.ts` | Fix `onStreamError` to branch on `sourceFormat`; fix `wrapStreamingResponse` error paths |
+| File                       | Change                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `ai-bridge/utils/error.ts` | Add `openaiSseErrorResponse()` function                                                  |
+| `handlers/chat.ts`         | Fix `onStreamError` to branch on `sourceFormat`; fix `wrapStreamingResponse` error paths |
 
 ## Verification
 

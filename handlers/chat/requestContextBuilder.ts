@@ -1,5 +1,9 @@
 import { clearAccountError } from "../../services/auth.ts";
-import { updateProviderCredentials, checkAndRefreshToken, getProjectIdForConnection } from "../../services/tokenRefresh.ts";
+import {
+  updateProviderCredentials,
+  checkAndRefreshToken,
+  getProjectIdForConnection,
+} from "../../services/tokenRefresh.ts";
 import { detectFormatByEndpoint } from "../../ai-bridge/translator/formats.ts";
 import { detectFormat } from "../../ai-bridge/handlers/provider.ts";
 import { getTargetFormat } from "../../ai-bridge/handlers/provider.js";
@@ -26,9 +30,17 @@ export interface BuildChatCoreOptsParams {
 
 export async function buildChatCoreOpts(params: BuildChatCoreOptsParams) {
   const {
-    body, provider, model, credentials: creds,
-    clientRawRequest, userAgent, apiKey, request, ctx,
-    requestId, startTime,
+    body,
+    provider,
+    model,
+    credentials: creds,
+    clientRawRequest,
+    userAgent,
+    apiKey,
+    request,
+    ctx,
+    requestId,
+    startTime,
   } = params;
 
   // Refresh credentials
@@ -48,7 +60,11 @@ export async function buildChatCoreOpts(params: BuildChatCoreOptsParams) {
       // Fire-and-forget — this is a best-effort persistence and must not
       // block the request path (can add tens of ms per call under load).
       updateProviderCredentials(creds.connectionId as string, { projectId: pid }).catch((e) => {
-        log.debug(ctx, "AUTH", `updateProviderCredentials failed: ${e instanceof Error ? e.message : String(e)}`);
+        log.debug(
+          ctx,
+          "AUTH",
+          `updateProviderCredentials failed: ${e instanceof Error ? e.message : String(e)}`
+        );
       });
     }
   }

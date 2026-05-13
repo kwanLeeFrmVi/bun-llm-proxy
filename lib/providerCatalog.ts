@@ -79,7 +79,8 @@ export const OAUTH_PROVIDERS: Record<string, ProviderMeta> = {
     name: "Antigravity",
     website: "https://antigravity.dev",
     deprecated: true,
-    deprecationNotice: "Antigravity is designed exclusively for Antigravity IDE. Using it with other tools may result in account restrictions.",
+    deprecationNotice:
+      "Antigravity is designed exclusively for Antigravity IDE. Using it with other tools may result in account restrictions.",
   },
   github: {
     color: "#333333",
@@ -154,10 +155,25 @@ export const FREE_TIER_PROVIDERS: Record<string, ProviderMeta> = {
 
 export const APIKEY_PROVIDERS: Record<string, ProviderMeta> = {
   deepgram: { color: "#13EF93", textIcon: "DG", name: "Deepgram", website: "https://deepgram.com" },
-  assemblyai: { color: "#0062FF", textIcon: "AA", name: "AssemblyAI", website: "https://assemblyai.com" },
-  nanobanana: { color: "#FFD700", textIcon: "NB", name: "NanoBanana", website: "https://nanobananaapi.ai" },
+  assemblyai: {
+    color: "#0062FF",
+    textIcon: "AA",
+    name: "AssemblyAI",
+    website: "https://assemblyai.com",
+  },
+  nanobanana: {
+    color: "#FFD700",
+    textIcon: "NB",
+    name: "NanoBanana",
+    website: "https://nanobananaapi.ai",
+  },
   chutes: { color: "#6366F1", textIcon: "CH", name: "Chutes AI", website: "https://chutes.ai" },
-  "ollama-local": { color: "#8b5cf6", textIcon: "OL", name: "Ollama Local", website: "https://ollama.com" },
+  "ollama-local": {
+    color: "#8b5cf6",
+    textIcon: "OL",
+    name: "Ollama Local",
+    website: "https://ollama.com",
+  },
   glm: {
     color: "#2563EB",
     textIcon: "GL",

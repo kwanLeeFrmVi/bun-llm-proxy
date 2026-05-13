@@ -1,7 +1,4 @@
-import {
-  getProviderConnectionById,
-  updateProviderConnection,
-} from "@/lib/localDb";
+import { getProviderConnectionById, updateProviderConnection } from "@/lib/localDb";
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
@@ -25,7 +22,9 @@ export async function POST(req: Request): Promise<Response> {
   console.log(`[CLEAR_LOCKS] connection=${id} provider=${connection.provider}`);
   console.log(`[CLEAR_LOCKS] psdKeys=${JSON.stringify(psdKeys)}`);
   console.log(`[CLEAR_LOCKS] flatKeys matching modelLock_=${JSON.stringify(modelLockFlat)}`);
-  console.log(`[CLEAR_LOCKS] providerSpecificData=${JSON.stringify(connection.providerSpecificData)}`);
+  console.log(
+    `[CLEAR_LOCKS] providerSpecificData=${JSON.stringify(connection.providerSpecificData)}`
+  );
 
   const update: Record<string, unknown> = {};
 

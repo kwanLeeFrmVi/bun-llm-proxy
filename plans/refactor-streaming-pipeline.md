@@ -17,16 +17,16 @@ Build the new pipeline-based streaming wrapper as `*.v2.ts` files alongside the 
 
 ## Log Payload Field Set (Preserve Exactly)
 
-| Field | Type | Events |
-|---|---|---|
-| `provider` | `string` | All |
-| `model` | `string` | All |
-| `usage` | `{ prompt_tokens?, completion_tokens?, reasoning_tokens?, cached_tokens? }` | `OUTER_COMPLETE` only |
-| `closeReason` | `"normal" \| "downstream_canceled" \| "inner_stream_error" \| "upstream_error"` | All |
-| `downstreamChunkCount` | `number` | All |
-| `firstDownstreamChunkMs` | `number \| null` | All |
-| `durationMs` | `number` | All |
-| `error` | `string` | `OUTER_ERROR`, `OUTER_CANCELED` only |
+| Field                    | Type                                                                            | Events                               |
+| ------------------------ | ------------------------------------------------------------------------------- | ------------------------------------ |
+| `provider`               | `string`                                                                        | All                                  |
+| `model`                  | `string`                                                                        | All                                  |
+| `usage`                  | `{ prompt_tokens?, completion_tokens?, reasoning_tokens?, cached_tokens? }`     | `OUTER_COMPLETE` only                |
+| `closeReason`            | `"normal" \| "downstream_canceled" \| "inner_stream_error" \| "upstream_error"` | All                                  |
+| `downstreamChunkCount`   | `number`                                                                        | All                                  |
+| `firstDownstreamChunkMs` | `number \| null`                                                                | All                                  |
+| `durationMs`             | `number`                                                                        | All                                  |
+| `error`                  | `string`                                                                        | `OUTER_ERROR`, `OUTER_CANCELED` only |
 
 ## Implementation Plan
 

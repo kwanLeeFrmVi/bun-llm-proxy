@@ -344,7 +344,10 @@ export async function proxGetStatus(keyId?: string): Promise<ProxStatus> {
   return aggregateStatus(statuses);
 }
 
-export async function proxGetSummary(days: string | number = 0, keyId?: string): Promise<ProxSummary> {
+export async function proxGetSummary(
+  days: string | number = 0,
+  keyId?: string
+): Promise<ProxSummary> {
   const keys = await getProxKeys();
   if (keyId) {
     const key = keys.find((k) => k.id === keyId);

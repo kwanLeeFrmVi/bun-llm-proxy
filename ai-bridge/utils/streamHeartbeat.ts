@@ -12,9 +12,7 @@ export interface HeartbeatTransformHandle {
   stop(): void;
 }
 
-export function createHeartbeatTransform(
-  intervalMs: number = 15_000
-): HeartbeatTransformHandle {
+export function createHeartbeatTransform(intervalMs: number = 15_000): HeartbeatTransformHandle {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let controllerRef: TransformStreamDefaultController<Uint8Array> | null = null;
 

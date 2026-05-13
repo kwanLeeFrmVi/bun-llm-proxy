@@ -23,10 +23,24 @@ export function CldbModelTable({ summary }: CldbModelTableProps) {
           boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
         }}
       >
-        <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--on-surface)", marginBottom: "12px" }}>
+        <p
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "var(--on-surface)",
+            marginBottom: "12px",
+          }}
+        >
           Model Breakdown
         </p>
-        <p style={{ fontSize: "12px", color: "var(--on-surface-variant)", textAlign: "center", padding: "20px" }}>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--on-surface-variant)",
+            textAlign: "center",
+            padding: "20px",
+          }}
+        >
           No model data available.
         </p>
       </div>
@@ -43,7 +57,14 @@ export function CldbModelTable({ summary }: CldbModelTableProps) {
         boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
       }}
     >
-      <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--on-surface)", marginBottom: "12px" }}>
+      <p
+        style={{
+          fontSize: "13px",
+          fontWeight: 600,
+          color: "var(--on-surface)",
+          marginBottom: "12px",
+        }}
+      >
         Model Breakdown
       </p>
       <div style={{ overflowX: "auto" }}>
@@ -81,10 +102,14 @@ export function CldbModelTable({ summary }: CldbModelTableProps) {
                 >
                   {item.model}
                 </td>
-                <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--on-surface)" }}>
+                <td
+                  style={{ padding: "10px 12px", textAlign: "right", color: "var(--on-surface)" }}
+                >
                   {fmt(item.requests)}
                 </td>
-                <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--on-surface)" }}>
+                <td
+                  style={{ padding: "10px 12px", textAlign: "right", color: "var(--on-surface)" }}
+                >
                   {fmt(item.tokens)}
                 </td>
                 <td

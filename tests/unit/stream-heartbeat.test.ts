@@ -67,13 +67,13 @@ describe("streamHeartbeat", () => {
 
     // Wait another half-interval — no ping should have fired yet
     await Bun.sleep(intervalMs / 2);
-    
+
     expect(chunks.length).toBe(1);
     expect(chunks[0]).toEqual(data);
 
     // Wait for the next ping
     await Bun.sleep(intervalMs);
-    
+
     stop();
     await writer.close();
     await readPromise;

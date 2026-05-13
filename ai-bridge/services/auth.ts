@@ -1,7 +1,13 @@
 // Account fallback and cooldown logic.
 // Written from scratch in TypeScript.
 
-import { COOLDOWN_MS, BACKOFF_CONFIG, QUOTA_BACKOFF_CONFIG, QUOTA_EXHAUSTION_KEYWORDS, HTTP_STATUS } from "../config/runtimeConfig.ts";
+import {
+  COOLDOWN_MS,
+  BACKOFF_CONFIG,
+  QUOTA_BACKOFF_CONFIG,
+  QUOTA_EXHAUSTION_KEYWORDS,
+  HTTP_STATUS,
+} from "../config/runtimeConfig.ts";
 
 // ─── Quota / Rate Limit Cooldown ───────────────────────────────────────────────
 
@@ -43,7 +49,8 @@ export function checkFallbackError(
     // Provider-wide account availability errors (not account-specific) — use short lock
     // Examples: "no account available", "all accounts unavailable", "no sssaicode account available"
     if (
-      (lowerError.includes("account") && (lowerError.includes("available") || lowerError.includes("unavailable"))) ||
+      (lowerError.includes("account") &&
+        (lowerError.includes("available") || lowerError.includes("unavailable"))) ||
       lowerError.includes("no account")
     ) {
       // Use very short lock (1-5 seconds) since this is provider-wide, not account-specific

@@ -97,9 +97,7 @@ export function convertOllamaResponseToClaude(
       const fn = tcObj.function as Record<string, unknown> | undefined;
       const toolName = (fn?.name as string) ?? "";
       const rawArgs =
-        typeof fn?.arguments === "string"
-          ? fn.arguments
-          : JSON.stringify(fn?.arguments ?? {});
+        typeof fn?.arguments === "string" ? fn.arguments : JSON.stringify(fn?.arguments ?? {});
 
       state.toolBlockIndex = state.nextBlockIndex++;
       state.nextToolIndex++;
@@ -235,9 +233,7 @@ export function convertOllamaResponseToClaudeNonStream(
       const fn = tc.function as Record<string, unknown> | undefined;
       const toolName = (fn?.name as string) ?? "";
       const rawArgs =
-        typeof fn?.arguments === "string"
-          ? fn.arguments
-          : JSON.stringify(fn?.arguments ?? {});
+        typeof fn?.arguments === "string" ? fn.arguments : JSON.stringify(fn?.arguments ?? {});
       content.push({
         type: "tool_use",
         id: `toolu_${i}_${Date.now()}`,

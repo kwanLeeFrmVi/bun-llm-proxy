@@ -125,7 +125,13 @@ export function OverviewTab({
               Aggregate usage across all active gateways
             </p>
           </div>
-          <Suspense fallback={<div className="h-96 flex items-center justify-center text-sm text-[--on-surface-variant]">Loading topology…</div>}>
+          <Suspense
+            fallback={
+              <div className="h-96 flex items-center justify-center text-sm text-[--on-surface-variant]">
+                Loading topology…
+              </div>
+            }
+          >
             <ProviderTopology
               providers={stats.byProvider}
               lastProvider={recentRows[0]?.provider}

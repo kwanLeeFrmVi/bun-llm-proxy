@@ -37,7 +37,8 @@ export function extractPromptText(body: Record<string, unknown>): string {
   if (Array.isArray(input)) {
     for (const item of input) {
       if (item && typeof item === "object") {
-        const content = (item as Record<string, unknown>).text ?? (item as Record<string, unknown>).content;
+        const content =
+          (item as Record<string, unknown>).text ?? (item as Record<string, unknown>).content;
         parts.push(extractContentText(content));
       }
     }

@@ -19,16 +19,18 @@ export function makeUsageCallback(
 
     const durMs = Date.now() - startTime;
     const completionTokens = usage.completion_tokens ?? 0;
-    const tps = completionTokens > 0 && durMs > 0
-      ? (completionTokens / durMs) * 1000
-      : undefined;
-    await saveRequestUsage(requestId, {
-      ...usage,
-      provider,
-      model,
-      ttft_ms: durMs,
-      tokens_per_second: tps,
-    }, durMs);
+    const tps = completionTokens > 0 && durMs > 0 ? (completionTokens / durMs) * 1000 : undefined;
+    await saveRequestUsage(
+      requestId,
+      {
+        ...usage,
+        provider,
+        model,
+        ttft_ms: durMs,
+        tokens_per_second: tps,
+      },
+      durMs
+    );
   };
 }
 
@@ -38,7 +40,5 @@ export function makeStreamErrorCallback(
   openaiSseErrorResponse: (status: number, msg: string) => Response
 ) {
   return (status: number, msg: string) =>
-    sourceFormat === "claude"
-      ? sseErrorResponse(status, msg)
-      : openaiSseErrorResponse(status, msg);
+    sourceFormat === "claude" ? sseErrorResponse(status, msg) : openaiSseErrorResponse(status, msg);
 }

@@ -49,11 +49,12 @@ describe("handleChat usage recording", () => {
     mock.restore();
     // Default mocks to prevent real DB/API calls
     mock.module("../../services/auth.ts", () => ({
-      getProviderCredentials: () => Promise.resolve({
-        connectionId: "conn-1",
-        connectionName: "Test Account",
-        accessToken: "at",
-      }),
+      getProviderCredentials: () =>
+        Promise.resolve({
+          connectionId: "conn-1",
+          connectionName: "Test Account",
+          accessToken: "at",
+        }),
       clearAccountError: () => Promise.resolve(),
     }));
     mock.module("../../services/model.ts", () => ({
@@ -71,14 +72,16 @@ describe("handleChat usage recording", () => {
 
   it("should record usage EXACTLY ONCE for non-streaming requests", async () => {
     const saveUsageSpy = spyOn(usageDb, "saveRequestUsage");
-    
+
     mock.module("../../ai-bridge/handlers/chatCore.ts", () => ({
       handleChatCore: async (opts: any) => {
         // Simulate non-streaming success
         await opts.onUsage({ prompt_tokens: 10, completion_tokens: 20 });
         return {
           success: true,
-          response: new Response(JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 20 } })),
+          response: new Response(
+            JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 20 } })
+          ),
         };
       },
     }));
@@ -98,7 +101,7 @@ describe("handleChat usage recording", () => {
 
   it("should record usage EXACTLY ONCE for streaming requests via stream wrapper", async () => {
     const saveUsageSpy = spyOn(usageDb, "saveRequestUsage");
-    
+
     mock.module("../../ai-bridge/handlers/chatCore.ts", () => ({
       handleChatCore: async (opts: any) => {
         // In streaming mode, chatCore DOES NOT call onUsage (it's handled by the wrapper)
@@ -107,7 +110,7 @@ describe("handleChat usage recording", () => {
           start(controller) {
             controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(usageData)}\n\n`));
             controller.close();
-          }
+          },
         });
         return {
           success: true,

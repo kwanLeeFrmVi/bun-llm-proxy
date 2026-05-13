@@ -6,16 +6,23 @@ const mockGetProviderConnections = mock(() => Promise.resolve([]));
 const mockGetProviderNodes = mock(() => Promise.resolve([]));
 const mockGetModelAliases = mock(() => Promise.resolve({}));
 const mockParseModel = mock((s: string) => ({
-  isAlias: false, provider: s.split("/")[0], providerAlias: s.split("/")[0], model: s.split("/")[1] ?? s,
+  isAlias: false,
+  provider: s.split("/")[0],
+  providerAlias: s.split("/")[0],
+  model: s.split("/")[1] ?? s,
 }));
 
 mock.module("../../db/index.ts", () => ({
-  getComboByName: mockGetComboByName, getComboConfig: mockGetComboConfig,
-  getProviderConnections: mockGetProviderConnections, getProviderNodes: mockGetProviderNodes,
+  getComboByName: mockGetComboByName,
+  getComboConfig: mockGetComboConfig,
+  getProviderConnections: mockGetProviderConnections,
+  getProviderNodes: mockGetProviderNodes,
   getModelAliases: mockGetModelAliases,
 }));
 mock.module("../../ai-bridge/services/model.ts", () => ({
-  parseModel: mockParseModel, resolveModelAliasFromMap: () => null, getModelInfoCore: () => Promise.resolve({ provider: null, model: null }),
+  parseModel: mockParseModel,
+  resolveModelAliasFromMap: () => null,
+  getModelInfoCore: () => Promise.resolve({ provider: null, model: null }),
 }));
 
 import { getFilteredComboModelConfigs } from "../../services/model.ts";
@@ -38,13 +45,29 @@ describe("getFilteredComboModelConfigs", () => {
 
   it("filters out models from disabled providers", async () => {
     mockGetComboByName.mockImplementation(async (n: string) =>
-      n === "my-combo" ? { id: "1", name: n, models: ["openai/a", "anthropic/b", "gemini/c"] } : null
+      n === "my-combo"
+        ? { id: "1", name: n, models: ["openai/a", "anthropic/b", "gemini/c"] }
+        : null
     );
     mockGetComboConfig.mockImplementation(async (n: string) =>
-      n === "my-combo" ? { name: n, models: [{ model: "openai/a", weight: 2 }, { model: "anthropic/b", weight: 1 }, { model: "gemini/c", weight: 1 }] } : null
+      n === "my-combo"
+        ? {
+            name: n,
+            models: [
+              { model: "openai/a", weight: 2 },
+              { model: "anthropic/b", weight: 1 },
+              { model: "gemini/c", weight: 1 },
+            ],
+          }
+        : null
     );
     mockGetProviderConnections.mockImplementation(async (f: any) =>
-      f?.isActive === true ? [{ id: "c1", provider: "openai" }, { id: "c3", provider: "gemini" }] : []
+      f?.isActive === true
+        ? [
+            { id: "c1", provider: "openai" },
+            { id: "c3", provider: "gemini" },
+          ]
+        : []
     );
 
     const result = await getFilteredComboModelConfigs("my-combo");
@@ -59,9 +82,19 @@ describe("getFilteredComboModelConfigs", () => {
       n === "my-combo" ? { id: "1", name: n, models: ["openai/a", "anthropic/b"] } : null
     );
     mockGetComboConfig.mockImplementation(async (n: string) =>
-      n === "my-combo" ? { name: n, models: [{ model: "openai/a", weight: 1 }, { model: "anthropic/b", weight: 1 }] } : null
+      n === "my-combo"
+        ? {
+            name: n,
+            models: [
+              { model: "openai/a", weight: 1 },
+              { model: "anthropic/b", weight: 1 },
+            ],
+          }
+        : null
     );
-    mockGetProviderConnections.mockImplementation(async (f: any) => f?.isActive === true ? [] : []);
+    mockGetProviderConnections.mockImplementation(async (f: any) =>
+      f?.isActive === true ? [] : []
+    );
 
     expect(await getFilteredComboModelConfigs("my-combo")).toBeNull();
   });
@@ -73,7 +106,14 @@ describe("getFilteredComboModelConfigs", () => {
       return null;
     });
     mockGetComboConfig.mockImplementation(async (n: string) => {
-      if (n === "outer") return { name: n, models: [{ model: "inner", weight: 1 }, { model: "openai/a", weight: 1 }] };
+      if (n === "outer")
+        return {
+          name: n,
+          models: [
+            { model: "inner", weight: 1 },
+            { model: "openai/a", weight: 1 },
+          ],
+        };
       if (n === "inner") return { name: n, models: [{ model: "anthropic/b", weight: 1 }] };
       return null;
     });
@@ -95,13 +135,25 @@ describe("getFilteredComboModelConfigs", () => {
       return null;
     });
     mockGetComboConfig.mockImplementation(async (n: string) => {
-      if (n === "outer") return { name: n, models: [{ model: "inner", weight: 3 }, { model: "openai/a", weight: 1 }] };
+      if (n === "outer")
+        return {
+          name: n,
+          models: [
+            { model: "inner", weight: 3 },
+            { model: "openai/a", weight: 1 },
+          ],
+        };
       if (n === "inner") return { name: n, models: [{ model: "anthropic/b", weight: 1 }] };
       return null;
     });
     // Both openai and anthropic active
     mockGetProviderConnections.mockImplementation(async (f: any) =>
-      f?.isActive === true ? [{ id: "c1", provider: "openai" }, { id: "c2", provider: "anthropic" }] : []
+      f?.isActive === true
+        ? [
+            { id: "c1", provider: "openai" },
+            { id: "c2", provider: "anthropic" },
+          ]
+        : []
     );
 
     const result = await getFilteredComboModelConfigs("outer");

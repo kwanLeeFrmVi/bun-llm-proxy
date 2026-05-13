@@ -180,7 +180,7 @@ export function cacheClaudeHeaders(headers: Record<string, string>): void {
     // Skip overwrite if a valid (non-expired) entry already exists for this key.
     // Just touch LRU stats to keep the entry active.
     const existing = headerCache.get(cacheKey);
-    if (existing && (now - existing.timestamp) < CACHE_TTL_MS) {
+    if (existing && now - existing.timestamp < CACHE_TTL_MS) {
       existing.lastAccess = now;
       existing.accessCount++;
       // Touch in Redis as well (fire-and-forget)

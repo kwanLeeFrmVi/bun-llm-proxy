@@ -22,9 +22,7 @@
     "paths": {
       "@/lib/usageDb": ["./stubs/usageDb.ts"],
       "@/lib/localDb": ["./db/index.ts"],
-      "@/services/*": [
-        "./services/*"
-      ],
+      "@/services/*": ["./services/*"],
       "@/models": ["./db/index.ts"],
       "@lib/*": ["./lib/*"],
       "@handlers/*": ["./handlers/*"],

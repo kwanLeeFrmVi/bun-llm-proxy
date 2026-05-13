@@ -4,7 +4,12 @@ import { incrementCircuitBreaker, resetCircuitBreaker } from "../../lib/circuitB
 import * as log from "../../lib/logger.ts";
 import type { RequestContext } from "../../lib/requestContext.ts";
 
-export type ChatCoreResult = { success: boolean; response?: Response; status: number; error: string };
+export type ChatCoreResult = {
+  success: boolean;
+  response?: Response;
+  status: number;
+  error: string;
+};
 
 /**
  * Execute chatCore with transient-error retry on the same account.

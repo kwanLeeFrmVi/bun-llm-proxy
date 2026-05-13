@@ -6,7 +6,8 @@ export function classifyNetworkError(msg: string): { category: string; suggestio
   if (msg.includes("unable to verify the first certificate") || msg.includes("certificate")) {
     return {
       category: "TLS_ERROR",
-      suggestion: "Upstream server has a certificate issue (invalid, expired, or self-signed). Check with the provider.",
+      suggestion:
+        "Upstream server has a certificate issue (invalid, expired, or self-signed). Check with the provider.",
     };
   }
   if (msg.includes("ECONNREFUSED")) {

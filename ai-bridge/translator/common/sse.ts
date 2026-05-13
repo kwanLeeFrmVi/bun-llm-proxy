@@ -71,7 +71,8 @@ export function buildClaudeErrorEvent(errorType: string, message: string): strin
 export function mapToAnthropicErrorType(status: number | null, errorMsg?: string): string {
   if (status === 429) return "rate_limit_error";
   if (status !== null && status >= 500) return "overloaded_error";
-  if (errorMsg && (errorMsg.includes("stall") || errorMsg.includes("timeout"))) return "overloaded_error";
+  if (errorMsg && (errorMsg.includes("stall") || errorMsg.includes("timeout")))
+    return "overloaded_error";
   return "api_error";
 }
 

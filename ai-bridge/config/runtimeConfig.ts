@@ -68,7 +68,7 @@ export const BACKOFF_CONFIG = {
 // Escalation: 1h → 2h → 4h → 5h(cap)
 export const QUOTA_BACKOFF_CONFIG = {
   base: 1 * 60 * 60 * 1000, // 1 hours
-  max: 5 * 60 * 60 * 1000,  // 5 hours max (matches GLM reset cycle)
+  max: 5 * 60 * 60 * 1000, // 5 hours max (matches GLM reset cycle)
   maxLevel: 3, // 3 escalation levels
 } as const;
 

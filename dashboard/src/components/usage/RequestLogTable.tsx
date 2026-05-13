@@ -62,15 +62,7 @@ function TokenCell({ input, output }: { input: number; output: number }) {
   );
 }
 
-function CacheCell({
-  cached,
-  write,
-  hit,
-}: {
-  cached: number;
-  write: number;
-  hit: number;
-}) {
+function CacheCell({ cached, write, hit }: { cached: number; write: number; hit: number }) {
   if (cached === 0 && write === 0 && hit === 0) {
     return <span className="text-[var(--on-surface-variant)] text-[11px]">—</span>;
   }
@@ -99,16 +91,9 @@ function DiscountBadge({ label }: { label: string }) {
   );
 }
 
-export function RequestLogTable({
-  rows,
-  loading,
-  pagination,
-  onPageChange,
-}: RequestLogTableProps) {
+export function RequestLogTable({ rows, loading, pagination, onPageChange }: RequestLogTableProps) {
   return (
-    <div
-      className="rounded-xl bg-card overflow-hidden border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
-    >
+    <div className="rounded-xl bg-card overflow-hidden border border-[rgba(203,213,225,0.6)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(203,213,225,0.4)]">
         <p className="text-[13px] font-semibold text-[var(--on-surface)]">Request History</p>
@@ -122,16 +107,16 @@ export function RequestLogTable({
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div
-            className="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"
-          />
+          <div className="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
         </div>
       )}
 
       {/* Empty */}
       {!loading && rows.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-[12px] text-[var(--on-surface-variant)]">No requests in this period.</p>
+          <p className="text-[12px] text-[var(--on-surface-variant)]">
+            No requests in this period.
+          </p>
         </div>
       )}
 
@@ -181,10 +166,7 @@ export function RequestLogTable({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    style={{ borderBottom: "1px solid rgba(203,213,225,0.15)" }}
-                  >
+                  <tr key={row.id} style={{ borderBottom: "1px solid rgba(203,213,225,0.15)" }}>
                     {/* Model */}
                     <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: "11px" }}>
                       <span className="text-[var(--on-surface)]">{row.model}</span>
@@ -240,10 +222,9 @@ export function RequestLogTable({
                       <span
                         className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold"
                         style={{
-                          background:
-                            row.isStream
-                              ? "rgba(139,92,246,0.15)"
-                              : "rgba(100,116,139,0.15)",
+                          background: row.isStream
+                            ? "rgba(139,92,246,0.15)"
+                            : "rgba(100,116,139,0.15)",
                           color: row.isStream ? "#8b5cf6" : "#64748b",
                         }}
                       >

@@ -8,7 +8,11 @@ export async function POST(req: Request): Promise<Response> {
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
   const proxyErr = res.headers.get("X-Proxy-Error");
-  log.info(null, "SEND", `POST /v1/responses → ${res.status}${proxyErr ? ` (proxy error: ${proxyErr})` : ""}`);
+  log.info(
+    null,
+    "SEND",
+    `POST /v1/responses → ${res.status}${proxyErr ? ` (proxy error: ${proxyErr})` : ""}`
+  );
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 

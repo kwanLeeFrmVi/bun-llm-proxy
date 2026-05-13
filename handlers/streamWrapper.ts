@@ -15,7 +15,10 @@ import { RequestContext } from "../lib/requestContext.ts";
 import { saveRequestUsage } from "../stubs/usageDb.ts";
 import { getComboMetadata } from "../services/comboRouting.ts";
 import { recordComboTTFT } from "../db/index.ts";
-import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../ai-bridge/translator/common/sse.ts";
+import {
+  buildClaudeErrorEvent,
+  mapToAnthropicErrorType,
+} from "../ai-bridge/translator/common/sse.ts";
 import { STREAM_HEARTBEAT_INTERVAL_MS } from "../ai-bridge/config/runtimeConfig.ts";
 import { countTokens, extractPromptText } from "../lib/tokenCounter.ts";
 
@@ -44,8 +47,16 @@ export function wrapStreamingResponseV2(
 
   // Detect client abort early to avoid wasting upstream resources
   if (clientSignal?.aborted) {
-    try { response.body.cancel(); } catch { /* already closed */ }
-    return new Response(null, { status: 499, statusText: "Client Closed Request", headers: response.headers });
+    try {
+      response.body.cancel();
+    } catch {
+      /* already closed */
+    }
+    return new Response(null, {
+      status: 499,
+      statusText: "Client Closed Request",
+      headers: response.headers,
+    });
   }
 
   const comboMetadata = getComboMetadata(response);
@@ -55,12 +66,12 @@ export function wrapStreamingResponseV2(
     startTime,
     ctx,
   });
-  const { transform: heartbeatTransform, stop: stopHeartbeat } = createHeartbeatTransform(STREAM_HEARTBEAT_INTERVAL_MS);
+  const { transform: heartbeatTransform, stop: stopHeartbeat } = createHeartbeatTransform(
+    STREAM_HEARTBEAT_INTERVAL_MS
+  );
 
   // Pipe: upstream → diagnostics → heartbeat
-  const pipedBody = response.body
-    .pipeThrough(diagnosticsTransform)
-    .pipeThrough(heartbeatTransform);
+  const pipedBody = response.body.pipeThrough(diagnosticsTransform).pipeThrough(heartbeatTransform);
 
   // Once-only settlement guard
   let settled = false;
@@ -85,7 +96,11 @@ export function wrapStreamingResponseV2(
       const ttftMs = st.firstChunkTime - startTime;
       recordComboTTFT(comboMetadata.comboName, comboMetadata.selectedModel, ttftMs).catch(
         (e: unknown) => {
-          log.debug(ctx, "COMBO", `recordComboTTFT failed: ${e instanceof Error ? e.message : String(e)}`);
+          log.debug(
+            ctx,
+            "COMBO",
+            `recordComboTTFT failed: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
       );
     }
@@ -94,7 +109,8 @@ export function wrapStreamingResponseV2(
     if (closeReason === "normal" && !st.upstreamErrorMsg) {
       // Detect empty upstream responses at the outer layer: 0 completion tokens
       // means the upstream returned no useful content despite a 200 status.
-      const isEmptyResponse = st.finalUsage &&
+      const isEmptyResponse =
+        st.finalUsage &&
         (st.finalUsage.completion_tokens ?? 0) === 0 &&
         (st.finalUsage.prompt_tokens ?? 0) === 0 &&
         st.downstreamChunkCount <= 5;
@@ -196,7 +212,11 @@ export function wrapStreamingResponseV2(
       },
       durationMs
     ).catch((e) => {
-      log.debug(ctx, "USAGE", `saveRequestUsage failed: ${e instanceof Error ? e.message : String(e)}`);
+      log.debug(
+        ctx,
+        "USAGE",
+        `saveRequestUsage failed: ${e instanceof Error ? e.message : String(e)}`
+      );
     });
 
     RequestContext.delete(ctx.id);
@@ -211,7 +231,11 @@ export function wrapStreamingResponseV2(
         const { done, value } = await reader.read();
         if (done) {
           onSettled("normal");
-          try { controller.close(); } catch { /* already closed */ }
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
           return;
         }
         controller.enqueue(value);
@@ -224,7 +248,11 @@ export function wrapStreamingResponseV2(
         // Inject error SSE events so the client doesn't hang
         injectErrorEvents(controller, sourceFormat, model, errMsg);
 
-        try { controller.close(); } catch { /* already closed */ }
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       }
     },
 
@@ -269,7 +297,9 @@ function injectErrorEvents(
     if (sourceFormat === "claude") {
       // Anthropic error event
       controller.enqueue(
-        encoder.encode(buildClaudeErrorEvent(mapToAnthropicErrorType(null, errMsg), errMsgForClient))
+        encoder.encode(
+          buildClaudeErrorEvent(mapToAnthropicErrorType(null, errMsg), errMsgForClient)
+        )
       );
       // Text delta with error message
       controller.enqueue(
@@ -302,9 +332,7 @@ function injectErrorEvents(
       );
       // Message stop
       controller.enqueue(
-        encoder.encode(
-          `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
-        )
+        encoder.encode(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`)
       );
     } else {
       // OpenAI SSE: final chunk with error finish_reason + [DONE]
@@ -315,7 +343,14 @@ function injectErrorEvents(
             object: "chat.completion.chunk",
             created: Math.floor(Date.now() / 1000),
             model,
-            choices: [{ index: 0, delta: { content: errMsgForClient }, finish_reason: "error", logprobs: null }],
+            choices: [
+              {
+                index: 0,
+                delta: { content: errMsgForClient },
+                finish_reason: "error",
+                logprobs: null,
+              },
+            ],
           })}\n\n`
         )
       );

@@ -30,7 +30,14 @@ export async function handleChat(
   const parsed = await parseAndValidateRequest(request, ctx, clientRawRequest);
   if (!parsed.ok) return parsed.response;
 
-  const { body, modelStr, msgCount, toolCount, effort, clientRawRequest: resolvedClientRaw } = parsed;
+  const {
+    body,
+    modelStr,
+    msgCount,
+    toolCount,
+    effort,
+    clientRawRequest: resolvedClientRaw,
+  } = parsed;
   clientRawRequest = resolvedClientRaw;
 
   // 2. Cache Claude headers for downstream use
@@ -55,14 +62,28 @@ export async function handleChat(
     body,
     ctx,
     request,
-    handleSingleModel: (b, m) => runSingleModel({
-      body: b, modelStr: m, clientRawRequest, request, apiKey, apiKeyId, ctx,
-    }),
+    handleSingleModel: (b, m) =>
+      runSingleModel({
+        body: b,
+        modelStr: m,
+        clientRawRequest,
+        request,
+        apiKey,
+        apiKeyId,
+        ctx,
+      }),
   });
   if (comboResult) return comboResult;
 
   // 6. Run single-model pipeline
   return runSingleModel({
-    body, modelStr, clientRawRequest, request, apiKey, apiKeyId, ctx, skipComboCheck: true,
+    body,
+    modelStr,
+    clientRawRequest,
+    request,
+    apiKey,
+    apiKeyId,
+    ctx,
+    skipComboCheck: true,
   });
 }

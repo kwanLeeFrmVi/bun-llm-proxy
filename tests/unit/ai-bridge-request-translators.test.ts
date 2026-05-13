@@ -285,9 +285,7 @@ describe("claude → openai (Request)", () => {
         },
         {
           role: "tool",
-          content: [
-            { type: "tool_result", tool_use_id: "toolu_abc", content: '{"temp":22}' },
-          ],
+          content: [{ type: "tool_result", tool_use_id: "toolu_abc", content: '{"temp":22}' }],
         },
       ],
     };

@@ -123,7 +123,7 @@ export function convertGeminiResponseToOpenAI(
                         tool_calls: [
                           {
                             index: tcIdx,
-                            id: `call_${(fc.name as string ?? "tool").slice(0, 8)}_${tcIdx}`,
+                            id: `call_${((fc.name as string) ?? "tool").slice(0, 8)}_${tcIdx}`,
                             type: "function",
                             function: {
                               name: fc.name ?? "",

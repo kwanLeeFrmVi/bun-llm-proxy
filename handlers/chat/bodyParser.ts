@@ -32,7 +32,10 @@ export async function parseAndValidateRequest(
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     log.warn(ctx, "CHAT", "Invalid JSON body");
-    return { ok: false, response: errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body") as Response };
+    return {
+      ok: false,
+      response: errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body") as Response,
+    };
   }
 
   let resolvedClientRawRequest = clientRawRequest ?? null;

@@ -321,9 +321,7 @@ describe("convertOllamaResponseToClaude", () => {
         message: {
           role: "assistant",
           content: null,
-          tool_calls: [
-            { function: { name: "bash", arguments: '{"cmd":"ls"}' } },
-          ],
+          tool_calls: [{ function: { name: "bash", arguments: '{"cmd":"ls"}' } }],
         },
         done: false,
       })

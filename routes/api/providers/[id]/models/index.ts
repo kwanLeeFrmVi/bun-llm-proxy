@@ -3,7 +3,12 @@ import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry.ts";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "lib/providers.ts";
-import { getProviderConnections, getProviderEnabledModels, getProviderNodeById, getProviderExcludedModels } from "db/index.ts";
+import {
+  getProviderConnections,
+  getProviderEnabledModels,
+  getProviderNodeById,
+  getProviderExcludedModels,
+} from "db/index.ts";
 
 type BunRequest = Request & { params: Record<string, string> };
 

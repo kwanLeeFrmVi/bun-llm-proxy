@@ -37,9 +37,10 @@ const SENTINEL_HOLDBACK = UPSTREAM_ERROR_SENTINEL.length - 1; // 20
 // Safety cap on the SSE parse buffer when upstream never emits `\n\n`.
 const MAX_SSE_BUFFER = 1_048_576; // 1 MB
 
-export function createDiagnosticTransform(
-  opts: DiagnosticTransformOpts
-): { transform: TransformStream<Uint8Array, Uint8Array>; getState: () => DiagnosticState } {
+export function createDiagnosticTransform(opts: DiagnosticTransformOpts): {
+  transform: TransformStream<Uint8Array, Uint8Array>;
+  getState: () => DiagnosticState;
+} {
   const { startTime, ctx: _ctx } = opts;
   void _ctx;
 
@@ -59,12 +60,24 @@ export function createDiagnosticTransform(
   let responseText = "";
 
   const state: DiagnosticState = {
-    get downstreamChunkCount() { return downstreamChunkCount; },
-    get firstDownstreamChunkMs() { return firstDownstreamChunkMs; },
-    get upstreamErrorMsg() { return upstreamErrorMsg; },
-    get finalUsage() { return finalUsage; },
-    get firstChunkTime() { return firstChunkTime; },
-    get accumulatedResponseText() { return responseText; },
+    get downstreamChunkCount() {
+      return downstreamChunkCount;
+    },
+    get firstDownstreamChunkMs() {
+      return firstDownstreamChunkMs;
+    },
+    get upstreamErrorMsg() {
+      return upstreamErrorMsg;
+    },
+    get finalUsage() {
+      return finalUsage;
+    },
+    get firstChunkTime() {
+      return firstChunkTime;
+    },
+    get accumulatedResponseText() {
+      return responseText;
+    },
   };
 
   const encoder = new TextEncoder();
@@ -158,10 +171,8 @@ export function createDiagnosticTransform(
             if (usageSource) {
               finalUsage = {
                 prompt_tokens: usageSource.prompt_tokens ?? usageSource.input_tokens ?? 0,
-                completion_tokens:
-                  usageSource.completion_tokens ?? usageSource.output_tokens ?? 0,
-                reasoning_tokens:
-                  usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
+                completion_tokens: usageSource.completion_tokens ?? usageSource.output_tokens ?? 0,
+                reasoning_tokens: usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
                 cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
               };
             }
@@ -217,10 +228,8 @@ export function createDiagnosticTransform(
             if (usageSource) {
               finalUsage = {
                 prompt_tokens: usageSource.prompt_tokens ?? usageSource.input_tokens ?? 0,
-                completion_tokens:
-                  usageSource.completion_tokens ?? usageSource.output_tokens ?? 0,
-                reasoning_tokens:
-                  usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
+                completion_tokens: usageSource.completion_tokens ?? usageSource.output_tokens ?? 0,
+                reasoning_tokens: usageSource.reasoning_tokens ?? usageSource.thinking_tokens ?? 0,
                 cached_tokens: usageSource.prompt_tokens_details?.cached_tokens ?? 0,
               };
             }

@@ -34,7 +34,12 @@ export async function runSingleModel(opts: SingleModelPipelineOpts): Promise<Res
   if (!modelInfo.provider) {
     if (skipComboCheck) {
       log.warn(ctx, "CHAT", "Invalid model format", { model: modelStr });
-      return formatAwareErrorResponse(body, request, HTTP_STATUS.BAD_REQUEST, "Invalid model format");
+      return formatAwareErrorResponse(
+        body,
+        request,
+        HTTP_STATUS.BAD_REQUEST,
+        "Invalid model format"
+      );
     }
 
     // Re-check combo routing (model might be a combo alias that wasn't caught earlier).
@@ -45,9 +50,16 @@ export async function runSingleModel(opts: SingleModelPipelineOpts): Promise<Res
       body,
       ctx,
       request,
-      handleSingleModel: (b, m) => runSingleModel({
-        body: b, modelStr: m, clientRawRequest, request, apiKey, apiKeyId, ctx,
-      }),
+      handleSingleModel: (b, m) =>
+        runSingleModel({
+          body: b,
+          modelStr: m,
+          clientRawRequest,
+          request,
+          apiKey,
+          apiKeyId,
+          ctx,
+        }),
     });
     if (comboResult) return comboResult;
 
@@ -78,7 +90,16 @@ export async function runSingleModel(opts: SingleModelPipelineOpts): Promise<Res
   const userAgent = request?.headers?.get("user-agent") ?? "";
 
   return executeWithAccountFallback({
-    body, provider, model, clientRawRequest, request, apiKey, apiKeyId,
-    ctx, requestId, startTime, userAgent,
+    body,
+    provider,
+    model,
+    clientRawRequest,
+    request,
+    apiKey,
+    apiKeyId,
+    ctx,
+    requestId,
+    startTime,
+    userAgent,
   });
 }

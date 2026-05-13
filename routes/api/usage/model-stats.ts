@@ -15,7 +15,10 @@ export async function GET(req: Request): Promise<Response> {
   const limit = parseInt(url.searchParams.get("limit") ?? "50");
 
   if (!model) {
-    return Response.json({ error: "Missing model parameter" }, { status: 400, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Missing model parameter" },
+      { status: 400, headers: CORS_HEADERS }
+    );
   }
 
   const result = getModelStats(model, period, { page, limit });

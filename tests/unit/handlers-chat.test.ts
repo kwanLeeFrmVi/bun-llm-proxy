@@ -459,7 +459,9 @@ describe("wrapStreamingResponse — mid-stream error injection", () => {
 
     const origFetch = globalThis.fetch;
     globalThis.fetch = (() =>
-      Promise.resolve(createFailingStreamResponse([validChunk], "Connection reset by peer"))) as unknown as typeof globalThis.fetch;
+      Promise.resolve(
+        createFailingStreamResponse([validChunk], "Connection reset by peer")
+      )) as unknown as typeof globalThis.fetch;
 
     try {
       const res = await handleChat(
@@ -555,7 +557,9 @@ describe("classifyNetworkError — error categorization via response", () => {
       // The error message should mention the certificate error
       const cbDelta = events.find((e) => e.event === "content_block_delta");
       expect(cbDelta).toBeDefined();
-      const deltaText = ((cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>).text as string;
+      const deltaText = (
+        (cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>
+      ).text as string;
       expect(deltaText).toContain("unable to verify the first certificate");
     } finally {
       globalThis.fetch = origFetch;
@@ -596,7 +600,9 @@ describe("classifyNetworkError — error categorization via response", () => {
       const events = parseSSE(text);
       const cbDelta = events.find((e) => e.event === "content_block_delta");
       expect(cbDelta).toBeDefined();
-      const deltaText = ((cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>).text as string;
+      const deltaText = (
+        (cbDelta!.data as Record<string, unknown>).delta as Record<string, unknown>
+      ).text as string;
       expect(deltaText).toContain("ECONNREFUSED");
     } finally {
       globalThis.fetch = origFetch;

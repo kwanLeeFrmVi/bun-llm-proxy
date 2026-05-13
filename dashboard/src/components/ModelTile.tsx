@@ -91,15 +91,11 @@ export function ModelTile({
                 </span>
                 {hasStats && (
                   <span className="text-[10px] text-on-surface-variant/60 mt-0.5 flex items-center gap-1.5">
-                    {displayTtft != null && (
-                      <span>TTFT: {fmtMs(displayTtft)}</span>
-                    )}
+                    {displayTtft != null && <span>TTFT: {fmtMs(displayTtft)}</span>}
                     {displayTtft != null && displayTps != null && (
                       <span className="text-on-surface-variant/30">&middot;</span>
                     )}
-                    {displayTps != null && (
-                      <span>Token/s: {displayTps.toFixed(1)}</span>
-                    )}
+                    {displayTps != null && <span>Token/s: {displayTps.toFixed(1)}</span>}
                   </span>
                 )}
               </div>

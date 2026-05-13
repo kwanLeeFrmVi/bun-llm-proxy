@@ -191,9 +191,8 @@ function processClaudeContent(
             type: "function",
             function: {
               name: part.name ?? "",
-              arguments: typeof part.input === "string"
-                ? part.input
-                : JSON.stringify(part.input ?? {}),
+              arguments:
+                typeof part.input === "string" ? part.input : JSON.stringify(part.input ?? {}),
             },
           };
           toolCalls.push(call);

@@ -17,7 +17,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!conn || !conn.apiKey) {
     return Response.json(
       {
-        error: "No Claudible provider connection found. Add an 'anthropic-compatible-cldb' provider with a valid API key.",
+        error:
+          "No Claudible provider connection found. Add an 'anthropic-compatible-cldb' provider with a valid API key.",
       },
       { status: 404, headers: CORS_HEADERS }
     );
@@ -30,9 +31,9 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Accept": "*/*",
-        "Origin": "https://claudible.io",
-        "Referer": "https://claudible.io/dashboard",
+        Accept: "*/*",
+        Origin: "https://claudible.io",
+        Referer: "https://claudible.io/dashboard",
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
       },

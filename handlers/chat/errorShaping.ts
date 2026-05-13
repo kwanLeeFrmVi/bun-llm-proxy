@@ -1,4 +1,8 @@
-import { sseErrorResponse, openaiSseErrorResponse, errorResponse } from "../../ai-bridge/utils/error.ts";
+import {
+  sseErrorResponse,
+  openaiSseErrorResponse,
+  errorResponse,
+} from "../../ai-bridge/utils/error.ts";
 import { detectFormatByEndpoint } from "../../ai-bridge/translator/formats.ts";
 import { detectFormat } from "../../ai-bridge/handlers/provider.ts";
 

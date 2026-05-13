@@ -559,7 +559,7 @@ describe("syncOpenRouterPricing", () => {
       return {
         ok: false,
         status: 500,
-        text: async () => "Internal Server Error"
+        text: async () => "Internal Server Error",
       } as Response;
     };
 

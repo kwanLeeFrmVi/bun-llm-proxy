@@ -47,7 +47,10 @@ function scheduleNext(): void {
   }
 
   const delay = next.getTime() - now;
-  log.info("CRON", `Next chat cron scheduled at ${next.toISOString()} (in ${Math.round(delay / 1000)}s)`);
+  log.info(
+    "CRON",
+    `Next chat cron scheduled at ${next.toISOString()} (in ${Math.round(delay / 1000)}s)`
+  );
 
   nextTimer = setTimeout(async () => {
     await runChatCronJob();

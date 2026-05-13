@@ -132,7 +132,10 @@ export async function getSessionModel(
     if (!raw) return null;
     return JSON.parse(raw) as { model: string; assignedAt: number };
   } catch (err) {
-    log.debug("REDIS", `getSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`);
+    log.debug(
+      "REDIS",
+      `getSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`
+    );
     return null;
   }
 }
@@ -153,7 +156,10 @@ export async function setSessionModel(
     const value = JSON.stringify({ model, assignedAt: Date.now() });
     await client.set(`${SESSION_PREFIX}${comboName}:${sessionId}`, value, "EX", ttlSeconds);
   } catch (err) {
-    log.debug("REDIS", `setSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`);
+    log.debug(
+      "REDIS",
+      `setSessionModel error for ${comboName}:${sessionId}: ${(err as Error).message}`
+    );
   }
 }
 
@@ -286,7 +292,10 @@ export async function setVertexToken(
   const client = getRedis();
   if (!client) return;
   try {
-    const ttlSec = Math.max(TTL_VERTEX_TOKEN_MIN, Math.floor((expiresAt - Date.now()) / 1000) - TTL_VERTEX_TOKEN_BUFFER);
+    const ttlSec = Math.max(
+      TTL_VERTEX_TOKEN_MIN,
+      Math.floor((expiresAt - Date.now()) / 1000) - TTL_VERTEX_TOKEN_BUFFER
+    );
     await client.set(
       `${VERTEX_TOKEN_PREFIX}${clientEmail}`,
       JSON.stringify({ token, expiresAt }),
@@ -314,9 +323,16 @@ export async function getCachedClaudeHeadersRedis(
   try {
     const raw = await client.get(`${CLAUDE_HEADER_PREFIX}${cacheKey}`);
     if (!raw) return null;
-    return JSON.parse(raw) as { headers: Record<string, string>; timestamp: number; lastAccess: number };
+    return JSON.parse(raw) as {
+      headers: Record<string, string>;
+      timestamp: number;
+      lastAccess: number;
+    };
   } catch (err) {
-    log.debug("REDIS", `getCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
+    log.debug(
+      "REDIS",
+      `getCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`
+    );
     return null;
   }
 }
@@ -340,7 +356,10 @@ export async function setCachedClaudeHeadersRedis(
       ttlSeconds
     );
   } catch (err) {
-    log.debug("REDIS", `setCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
+    log.debug(
+      "REDIS",
+      `setCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`
+    );
   }
 }
 
@@ -361,7 +380,10 @@ export async function touchCachedClaudeHeadersRedis(cacheKey: string): Promise<v
       );
     }
   } catch (err) {
-    log.debug("REDIS", `touchCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`);
+    log.debug(
+      "REDIS",
+      `touchCachedClaudeHeadersRedis error for ${cacheKey}: ${(err as Error).message}`
+    );
   }
 }
 

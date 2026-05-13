@@ -172,14 +172,14 @@ export default function ClaudibleUsage() {
   };
 
   // Derived values from real data
-  // Preference: 
+  // Preference:
   // 1. stats.totalCost (if server provides it)
   // 2. sum of usage list (at least what we can see)
   // 3. (dailyQuota - balance) - In Claudible, if balance < quota on a daily plan, the difference is usually what was spent today.
   const sumFromList = data ? totalSpendFromUsage(data.usage) : 0;
   let totalSpend = data ? Math.max(data.stats.totalCost, sumFromList) : 0;
-  
-  if (data && totalSpend < (data.dailyQuota - data.balance) && data.balance < data.dailyQuota) {
+
+  if (data && totalSpend < data.dailyQuota - data.balance && data.balance < data.dailyQuota) {
     // If the inferred spend is higher than what we see in the list or stats, use it.
     totalSpend = data.dailyQuota - data.balance;
   }
@@ -377,8 +377,8 @@ export default function ClaudibleUsage() {
                 data.stats.totalCost > 0
                   ? "From account stats"
                   : totalSpend > sumFromList
-                  ? "Inferred from balance"
-                  : "From usage list"
+                    ? "Inferred from balance"
+                    : "From usage list"
               }
               color="#f97316"
             />

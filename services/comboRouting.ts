@@ -24,7 +24,9 @@ async function readComboError(resp: Response, model: string): Promise<string> {
           // Strip the "[Proxy Error N] " prefix to get the clean message
           const clean = deltaText.replace(/^\[Proxy Error \d+\]\s*/, "");
           if (clean) return clean;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
       // OpenAI SSE: extract error from data line
       const errorMatch = text.match(/data: ({.*?"error".*?})\n\n/s);
@@ -33,9 +35,13 @@ async function readComboError(resp: Response, model: string): Promise<string> {
           const parsed = JSON.parse(errorMatch[1]!);
           const msg = parsed?.error?.message ?? parsed?.error;
           if (msg && typeof msg === "string") return msg;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     return `[Proxy Error ${proxyErrorStatus}]`;
   }
 
@@ -99,7 +105,15 @@ const MAX_SESSIONS_PER_COMBO = 1000;
 const COMBO_METADATA = Symbol.for("comboMetadata");
 
 import type { RequestContext } from "../lib/requestContext.ts";
-import { getSessionModel, setSessionModel, incrementSessionCounter, getRRState, setRRState as setRRStateRedis, getSpeedState, setSpeedState as setSpeedStateRedis } from "../lib/redis.ts";
+import {
+  getSessionModel,
+  setSessionModel,
+  incrementSessionCounter,
+  getRRState,
+  setRRState as setRRStateRedis,
+  getSpeedState,
+  setSpeedState as setSpeedStateRedis,
+} from "../lib/redis.ts";
 
 export interface ComboMetadata {
   comboName: string;
@@ -225,10 +239,18 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         return attachComboMetadata(resp, comboName, selectedModel);
       }
       lastError = await readComboError(resp, selectedModel);
-      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} failed (${resp.status}): ${lastError}`);
+      log.warn(
+        ctx ?? null,
+        "COMBO",
+        `Round-robin: ${selectedModel} failed (${resp.status}): ${lastError}`
+      );
     } catch (e) {
       lastError = `${selectedModel}: ${e instanceof Error ? e.message : String(e)}`;
-      log.warn(ctx ?? null, "COMBO", `Round-robin: ${selectedModel} threw: ${e instanceof Error ? e.message : String(e)}`);
+      log.warn(
+        ctx ?? null,
+        "COMBO",
+        `Round-robin: ${selectedModel} threw: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
 
     // Fallback: try remaining models in order
@@ -243,10 +265,18 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
           return attachComboMetadata(resp, comboName, m.model);
         }
         lastError = await readComboError(resp, m.model);
-        log.warn(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} failed (${resp.status}): ${lastError}`);
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Round-robin fallback: ${m.model} failed (${resp.status}): ${lastError}`
+        );
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        log.warn(ctx ?? null, "COMBO", `Round-robin fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Round-robin fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
     }
 
@@ -292,7 +322,11 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         if (!lastError) lastError = errMsg;
       } catch (e) {
         const errMsg = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        log.warn(ctx ?? null, "COMBO", `Weight: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Weight: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`
+        );
         if (!lastError) lastError = errMsg;
       }
     }
@@ -334,7 +368,9 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       // Put sticky model first, rest in original order
       orderedModels = [
         { model: state.model, avgMs: null },
-        ...models.filter((m) => m.model !== state.model).map((m) => ({ model: m.model, avgMs: null })),
+        ...models
+          .filter((m) => m.model !== state.model)
+          .map((m) => ({ model: m.model, avgMs: null })),
       ];
     } else {
       // re-evaluate: pick model with lowest avg TTFT
@@ -375,7 +411,11 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} failed (${resp.status}): ${lastError}`);
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        log.warn(ctx ?? null, "COMBO", `Speed: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Speed: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
     }
 
@@ -472,13 +512,14 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
 
     // Try assigned model first; fallback to remaining models in order
     const assignedIndex = models.findIndex((m) => m.model === assignedModel);
-    const orderedModels = assignedIndex >= 0
-      ? [
-          models[assignedIndex]!,
-          ...models.slice(0, assignedIndex),
-          ...models.slice(assignedIndex + 1),
-        ]
-      : models;
+    const orderedModels =
+      assignedIndex >= 0
+        ? [
+            models[assignedIndex]!,
+            ...models.slice(0, assignedIndex),
+            ...models.slice(assignedIndex + 1),
+          ]
+        : models;
 
     let lastError: string | null = null;
     for (const m of orderedModels) {
@@ -501,7 +542,11 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
         );
       } catch (e) {
         lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-        log.warn(ctx ?? null, "COMBO", `Session-sticky: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+        log.warn(
+          ctx ?? null,
+          "COMBO",
+          `Session-sticky: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
     }
 
@@ -527,7 +572,11 @@ export async function handleComboModel(opts: ComboOptions): Promise<Response> {
       log.warn(ctx ?? null, "COMBO", `Fallback: ${m.model} failed (${resp.status}): ${lastError}`);
     } catch (e) {
       lastError = `${m.model}: ${e instanceof Error ? e.message : String(e)}`;
-      log.warn(ctx ?? null, "COMBO", `Fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`);
+      log.warn(
+        ctx ?? null,
+        "COMBO",
+        `Fallback: ${m.model} threw: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
     attemptNumber++;
   }

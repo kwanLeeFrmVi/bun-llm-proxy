@@ -3,7 +3,13 @@
 
 import { Request, NeedsTranslation, ResponseNonStream, initState } from "../translator/index.ts";
 import { Response as translateResponse } from "../translator/index.ts";
-import { HTTP_STATUS, STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS, STREAM_FIRST_CHUNK_TIMEOUT_MS, PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES } from "../config/runtimeConfig.ts";
+import {
+  HTTP_STATUS,
+  STREAM_HEARTBEAT_INTERVAL_MS,
+  STREAM_STALL_TIMEOUT_MS,
+  STREAM_FIRST_CHUNK_TIMEOUT_MS,
+  PROVIDER_MODEL_MIN_MAX_TOKENS_OVERRIDES,
+} from "../config/runtimeConfig.ts";
 import { buildClaudeErrorEvent, mapToAnthropicErrorType } from "../translator/common/sse.ts";
 import { PROVIDER_ID_TO_ALIAS, getModelTargetFormat } from "../config/providerModels.ts";
 import {
@@ -164,7 +170,11 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         opts
       );
       opts.onRequestSuccess?.().catch((e) => {
-        log.debug(ctx ?? null, "CHAT", `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`);
+        log.debug(
+          ctx ?? null,
+          "CHAT",
+          `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`
+        );
       });
       return { success: true, response };
     } else {
@@ -206,14 +216,25 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
         const usage = parsedBody.usage as Record<string, unknown> | undefined;
         if (usage) {
           usageData = {
-            prompt_tokens: usage.prompt_tokens as number | undefined ?? usage.input_tokens as number | undefined,
-            completion_tokens: usage.completion_tokens as number | undefined ?? usage.output_tokens as number | undefined,
-            reasoning_tokens: usage.reasoning_tokens as number | undefined ?? usage.thinking_tokens as number | undefined,
-            cached_tokens: (usage.prompt_tokens_details as Record<string, unknown> | undefined)?.cached_tokens as number | undefined,
+            prompt_tokens:
+              (usage.prompt_tokens as number | undefined) ??
+              (usage.input_tokens as number | undefined),
+            completion_tokens:
+              (usage.completion_tokens as number | undefined) ??
+              (usage.output_tokens as number | undefined),
+            reasoning_tokens:
+              (usage.reasoning_tokens as number | undefined) ??
+              (usage.thinking_tokens as number | undefined),
+            cached_tokens: (usage.prompt_tokens_details as Record<string, unknown> | undefined)
+              ?.cached_tokens as number | undefined,
           };
         }
       } catch (e) {
-        log.debug(ctx ?? null, "USAGE", `Non-JSON response body, skipping usage extraction: ${e instanceof Error ? e.message : String(e)}`);
+        log.debug(
+          ctx ?? null,
+          "USAGE",
+          `Non-JSON response body, skipping usage extraction: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
 
       // Fallback token counting when upstream doesn't provide counts
@@ -236,10 +257,18 @@ export async function handleChatCore(opts: ChatCoreOptions): Promise<ChatCoreRes
       });
 
       opts.onRequestSuccess?.().catch((e) => {
-        log.debug(ctx ?? null, "CHAT", `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`);
+        log.debug(
+          ctx ?? null,
+          "CHAT",
+          `onRequestSuccess callback failed: ${e instanceof Error ? e.message : String(e)}`
+        );
       });
       opts.onUsage?.(usageData).catch((e) => {
-        log.debug(ctx ?? null, "CHAT", `onUsage callback failed: ${e instanceof Error ? e.message : String(e)}`);
+        log.debug(
+          ctx ?? null,
+          "CHAT",
+          `onUsage callback failed: ${e instanceof Error ? e.message : String(e)}`
+        );
       });
       return { success: true, response };
     }
@@ -310,7 +339,11 @@ async function handleStreamingResponse(
     const errorText = await upstream.text().catch(() => "");
     const status = upstream.status;
     const msg = errorText || `Upstream error: ${status}`;
-    log.warn(opts.ctx ?? null, "UPSTREAM", `[${opts.modelInfo.provider}] HTTP ${status}: ${errorText}`);
+    log.warn(
+      opts.ctx ?? null,
+      "UPSTREAM",
+      `[${opts.modelInfo.provider}] HTTP ${status}: ${errorText}`
+    );
     log.warn(opts.ctx ?? null, "STREAM", `Upstream error ${status}: ${msg}`);
     if (opts.onStreamError) return opts.onStreamError(status, msg);
     return sseErrorResponse(status, msg);
@@ -375,7 +408,11 @@ async function handleStreamingResponse(
             controller.enqueue(chunk);
           } catch (enqueueErr) {
             controllerClosed = true;
-            log.debug(opts.ctx ?? null, "STREAM", `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`);
+            log.debug(
+              opts.ctx ?? null,
+              "STREAM",
+              `safeEnqueue: controller.enqueue failed (downstream closed): ${enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)}`
+            );
           }
         }
       };
@@ -385,7 +422,11 @@ async function handleStreamingResponse(
           try {
             controller.close();
           } catch (closeErr) {
-            log.debug(opts.ctx ?? null, "STREAM", `safeClose: controller.close failed (already closed): ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`);
+            log.debug(
+              opts.ctx ?? null,
+              "STREAM",
+              `safeClose: controller.close failed (already closed): ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`
+            );
           }
         }
       };
@@ -405,24 +446,33 @@ async function handleStreamingResponse(
       let stallResolve: (() => void) | null = null;
 
       const clearStreamTimers = () => {
-        if (heartbeatTimer !== null) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
-        if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; }
+        if (heartbeatTimer !== null) {
+          clearTimeout(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+        if (stallTimer !== null) {
+          clearTimeout(stallTimer);
+          stallTimer = null;
+        }
         heartbeatResolve = null;
         stallResolve = null;
       };
 
-      const makeHeartbeatPromise = () => new Promise<typeof HEARTBEAT_SYMBOL>((resolve) => {
-        heartbeatResolve = () => resolve(HEARTBEAT_SYMBOL);
-        heartbeatTimer = setTimeout(() => heartbeatResolve?.(), STREAM_HEARTBEAT_INTERVAL_MS);
-      });
+      const makeHeartbeatPromise = () =>
+        new Promise<typeof HEARTBEAT_SYMBOL>((resolve) => {
+          heartbeatResolve = () => resolve(HEARTBEAT_SYMBOL);
+          heartbeatTimer = setTimeout(() => heartbeatResolve?.(), STREAM_HEARTBEAT_INTERVAL_MS);
+        });
 
-      const makeStallPromise = () => new Promise<typeof STALL_SYMBOL>((resolve) => {
-        stallResolve = () => resolve(STALL_SYMBOL);
-        // Before first chunk: use a shorter timeout to fail fast on slow/overloaded upstreams.
-        // After first chunk: use the longer stall timeout for silence detection.
-        const timeout = firstUpstreamChunkMs === null ? STREAM_FIRST_CHUNK_TIMEOUT_MS : STREAM_STALL_TIMEOUT_MS;
-        stallTimer = setTimeout(() => stallResolve?.(), timeout);
-      });
+      const makeStallPromise = () =>
+        new Promise<typeof STALL_SYMBOL>((resolve) => {
+          stallResolve = () => resolve(STALL_SYMBOL);
+          // Before first chunk: use a shorter timeout to fail fast on slow/overloaded upstreams.
+          // After first chunk: use the longer stall timeout for silence detection.
+          const timeout =
+            firstUpstreamChunkMs === null ? STREAM_FIRST_CHUNK_TIMEOUT_MS : STREAM_STALL_TIMEOUT_MS;
+          stallTimer = setTimeout(() => stallResolve?.(), timeout);
+        });
 
       try {
         let readPromise = reader.read();
@@ -437,10 +487,15 @@ async function handleStreamingResponse(
         // This was causing Claude Code to hang: client disconnects → outer wrapper
         // cancel() → inner stream cancel() → streamAbort.abort(), but the inner
         // loop stays stuck in Promise.race for up to 15s.
-        const abortPromise = new Promise<{ kind: "abort"; done: false; value: undefined }>((resolve) => {
-          streamAbort.signal.addEventListener("abort", () =>
-            resolve({ kind: "abort" as const, done: false as const, value: undefined }), { once: true });
-        });
+        const abortPromise = new Promise<{ kind: "abort"; done: false; value: undefined }>(
+          (resolve) => {
+            streamAbort.signal.addEventListener(
+              "abort",
+              () => resolve({ kind: "abort" as const, done: false as const, value: undefined }),
+              { once: true }
+            );
+          }
+        );
 
         while (true) {
           // Check abort flag before each read — cancel() may have fired between chunks
@@ -448,8 +503,16 @@ async function handleStreamingResponse(
 
           const result = await Promise.race([
             readPromise.then((r) => ({ kind: "data" as const, done: r.done, value: r.value })),
-            heartbeatPromise.then(() => ({ kind: "heartbeat" as const, done: false as const, value: undefined })),
-            stallPromise.then(() => ({ kind: "stall" as const, done: false as const, value: undefined })),
+            heartbeatPromise.then(() => ({
+              kind: "heartbeat" as const,
+              done: false as const,
+              value: undefined,
+            })),
+            stallPromise.then(() => ({
+              kind: "stall" as const,
+              done: false as const,
+              value: undefined,
+            })),
             abortPromise,
           ]);
 
@@ -469,9 +532,10 @@ async function handleStreamingResponse(
           }
 
           if (result.kind === "stall") {
-            const stallMsg = firstUpstreamChunkMs === null
-              ? `Upstream timeout: no first chunk within ${STREAM_FIRST_CHUNK_TIMEOUT_MS / 1000}s`
-              : `Upstream stalled: no data received for ${STREAM_STALL_TIMEOUT_MS / 1000}s`;
+            const stallMsg =
+              firstUpstreamChunkMs === null
+                ? `Upstream timeout: no first chunk within ${STREAM_FIRST_CHUNK_TIMEOUT_MS / 1000}s`
+                : `Upstream stalled: no data received for ${STREAM_STALL_TIMEOUT_MS / 1000}s`;
             log.warn(opts.ctx ?? null, "STREAM", stallMsg);
             reader.cancel().catch(() => {});
             throw new Error(stallMsg);
@@ -482,8 +546,16 @@ async function handleStreamingResponse(
           if (done) break;
 
           // Data arrived — reset both timers
-          if (heartbeatTimer !== null) { clearTimeout(heartbeatTimer); heartbeatTimer = null; heartbeatResolve = null; }
-          if (stallTimer !== null) { clearTimeout(stallTimer); stallTimer = null; stallResolve = null; }
+          if (heartbeatTimer !== null) {
+            clearTimeout(heartbeatTimer);
+            heartbeatTimer = null;
+            heartbeatResolve = null;
+          }
+          if (stallTimer !== null) {
+            clearTimeout(stallTimer);
+            stallTimer = null;
+            stallResolve = null;
+          }
           heartbeatPromise = makeHeartbeatPromise();
           stallPromise = makeStallPromise();
           readPromise = reader.read();
@@ -507,7 +579,8 @@ async function handleStreamingResponse(
             const rawText = decoder.decode(raw, { stream: true });
             if (rawText.includes("message_start")) sawMessageStart = true;
             if (rawText.includes("message_stop")) sawMessageStop = true;
-            if (rawText.includes("message_delta") && rawText.includes("usage")) sawValidMessageDelta = true;
+            if (rawText.includes("message_delta") && rawText.includes("usage"))
+              sawValidMessageDelta = true;
             safeEnqueue(raw);
             continue;
           }
@@ -588,7 +661,10 @@ async function handleStreamingResponse(
                 // Track message_delta in NDJSON-translated chunks (mirrors SSE path below)
                 if (!sawValidMessageDelta) {
                   const chunkText = decoder.decode(chunk, { stream: false });
-                  if (chunkText.includes('"type":"message_delta"') && chunkText.includes('"usage"')) {
+                  if (
+                    chunkText.includes('"type":"message_delta"') &&
+                    chunkText.includes('"usage"')
+                  ) {
                     sawValidMessageDelta = true;
                   }
                 }
@@ -650,7 +726,11 @@ async function handleStreamingResponse(
                     }
                   }
                 } catch (e) {
-                  log.debug(opts.ctx ?? null, "STREAM", `SSE shape validation: non-JSON first event (may be comment/keep-alive): ${e instanceof Error ? e.message : String(e)}`);
+                  log.debug(
+                    opts.ctx ?? null,
+                    "STREAM",
+                    `SSE shape validation: non-JSON first event (may be comment/keep-alive): ${e instanceof Error ? e.message : String(e)}`
+                  );
                 }
               }
             }
@@ -663,13 +743,20 @@ async function handleStreamingResponse(
                   const parsed = JSON.parse(dataMatch[1]!);
                   if (parsed.type === "message_delta") {
                     const hasUsage = "usage" in parsed && parsed.usage != null;
-                    log.debug(opts.ctx ?? null, "STREAM",
-                      `message_delta event: hasUsage=${hasUsage}, usageValue=${JSON.stringify(parsed.usage)}`);
+                    log.debug(
+                      opts.ctx ?? null,
+                      "STREAM",
+                      `message_delta event: hasUsage=${hasUsage}, usageValue=${JSON.stringify(parsed.usage)}`
+                    );
                     if (hasUsage) sawValidMessageDelta = true;
                   }
                 }
               } catch (e) {
-                log.debug(opts.ctx ?? null, "STREAM", `message_delta tracking: JSON parse error: ${e instanceof Error ? e.message : String(e)}`);
+                log.debug(
+                  opts.ctx ?? null,
+                  "STREAM",
+                  `message_delta tracking: JSON parse error: ${e instanceof Error ? e.message : String(e)}`
+                );
               }
             }
             if (eventText.includes("message_start")) sawMessageStart = true;
@@ -793,10 +880,7 @@ async function handleStreamingResponse(
         // stream start. Passing this through causes Claude Code to hang because it
         // receives a response with no actual content.
         const isEmptyUpstream =
-          sourceFormat === "claude" &&
-          !sawMessageStart &&
-          !sawMessageStop &&
-          chunkCount <= 2;
+          sourceFormat === "claude" && !sawMessageStart && !sawMessageStop && chunkCount <= 2;
 
         if (isEmptyUpstream) {
           log.warn(
@@ -813,9 +897,7 @@ async function handleStreamingResponse(
           );
           // Emit a Claude error event so Claude Code can trigger its retry mechanism
           safeEnqueue(
-            encoder.encode(
-              buildClaudeErrorEvent("api_error", "Upstream returned empty response")
-            )
+            encoder.encode(buildClaudeErrorEvent("api_error", "Upstream returned empty response"))
           );
           // Minimal termination sequence so the client doesn't hang waiting for events
           safeEnqueue(
@@ -892,7 +974,11 @@ async function handleStreamingResponse(
         try {
           reader.cancel();
         } catch (cancelErr) {
-          log.debug(opts.ctx ?? null, "STREAM", `reader.cancel() failed (may already be done): ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`);
+          log.debug(
+            opts.ctx ?? null,
+            "STREAM",
+            `reader.cancel() failed (may already be done): ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`
+          );
         }
 
         // Flush stop events so the client gets at least a partial signal
@@ -930,7 +1016,11 @@ async function handleStreamingResponse(
               }
             }
           } catch (flushErr) {
-            log.debug(opts.ctx ?? null, "STREAM", `Failed to flush done chunks on stream error: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`);
+            log.debug(
+              opts.ctx ?? null,
+              "STREAM",
+              `Failed to flush done chunks on stream error: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`
+            );
           }
         }
 
@@ -942,7 +1032,9 @@ async function handleStreamingResponse(
           // this type and may trigger its retry mechanism.
           if (!downstreamCanceled) {
             const errorType = mapToAnthropicErrorType(null, errMsg);
-            safeEnqueue(encoder.encode(buildClaudeErrorEvent(errorType, `Upstream error: ${errMsg}`)));
+            safeEnqueue(
+              encoder.encode(buildClaudeErrorEvent(errorType, `Upstream error: ${errMsg}`))
+            );
           }
           if (!sawMessageStart) {
             safeEnqueue(
@@ -981,9 +1073,7 @@ async function handleStreamingResponse(
           // can detect the upstream truncation and log OUTER_ERROR instead of
           // OUTER_COMPLETE. The comment is invisible to SSE clients (RFC 6762:
           // lines starting with ":" are comments), so it won't break any protocol.
-          safeEnqueue(
-            encoder.encode(`: __UPSTREAM_ERROR__: ${errMsg}\n\n`)
-          );
+          safeEnqueue(encoder.encode(`: __UPSTREAM_ERROR__: ${errMsg}\n\n`));
           log.warn(
             opts.ctx ?? null,
             "STREAM",
@@ -1009,7 +1099,11 @@ async function handleStreamingResponse(
         // With the Promise.race heartbeat pattern, a pending readPromise may be
         // in-flight when the abort signal fires and we break early. Calling
         // releaseLock() while a read is pending throws AbortError in Bun.
-        try { reader.cancel(); } catch { /* ignore — may already be canceled/done */ }
+        try {
+          reader.cancel();
+        } catch {
+          /* ignore — may already be canceled/done */
+        }
         reader.releaseLock();
       }
     },

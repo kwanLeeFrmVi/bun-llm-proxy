@@ -10,9 +10,7 @@ try {
   console.log("=== Non-streaming (no stream param) ===");
   const resp = await client.chat.completions.create({
     model: "ollama/minimax-m2.7",
-    messages: [
-      { role: "user", content: "write a commit message for fixing a typo" },
-    ],
+    messages: [{ role: "user", content: "write a commit message for fixing a typo" }],
     temperature: 0,
     max_tokens: 500,
   });
@@ -30,9 +28,7 @@ try {
   console.log("\n=== Streaming ===");
   const stream = await client.chat.completions.create({
     model: "ollama/minimax-m2.7",
-    messages: [
-      { role: "user", content: "write a commit message for fixing a typo" },
-    ],
+    messages: [{ role: "user", content: "write a commit message for fixing a typo" }],
     stream: true,
     temperature: 0,
     max_tokens: 500,

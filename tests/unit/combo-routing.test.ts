@@ -966,9 +966,7 @@ describe("readComboError via combo fallback", () => {
   });
 
   it("should handle SSE error with unreadable body gracefully", async () => {
-    const models = [
-      { model: "model-a", weight: 1 },
-    ];
+    const models = [{ model: "model-a", weight: 1 }];
 
     // Return a response with X-Proxy-Error header but empty body
     const mockHandleSingle = async (_body: unknown, _model: string) => {

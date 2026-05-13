@@ -6,7 +6,14 @@
  * to the TrollLLM upstream on every request.
  */
 
-import type { TrollBilling, TrollUsageStatus, TrollSummary, TrollLogs, TrollMe, TrollPromo } from "dashboard/src/lib/trollTypes.ts";
+import type {
+  TrollBilling,
+  TrollUsageStatus,
+  TrollSummary,
+  TrollLogs,
+  TrollMe,
+  TrollPromo,
+} from "dashboard/src/lib/trollTypes.ts";
 
 // ─── Config ─────────────────────────────────────────────────────────────────────
 
@@ -18,11 +25,7 @@ const TROLL_BASE = process.env.TROLLLLM_BASE_URL ?? "https://trollllm.xyz";
  * Fetch from TrollLLM upstream, forwarding the user's session token.
  * Throws if response is non-OK.
  */
-async function trollFetch(
-  token: string,
-  path: string,
-  init: RequestInit = {}
-): Promise<Response> {
+async function trollFetch(token: string, path: string, init: RequestInit = {}): Promise<Response> {
   const url = path.startsWith("http") ? path : `${TROLL_BASE}${path}`;
   const res = await fetch(url, {
     ...init,
@@ -72,10 +75,7 @@ export async function trollGetStatus(token: string): Promise<TrollUsageStatus> {
  * GET /api/user/request-logs/summary?period=1h
  * Returns aggregated stats (cost, tokens, req count, cached) for the period.
  */
-export async function trollGetSummary(
-  token: string,
-  period = "1h"
-): Promise<TrollSummary> {
+export async function trollGetSummary(token: string, period = "1h"): Promise<TrollSummary> {
   const res = await trollFetch(
     token,
     `/api/user/request-logs/summary?period=${encodeURIComponent(period)}`
@@ -106,7 +106,7 @@ export async function trollGetLogs(
     throw new Error(`TrollLLM /request-logs failed (${res.status}): ${text}`);
   }
 
-  const data = await res.json() as {
+  const data = (await res.json()) as {
     requests: Array<{
       id: string;
       model: string;

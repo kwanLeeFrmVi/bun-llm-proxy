@@ -31,8 +31,17 @@ export interface AccountFallbackOpts {
  */
 export async function executeWithAccountFallback(opts: AccountFallbackOpts): Promise<Response> {
   const {
-    body, provider, model, clientRawRequest, request, apiKey, apiKeyId,
-    ctx, requestId, startTime, userAgent,
+    body,
+    provider,
+    model,
+    clientRawRequest,
+    request,
+    apiKey,
+    apiKeyId,
+    ctx,
+    requestId,
+    startTime,
+    userAgent,
   } = opts;
 
   const excludeConnectionIds = new Set<string>();
@@ -50,9 +59,14 @@ export async function executeWithAccountFallback(opts: AccountFallbackOpts): Pro
           lastStatus ?? (Number(creds.lastErrorCode) || HTTP_STATUS.SERVICE_UNAVAILABLE);
         log.warn(ctx, "CHAT", `[${provider}/${model}] ${errorMsg} (${creds.retryAfterHuman})`);
         appendRequestLog(requestId, "rate_limited");
-        
+
         if (body.stream === true) {
-          return formatAwareErrorResponse(body, request, status, `[${provider}/${model}] ${errorMsg}`);
+          return formatAwareErrorResponse(
+            body,
+            request,
+            status,
+            `[${provider}/${model}] ${errorMsg}`
+          );
         }
         return unavailableResponse(
           status,
@@ -64,20 +78,38 @@ export async function executeWithAccountFallback(opts: AccountFallbackOpts): Pro
       if (excludeConnectionIds.size === 0) {
         log.warn(ctx, "AUTH", `No active credentials for provider: ${provider}`);
         appendRequestLog(requestId, "no_credentials");
-        return formatAwareErrorResponse(body, request, HTTP_STATUS.NOT_FOUND, `No active credentials for provider: ${provider}`);
+        return formatAwareErrorResponse(
+          body,
+          request,
+          HTTP_STATUS.NOT_FOUND,
+          `No active credentials for provider: ${provider}`
+        );
       }
       log.warn(ctx, "CHAT", "No more accounts available", { provider });
       appendRequestLog(requestId, "unavailable");
-      return formatAwareErrorResponse(body, request, lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE, lastError ?? "All accounts unavailable");
+      return formatAwareErrorResponse(
+        body,
+        request,
+        lastStatus ?? HTTP_STATUS.SERVICE_UNAVAILABLE,
+        lastError ?? "All accounts unavailable"
+      );
     }
 
     const creds = credentials as Record<string, unknown>;
     log.info(ctx, "AUTH", `Selected account: ${creds.connectionName}`);
 
     const { chatCoreOpts, sourceFormat, isStreamingLocal } = await buildChatCoreOpts({
-      body, provider, model, credentials: creds,
-      clientRawRequest, userAgent, apiKey, request, ctx,
-      requestId, startTime,
+      body,
+      provider,
+      model,
+      credentials: creds,
+      clientRawRequest,
+      userAgent,
+      apiKey,
+      request,
+      ctx,
+      requestId,
+      startTime,
     });
 
     const result = await executeWithTransientRetry(
@@ -133,21 +165,31 @@ export async function executeWithAccountFallback(opts: AccountFallbackOpts): Pro
     appendRequestLog(requestId, `error_${result.status}`);
     const { category, suggestion } = classifyNetworkError(result.error ?? "");
     if (category !== "NETWORK_ERROR") {
-      log.error(ctx, "CHAT", `[${provider}/${model}] ${category}: ${result.error}${suggestion ? ` — ${suggestion}` : ""}`);
+      log.error(
+        ctx,
+        "CHAT",
+        `[${provider}/${model}] ${category}: ${result.error}${suggestion ? ` — ${suggestion}` : ""}`
+      );
     } else {
-      log.warn(ctx, "CHAT", `[${provider}/${model}] Upstream error (${result.status}): ${result.error}`);
+      log.warn(
+        ctx,
+        "CHAT",
+        `[${provider}/${model}] Upstream error (${result.status}): ${result.error}`
+      );
     }
 
     const isStreaming = body.stream === true;
     if (isStreaming) {
-      return formatAwareErrorResponse(body, request, result.status ?? HTTP_STATUS.BAD_GATEWAY, result.error ?? "Unknown error");
+      return formatAwareErrorResponse(
+        body,
+        request,
+        result.status ?? HTTP_STATUS.BAD_GATEWAY,
+        result.error ?? "Unknown error"
+      );
     }
     return (
       result.response ??
-      errorResponse(
-        result.status ?? HTTP_STATUS.BAD_GATEWAY,
-        result.error ?? "Unknown error"
-      )
+      errorResponse(result.status ?? HTTP_STATUS.BAD_GATEWAY, result.error ?? "Unknown error")
     );
   }
 }

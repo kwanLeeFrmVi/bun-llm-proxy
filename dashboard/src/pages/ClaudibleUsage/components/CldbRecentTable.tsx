@@ -69,29 +69,31 @@ export function CldbRecentTable({ usage, loading }: CldbRecentTableProps) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(203,213,225,0.4)" }}>
-                {["Time", "Model", "Input", "Output", "Cache Read", "Cache Write", "Cost"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: "6px 10px",
-                      textAlign: "right",
-                      fontWeight: 600,
-                      color: "var(--on-surface-variant)",
-                      textTransform: "uppercase",
-                      fontSize: "10px",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["Time", "Model", "Input", "Output", "Cache Read", "Cache Write", "Cost"].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "6px 10px",
+                        textAlign: "right",
+                        fontWeight: 600,
+                        color: "var(--on-surface-variant)",
+                        textTransform: "uppercase",
+                        fontSize: "10px",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
               {usage.map((item, i) => {
                 // costUSD is the total; fall back to summing sub-costs if it's missing/0
                 const cost =
-                  (item.costUSD && item.costUSD > 0)
+                  item.costUSD && item.costUSD > 0
                     ? item.costUSD
                     : (item.costInputUSD ?? 0) +
                       (item.costOutputUSD ?? 0) +
@@ -99,8 +101,17 @@ export function CldbRecentTable({ usage, loading }: CldbRecentTableProps) {
                       (item.costCacheWriteUSD ?? 0);
 
                 return (
-                  <tr key={item.id ?? i} style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}>
-                    <td style={{ padding: "8px 10px", color: "var(--on-surface-variant)", fontSize: "11px" }}>
+                  <tr
+                    key={item.id ?? i}
+                    style={{ borderBottom: "1px solid rgba(203,213,225,0.2)" }}
+                  >
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        color: "var(--on-surface-variant)",
+                        fontSize: "11px",
+                      }}
+                    >
                       {fmtDate(item.createdAt)}
                     </td>
                     <td
@@ -113,16 +124,40 @@ export function CldbRecentTable({ usage, loading }: CldbRecentTableProps) {
                     >
                       {item.model}
                     </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        color: "var(--on-surface)",
+                      }}
+                    >
                       {fmt(item.promptTokens)}
                     </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        color: "var(--on-surface)",
+                      }}
+                    >
                       {fmt(item.completionTokens)}
                     </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        color: "var(--on-surface)",
+                      }}
+                    >
                       {fmt(item.cacheReadTokens)}
                     </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--on-surface)" }}>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
+                        color: "var(--on-surface)",
+                      }}
+                    >
                       {fmt(item.cacheWriteTokens)}
                     </td>
                     <td

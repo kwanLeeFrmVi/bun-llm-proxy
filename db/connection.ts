@@ -30,7 +30,11 @@ export function getRawDb(): Database {
   _db.run("PRAGMA busy_timeout = 10000;");
   // Run a WAL checkpoint to clean up any leftover WAL/SHM files from a
   // previous process that didn't shut down cleanly (e.g. PM2 kill).
-  try { _db.run("PRAGMA wal_checkpoint(TRUNCATE);"); } catch { /* ignore if WAL not active */ }
+  try {
+    _db.run("PRAGMA wal_checkpoint(TRUNCATE);");
+  } catch {
+    /* ignore if WAL not active */
+  }
 
   return _db;
 }

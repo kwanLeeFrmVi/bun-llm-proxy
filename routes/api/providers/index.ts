@@ -2,7 +2,12 @@ import { getProviderConnections, createProviderConnection } from "@/lib/localDb"
 import { checkAdminAuth } from "lib/authMiddleware.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
-import { FREE_PROVIDERS, FREE_TIER_PROVIDERS, OAUTH_PROVIDERS, APIKEY_PROVIDERS } from "lib/providerCatalog.ts";
+import {
+  FREE_PROVIDERS,
+  FREE_TIER_PROVIDERS,
+  OAUTH_PROVIDERS,
+  APIKEY_PROVIDERS,
+} from "lib/providerCatalog.ts";
 import {
   asObjectRecord,
   isAnthropicCompatibleProvider,

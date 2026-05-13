@@ -67,7 +67,10 @@ export async function GET(req: Request): Promise<Response> {
   const strategy = comboStrategies[combo.name]?.fallbackStrategy;
   const stickyLimit = comboStrategies[combo.name]?.stickyRoundRobinLimit;
 
-  return Response.json({ ...combo, models, strategy, stickyLimit: stickyLimit ?? 3 }, { headers: CORS_HEADERS });
+  return Response.json(
+    { ...combo, models, strategy, stickyLimit: stickyLimit ?? 3 },
+    { headers: CORS_HEADERS }
+  );
 }
 
 export async function PUT(req: Request): Promise<Response> {
@@ -147,7 +150,11 @@ export async function PUT(req: Request): Promise<Response> {
   }
 
   // Update strategy and sticky limit in settings if provided
-  if (strategy !== undefined || stickyLimit !== undefined || (name !== undefined && name !== combo.name)) {
+  if (
+    strategy !== undefined ||
+    stickyLimit !== undefined ||
+    (name !== undefined && name !== combo.name)
+  ) {
     const settings = await getSettings();
     const comboStrategies = { ...((settings.comboStrategies as Record<string, any>) || {}) };
     const targetName = name ?? combo.name;
@@ -173,7 +180,10 @@ export async function PUT(req: Request): Promise<Response> {
   // Fetch the final state to return to the client with weights and correct order
   const finalCombo = await getComboById(id);
   if (!finalCombo) {
-    return Response.json({ error: "Failed to retrieve updated combo" }, { status: 500, headers: CORS_HEADERS });
+    return Response.json(
+      { error: "Failed to retrieve updated combo" },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 
   const finalConfig = await getComboConfig(finalCombo.name);
@@ -194,12 +204,15 @@ export async function PUT(req: Request): Promise<Response> {
   // when the user edits other fields without touching the strategy dropdown
   const existingStrategy = finalComboStrategies[combo.name]?.fallbackStrategy;
   const existingStickyLimit = finalComboStrategies[combo.name]?.stickyRoundRobinLimit;
-  return Response.json({
-    ...finalCombo,
-    models: finalModels,
-    strategy: finalStrategy ?? existingStrategy,
-    stickyLimit: finalStickyLimit ?? existingStickyLimit ?? 3,
-  }, { headers: CORS_HEADERS });
+  return Response.json(
+    {
+      ...finalCombo,
+      models: finalModels,
+      strategy: finalStrategy ?? existingStrategy,
+      stickyLimit: finalStickyLimit ?? existingStickyLimit ?? 3,
+    },
+    { headers: CORS_HEADERS }
+  );
 }
 
 export async function DELETE(req: Request): Promise<Response> {

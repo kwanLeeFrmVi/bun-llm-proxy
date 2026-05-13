@@ -287,7 +287,14 @@ export default function ProviderTopology({
   errorProvider,
   nodes,
 }: ProviderTopologyProps) {
-  return <_ProviderTopology providers={providers} lastProvider={lastProvider} errorProvider={errorProvider} nodes={nodes} />;
+  return (
+    <_ProviderTopology
+      providers={providers}
+      lastProvider={lastProvider}
+      errorProvider={errorProvider}
+      nodes={nodes}
+    />
+  );
 }
 
 function _ProviderTopology({

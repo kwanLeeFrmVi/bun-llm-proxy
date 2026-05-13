@@ -403,15 +403,27 @@ describe("handleChatCore", () => {
           let canceled = false;
           const trySend = (bytes: Uint8Array) => {
             if (canceled) return;
-            try { controller.enqueue(bytes); } catch { canceled = true; }
+            try {
+              controller.enqueue(bytes);
+            } catch {
+              canceled = true;
+            }
           };
           const tryClose = () => {
             if (canceled) return;
-            try { controller.close(); } catch { canceled = true; }
+            try {
+              controller.close();
+            } catch {
+              canceled = true;
+            }
           };
-          trySend(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello"}}]}\n\n'));
+          trySend(
+            new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello"}}]}\n\n')
+          );
           setTimeout(() => {
-            trySend(new TextEncoder().encode('data: {"choices":[{"delta":{"content":" world"}}]}\n\n'));
+            trySend(
+              new TextEncoder().encode('data: {"choices":[{"delta":{"content":" world"}}]}\n\n')
+            );
             setTimeout(() => {
               trySend(new TextEncoder().encode("data: [DONE]\n\n"));
               tryClose();
@@ -477,7 +489,9 @@ describe("handleChatCore", () => {
             'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-3-5-sonnet-20241022","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n';
           try {
             controller.enqueue(new TextEncoder().encode(first));
-          } catch { return; }
+          } catch {
+            return;
+          }
           // Schedule remaining events — they will be delivered AFTER the consumer reads
           // and cancels, so the inner stream will be mid-read when the cancel fires.
           const remaining = [
@@ -497,7 +511,11 @@ describe("handleChatCore", () => {
               }
               sourceTimerId = setTimeout(sendNext, 8);
             } else {
-              try { controller.close(); } catch { /* already closed */ }
+              try {
+                controller.close();
+              } catch {
+                /* already closed */
+              }
             }
           };
           sourceTimerId = setTimeout(sendNext, 8);
@@ -523,7 +541,10 @@ describe("handleChatCore", () => {
           messages: [{ role: "user", content: "hi" }],
           stream: true,
         },
-        modelInfo: { provider: "anthropic-compatible-myprovider", model: "claude-3-5-sonnet-20241022" },
+        modelInfo: {
+          provider: "anthropic-compatible-myprovider",
+          model: "claude-3-5-sonnet-20241022",
+        },
         credentials: { apiKey: "test-key" },
         sourceFormatOverride: "claude",
       });
@@ -569,7 +590,10 @@ describe("handleChatCore", () => {
         },
       });
       return Promise.resolve(
-        new globalThis.Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
       );
     }) as unknown as typeof globalThis.fetch;
 
@@ -625,7 +649,10 @@ describe("handleChatCore", () => {
         },
       });
       return Promise.resolve(
-        new globalThis.Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })
+        new globalThis.Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
       );
     }) as unknown as typeof globalThis.fetch;
 
@@ -701,7 +728,10 @@ describe("handleChatCore", () => {
           stream: true,
         },
         modelInfo: { provider: "openai-compatible-myprovider", model: "some-model" },
-        credentials: { apiKey: "test-key", providerSpecificData: { baseUrl: "https://example.test/v1" } },
+        credentials: {
+          apiKey: "test-key",
+          providerSpecificData: { baseUrl: "https://example.test/v1" },
+        },
         sourceFormatOverride: "openai",
       });
 
@@ -772,7 +802,10 @@ describe("handleChatCore", () => {
           stream: false,
         },
         modelInfo: { provider: "openai-compatible-myprovider", model: "some-model" },
-        credentials: { apiKey: "test-key", providerSpecificData: { baseUrl: "https://example.test/v1" } },
+        credentials: {
+          apiKey: "test-key",
+          providerSpecificData: { baseUrl: "https://example.test/v1" },
+        },
         sourceFormatOverride: "openai",
       });
 

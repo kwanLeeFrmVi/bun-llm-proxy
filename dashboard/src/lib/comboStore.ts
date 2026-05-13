@@ -30,8 +30,19 @@ interface ComboStore {
 
   // Actions
   loadCombos: () => Promise<void>;
-  createCombo: (name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => Promise<void>;
-  updateCombo: (id: string, name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => Promise<void>;
+  createCombo: (
+    name: string,
+    models: ComboModel[],
+    strategy?: string,
+    stickyLimit?: number
+  ) => Promise<void>;
+  updateCombo: (
+    id: string,
+    name: string,
+    models: ComboModel[],
+    strategy?: string,
+    stickyLimit?: number
+  ) => Promise<void>;
   deleteCombo: (id: string) => Promise<void>;
   reset: () => void;
 }
@@ -65,7 +76,12 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  createCombo: async (name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => {
+  createCombo: async (
+    name: string,
+    models: ComboModel[],
+    strategy?: string,
+    stickyLimit?: number
+  ) => {
     set({ error: null });
     try {
       const newCombo = await api.combos.create({ name, models, strategy, stickyLimit });
@@ -76,7 +92,13 @@ export const useComboStore = create<ComboStore>((set, get) => ({
     }
   },
 
-  updateCombo: async (id: string, name: string, models: ComboModel[], strategy?: string, stickyLimit?: number) => {
+  updateCombo: async (
+    id: string,
+    name: string,
+    models: ComboModel[],
+    strategy?: string,
+    stickyLimit?: number
+  ) => {
     set({ error: null });
     try {
       const updatedCombo = await api.combos.update(id, { name, models, strategy, stickyLimit });

@@ -355,7 +355,9 @@ export const api = {
           tokensPerSecond: number | null;
         }>;
         total: number;
-      }>(`/api/usage/model-stats?model=${encodeURIComponent(model)}&period=${period}&page=${page}&limit=${limit}`),
+      }>(
+        `/api/usage/model-stats?model=${encodeURIComponent(model)}&period=${period}&page=${page}&limit=${limit}`
+      ),
     modelsLatestStats: () =>
       request<{
         stats: Array<{

@@ -726,7 +726,10 @@ const migrationV5: Migration = {
         );
         seededCount++;
       } catch (err) {
-        console.error(`[Migration v5] Failed to seed pricing for ${entry.provider}/${entry.model}:`, err);
+        console.error(
+          `[Migration v5] Failed to seed pricing for ${entry.provider}/${entry.model}:`,
+          err
+        );
       }
     }
 
@@ -746,7 +749,10 @@ const migrationV6: Migration = {
 
     // Defensive: skip if usage_log doesn't exist (shouldn't happen, but safe)
     const tableCheck = db
-      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table' AND name='usage_log'")
+      .query<
+        { name: string },
+        []
+      >("SELECT name FROM sqlite_master WHERE type='table' AND name='usage_log'")
       .get();
     if (!tableCheck) {
       console.log("[Migration v6] usage_log table not found, skipping");
@@ -755,8 +761,19 @@ const migrationV6: Migration = {
 
     // ── Inline helpers (avoid circular import from services/pricingSync.ts) ──
     const STRIP_SUFFIXES = [
-      "-turbo", "-maas", "-fast", "-ultra", "-large", "-mini",
-      "-hd", "-code", "-instruct", "-preview", "-latest", ":cloud", "-highspeed",
+      "-turbo",
+      "-maas",
+      "-fast",
+      "-ultra",
+      "-large",
+      "-mini",
+      "-hd",
+      "-code",
+      "-instruct",
+      "-preview",
+      "-latest",
+      ":cloud",
+      "-highspeed",
     ];
 
     function stripProviderPrefix(name: string): string {
@@ -788,8 +805,13 @@ const migrationV6: Migration = {
     function baseModelName(model: string): string {
       const normalized = normalizeModelName(model);
       const knownBases = [
-        "claude-opus", "claude-sonnet", "claude-haiku",
-        "gpt-4", "gpt-3.5", "glm-5", "minimax",
+        "claude-opus",
+        "claude-sonnet",
+        "claude-haiku",
+        "gpt-4",
+        "gpt-3.5",
+        "glm-5",
+        "minimax",
       ];
       for (const b of knownBases) {
         if (normalized.toLowerCase().startsWith(b)) return b;
@@ -806,9 +828,10 @@ const migrationV6: Migration = {
 
     // ── Build pricing map from DB ──
     const pricingRows = db
-      .query<{ provider: string; model: string; input: number; output: number }, []>(
-        "SELECT provider, model, input, output FROM pricing"
-      )
+      .query<
+        { provider: string; model: string; input: number; output: number },
+        []
+      >("SELECT provider, model, input, output FROM pricing")
       .all();
 
     const pricing: Record<string, Record<string, { input: number; output: number }>> = {};
@@ -820,7 +843,13 @@ const migrationV6: Migration = {
     // ── Find zero-cost entries ──
     const entries = db
       .query<
-        { id: string; provider: string; model: string; prompt_tokens: number; completion_tokens: number },
+        {
+          id: string;
+          provider: string;
+          model: string;
+          prompt_tokens: number;
+          completion_tokens: number;
+        },
         []
       >(
         `SELECT id, provider, model, prompt_tokens, completion_tokens
@@ -877,7 +906,9 @@ const migrationV6: Migration = {
             key === base ||
             normalizeModelName(key) === normalized
           ) {
-            cost = (prompt_tokens * value.input) / 1_000_000 + (completion_tokens * value.output) / 1_000_000;
+            cost =
+              (prompt_tokens * value.input) / 1_000_000 +
+              (completion_tokens * value.output) / 1_000_000;
             found = true;
             break;
           }
@@ -889,7 +920,9 @@ const migrationV6: Migration = {
         for (const key of [model, normalized, stripped, base]) {
           const entry = FALLBACK_PRICING[key];
           if (entry) {
-            cost = (prompt_tokens * entry.input) / 1_000_000 + (completion_tokens * entry.output) / 1_000_000;
+            cost =
+              (prompt_tokens * entry.input) / 1_000_000 +
+              (completion_tokens * entry.output) / 1_000_000;
             found = true;
             break;
           }
@@ -929,15 +962,29 @@ const migrationV7: Migration = {
         );
         seededCount++;
       } catch (err) {
-        console.error(`[Migration v7] Failed to seed pricing for ${entry.provider}/${entry.model}:`, err);
+        console.error(
+          `[Migration v7] Failed to seed pricing for ${entry.provider}/${entry.model}:`,
+          err
+        );
       }
     }
     console.log(`[Migration v7] Seeded ${seededCount} pricing entries`);
 
     // ── Inline helpers ──
     const STRIP_SUFFIXES = [
-      "-turbo", "-maas", "-fast", "-ultra", "-large", "-mini",
-      "-hd", "-code", "-instruct", "-preview", "-latest", ":cloud", "-highspeed",
+      "-turbo",
+      "-maas",
+      "-fast",
+      "-ultra",
+      "-large",
+      "-mini",
+      "-hd",
+      "-code",
+      "-instruct",
+      "-preview",
+      "-latest",
+      ":cloud",
+      "-highspeed",
     ];
 
     function stripProviderPrefix(name: string): string {
@@ -969,8 +1016,13 @@ const migrationV7: Migration = {
     function baseModelName(model: string): string {
       const normalized = normalizeModelName(model);
       const knownBases = [
-        "claude-opus", "claude-sonnet", "claude-haiku",
-        "gpt-4", "gpt-3.5", "glm-5", "minimax",
+        "claude-opus",
+        "claude-sonnet",
+        "claude-haiku",
+        "gpt-4",
+        "gpt-3.5",
+        "glm-5",
+        "minimax",
       ];
       for (const b of knownBases) {
         if (normalized.toLowerCase().startsWith(b)) return b;
@@ -988,9 +1040,10 @@ const migrationV7: Migration = {
 
     // ── Build pricing map from DB ──
     const pricingRows = db
-      .query<{ provider: string; model: string; input: number; output: number }, []>(
-        "SELECT provider, model, input, output FROM pricing"
-      )
+      .query<
+        { provider: string; model: string; input: number; output: number },
+        []
+      >("SELECT provider, model, input, output FROM pricing")
       .all();
 
     const pricing: Record<string, Record<string, { input: number; output: number }>> = {};
@@ -1003,10 +1056,16 @@ const migrationV7: Migration = {
     // This fixes both:
     //   - gpt-55 and other new models with cost=0 (v6 missed them)
     //   - claude-opus-4-6 with wrong cost from base-model fallback
-    const modelList = [...fallbackModels].map(m => `'${m.replace(/'/g, "''")}'`).join(",");
+    const modelList = [...fallbackModels].map((m) => `'${m.replace(/'/g, "''")}'`).join(",");
     const entries = db
       .query<
-        { id: string; provider: string; model: string; prompt_tokens: number; completion_tokens: number },
+        {
+          id: string;
+          provider: string;
+          model: string;
+          prompt_tokens: number;
+          completion_tokens: number;
+        },
         []
       >(
         `SELECT id, provider, model, prompt_tokens, completion_tokens
@@ -1064,7 +1123,9 @@ const migrationV7: Migration = {
             key === base ||
             normalizeModelName(key) === normalized
           ) {
-            cost = (prompt_tokens * value.input) / 1_000_000 + (completion_tokens * value.output) / 1_000_000;
+            cost =
+              (prompt_tokens * value.input) / 1_000_000 +
+              (completion_tokens * value.output) / 1_000_000;
             found = true;
             break;
           }
@@ -1076,7 +1137,8 @@ const migrationV7: Migration = {
         for (const key of [model, normalized, stripped, base]) {
           const fb = FALLBACK_PRICING[key];
           if (fb) {
-            cost = (prompt_tokens * fb.input) / 1_000_000 + (completion_tokens * fb.output) / 1_000_000;
+            cost =
+              (prompt_tokens * fb.input) / 1_000_000 + (completion_tokens * fb.output) / 1_000_000;
             found = true;
             break;
           }
@@ -1118,7 +1180,13 @@ const migrationV8: Migration = {
     // ── Recalculate zero-cost entries for kimi-x ──
     const entries = db
       .query<
-        { id: string; provider: string; model: string; prompt_tokens: number; completion_tokens: number },
+        {
+          id: string;
+          provider: string;
+          model: string;
+          prompt_tokens: number;
+          completion_tokens: number;
+        },
         []
       >(
         `SELECT id, provider, model, prompt_tokens, completion_tokens
@@ -1144,4 +1212,12 @@ const migrationV8: Migration = {
 };
 
 // All migrations in order
-export const migrations: Migration[] = [migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8];
+export const migrations: Migration[] = [
+  migrationV2,
+  migrationV3,
+  migrationV4,
+  migrationV5,
+  migrationV6,
+  migrationV7,
+  migrationV8,
+];

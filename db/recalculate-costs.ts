@@ -115,7 +115,12 @@ async function main() {
 
     // 6. Hardcoded fallback for models not available in OpenRouter
     if (cost === 0) {
-      for (const key of [model, normalizeModelName(model), stripSuffixes(model), baseModelName(model)]) {
+      for (const key of [
+        model,
+        normalizeModelName(model),
+        stripSuffixes(model),
+        baseModelName(model),
+      ]) {
         const entry = FALLBACK_PRICING[key];
         if (entry) {
           cost =

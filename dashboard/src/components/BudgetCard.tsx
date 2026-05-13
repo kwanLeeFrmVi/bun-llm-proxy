@@ -245,13 +245,7 @@ export function BudgetCard({ source }: BudgetCardProps) {
 
   // ── TrollLLM ───────────────────────────────────────────────────────────────
   if (source.type === "troll") {
-    const {
-      tier,
-      planDailyAllocation,
-      planDailyUsed,
-      planDailyResetDate,
-      planExpiresAt,
-    } = source;
+    const { tier, planDailyAllocation, planDailyUsed, planDailyResetDate, planExpiresAt } = source;
 
     const dailyPct = mavisPct(planDailyUsed, planDailyAllocation);
 
@@ -370,7 +364,8 @@ export function BudgetCard({ source }: BudgetCardProps) {
             </span>
           </div>
           <span style={{ fontSize: "12px", color: "var(--on-surface-variant)" }}>
-            Balance: <strong style={{ color: "var(--on-surface)" }}>{balance.toFixed(2)} credits</strong>
+            Balance:{" "}
+            <strong style={{ color: "var(--on-surface)" }}>{balance.toFixed(2)} credits</strong>
           </span>
         </div>
 

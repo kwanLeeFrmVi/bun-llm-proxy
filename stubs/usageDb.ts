@@ -602,9 +602,7 @@ export function getUserUsageByModel(userId: string, period: string): UserModelUs
   const baseFilter = since ? `ul.timestamp >= '${since.replace(/'/g, "''")}'` : "1=1";
   const SYSTEM_ID = "00000000-0000-0000-0000-000000000000";
   const userFilter =
-    userId === SYSTEM_ID
-      ? `ak.user_id IS NULL`
-      : `u.id = '${userId.replace(/'/g, "''")}'`;
+    userId === SYSTEM_ID ? `ak.user_id IS NULL` : `u.id = '${userId.replace(/'/g, "''")}'`;
 
   const rows = db
     .query<
@@ -704,17 +702,13 @@ export interface ModelLatestStats {
 function getComboMembers(db: Database, comboName: string): string[] {
   // Check combo_configs first (individual rows per member)
   const configRows = db
-    .query<{ model: string }, [string]>(
-      `SELECT model FROM combo_configs WHERE combo_name = ?`
-    )
+    .query<{ model: string }, [string]>(`SELECT model FROM combo_configs WHERE combo_name = ?`)
     .all(comboName);
   if (configRows.length > 0) return configRows.map((r) => r.model);
 
   // Check combos table (JSON models field)
   const comboRow = db
-    .query<{ models: string }, [string]>(
-      `SELECT models FROM combos WHERE name = ?`
-    )
+    .query<{ models: string }, [string]>(`SELECT models FROM combos WHERE name = ?`)
     .get(comboName);
   if (comboRow) {
     try {
@@ -789,9 +783,10 @@ export function getModelStats(
 
   // Get provider for this model
   const providerRow = db
-    .query<{ provider: string }, []>(
-      `SELECT provider FROM usage_log WHERE ${modelFilter} AND provider IS NOT NULL ${timeFilter} LIMIT 1`
-    )
+    .query<
+      { provider: string },
+      []
+    >(`SELECT provider FROM usage_log WHERE ${modelFilter} AND provider IS NOT NULL ${timeFilter} LIMIT 1`)
     .get();
   const provider = providerRow?.provider ?? "";
 
@@ -831,9 +826,10 @@ export function getModelStats(
     .get();
 
   const totalCount = db
-    .query<{ cnt: number }, []>(
-      `SELECT COUNT(*) as cnt FROM usage_log WHERE ${modelFilter} AND status != 'pending' ${timeFilter}`
-    )
+    .query<
+      { cnt: number },
+      []
+    >(`SELECT COUNT(*) as cnt FROM usage_log WHERE ${modelFilter} AND status != 'pending' ${timeFilter}`)
     .get();
 
   // Request rows
@@ -931,8 +927,7 @@ export function getModelsLatestStats(): ModelLatestStats[] {
     model: r.model,
     provider: r.provider,
     latestTtftMs: r.avg_ttft_ms != null ? Math.round(r.avg_ttft_ms) : null,
-    latestTokensPerSecond:
-      r.avg_tps != null ? Math.round(r.avg_tps * 100) / 100 : null,
+    latestTokensPerSecond: r.avg_tps != null ? Math.round(r.avg_tps * 100) / 100 : null,
   }));
 
   // Build a lookup map from bare model name → stats
@@ -945,15 +940,11 @@ export function getModelsLatestStats(): ModelLatestStats[] {
   // Get all combo names from both combo_configs and combos tables
   const allComboNames = new Set<string>();
   const configCombos = db
-    .query<{ combo_name: string }, []>(
-      `SELECT DISTINCT combo_name FROM combo_configs`
-    )
+    .query<{ combo_name: string }, []>(`SELECT DISTINCT combo_name FROM combo_configs`)
     .all();
   for (const c of configCombos) allComboNames.add(c.combo_name);
 
-  const jsonCombos = db
-    .query<{ name: string }, []>(`SELECT name FROM combos`)
-    .all();
+  const jsonCombos = db.query<{ name: string }, []>(`SELECT name FROM combos`).all();
   for (const c of jsonCombos) allComboNames.add(c.name);
 
   for (const comboName of allComboNames) {

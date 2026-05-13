@@ -30,9 +30,7 @@ export function RpmCard({ rpmUsed, rpmLimit, concurrentUsed, concurrentLimit }: 
             className="flex-1 rounded-sm transition-all"
             style={{
               height: `${Math.random() * 80 + 20}%`,
-              background: i < rpmUsed
-                ? "rgba(59, 130, 246, 0.7)"
-                : "rgba(59, 130, 246, 0.15)",
+              background: i < rpmUsed ? "rgba(59, 130, 246, 0.7)" : "rgba(59, 130, 246, 0.15)",
             }}
           />
         ))}
@@ -41,9 +39,7 @@ export function RpmCard({ rpmUsed, rpmLimit, concurrentUsed, concurrentLimit }: 
       <p className="text-[10px] text-[var(--on-surface-variant)] leading-relaxed">
         Max API requests per 60-second window.
       </p>
-      <p className="text-[10px] text-[var(--on-surface-variant)]">
-        Resets automatically.
-      </p>
+      <p className="text-[10px] text-[var(--on-surface-variant)]">Resets automatically.</p>
 
       {concurrentUsed !== undefined && concurrentLimit !== undefined && (
         <div className="mt-3 pt-3 border-t border-[rgba(203,213,225,0.3)]">
