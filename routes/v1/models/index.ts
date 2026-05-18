@@ -12,11 +12,9 @@ import {
   getProviderNodeById,
   type Combo,
 } from "db/index.ts";
-import { getAvailableComboModelConfigs, getFilteredComboModelConfigs } from "services/model.ts";
+import { getFilteredComboModelConfigs } from "services/model.ts";
 import { CORS_HEADERS } from "lib/cors.ts";
 import { register } from "lib/routeRegistry";
-import { parseOpenAIStyleModels, extractModelIds, normalizeBaseUrl } from "lib/utils.ts";
-import { ANTHROPIC_API_VERSION } from "lib/constants.ts";
 
 const providerModels = PROVIDER_MODELS as Record<string, Array<{ id: string; name?: string }>>;
 const providerIdToAlias = PROVIDER_ID_TO_ALIAS as Record<string, string>;
@@ -56,37 +54,6 @@ function mergeModelIds(
   }
 
   return Array.from(mergedModelIds);
-}
-
-async function fetchCompatibleModelIds(connection: Record<string, unknown>): Promise<string[]> {
-  if (!connection?.apiKey) return [];
-
-  const psd = (connection.providerSpecificData as Record<string, unknown> | undefined) ?? {};
-  const baseUrl = typeof psd.baseUrl === "string" ? normalizeBaseUrl(psd.baseUrl) : "";
-  if (!baseUrl) return [];
-
-  let url = `${baseUrl}/models`;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-  if (isOpenAICompatibleProvider(connection.provider as string)) {
-    headers.Authorization = `Bearer ${connection.apiKey}`;
-  } else if (isAnthropicCompatibleProvider(connection.provider as string)) {
-    headers["x-api-key"] = connection.apiKey as string;
-    headers["anthropic-version"] = ANTHROPIC_API_VERSION;
-    headers.Authorization = `Bearer ${connection.apiKey}`;
-  } else {
-    return [];
-  }
-
-  try {
-    const response = await fetch(url, { method: "GET", headers, cache: "no-store" });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const rawModels = parseOpenAIStyleModels(data);
-    return extractModelIds(rawModels);
-  } catch {
-    return [];
-  }
 }
 
 export async function GET(_req: Request): Promise<Response> {
@@ -199,15 +166,11 @@ export async function GET(_req: Request): Promise<Response> {
           (prefix, index, allPrefixes) => prefix && allPrefixes.indexOf(prefix) === index
         );
 
-        let rawModelIds = mergeModelIds(
+        const rawModelIds = mergeModelIds(
           pModels.map((m) => m.id),
           enabledModels,
           prefixes
         );
-
-        if (isCompatibleProvider && rawModelIds.length === 0) {
-          rawModelIds = await fetchCompatibleModelIds(conn);
-        }
 
         const modelIds = rawModelIds
           .map((modelId) => normalizeModelId(modelId, prefixes))
