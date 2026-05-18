@@ -513,10 +513,11 @@ export const api = {
 
   // ─── Dashboard (claudible replica) ─────────────────────────────────────────
   dashboard: {
-    lookup: () =>
+    lookup: (provider: "cldb" | "vcd" = "cldb") =>
       request<any>("/api/dashboard/lookup", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ provider }),
       }),
+    modelHub: () => request<any>("/api/dashboard/model-hub", { method: "GET" }),
   },
 };

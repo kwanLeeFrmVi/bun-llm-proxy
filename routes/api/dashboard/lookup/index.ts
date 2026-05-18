@@ -10,15 +10,28 @@ export async function POST(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
 
-  // Find the anthropic-compatible-cldb connection to get the API key
-  const connections = await getProviderConnections({ provider: "anthropic-compatible-cldb" });
+  let providerKey: "cldb" | "vcd" = "cldb";
+  try {
+    const body = (await req.json().catch(() => ({}))) as { provider?: string };
+    if (body.provider === "vcd" || body.provider === "cldb") providerKey = body.provider;
+    else if (body.provider !== undefined) {
+      return Response.json(
+        { error: `Invalid provider '${body.provider}'. Expected 'cldb' or 'vcd'.` },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+  } catch {
+    // empty body — keep default
+  }
+
+  const providerSlug = `anthropic-compatible-${providerKey}`;
+  const connections = await getProviderConnections({ provider: providerSlug });
   const conn = connections[0];
 
   if (!conn || !conn.apiKey) {
     return Response.json(
       {
-        error:
-          "No Claudible provider connection found. Add an 'anthropic-compatible-cldb' provider with a valid API key.",
+        error: `No Claudible provider connection found. Add a '${providerSlug}' provider with a valid API key.`,
       },
       { status: 404, headers: CORS_HEADERS }
     );

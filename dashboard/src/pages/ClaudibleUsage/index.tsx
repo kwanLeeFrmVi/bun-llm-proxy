@@ -6,6 +6,13 @@ import { QuotaCard } from "@/components/QuotaCard.tsx";
 import { fmt } from "@/lib/formatters.ts";
 import { CldbRecentTable } from "./components/CldbRecentTable.tsx";
 import { CldbModelTable } from "./components/CldbModelTable.tsx";
+import { CldbModelHub, type ModelHubResponse } from "./components/CldbModelHub.tsx";
+
+type ProviderKey = "cldb" | "vcd";
+const PROVIDER_TABS: { key: ProviderKey; label: string }[] = [
+  { key: "cldb", label: "CLDB" },
+  { key: "vcd", label: "VCD" },
+];
 
 // ─── Types — matching the real claudible.io /dashboard/lookup response ──────────
 
@@ -133,16 +140,22 @@ function resetsInLabel(): string {
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 export default function ClaudibleUsage() {
+  const [provider, setProvider] = useState<ProviderKey>("cldb");
   const [data, setData] = useState<CldbLookupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchData = async () => {
+  const [modelHub, setModelHub] = useState<ModelHubResponse | null>(null);
+  const [modelHubLoading, setModelHubLoading] = useState(true);
+  const [modelHubError, setModelHubError] = useState<string | null>(null);
+
+  const providerSlug = `anthropic-compatible-${provider}`;
+
+  const fetchData = async (p: ProviderKey) => {
     try {
-      // The backend now auto-fetches the key from DB — pass empty string
-      const result = (await api.dashboard.lookup()) as CldbLookupData;
+      const result = (await api.dashboard.lookup(p)) as CldbLookupData;
       if (!result.valid) throw new Error("Claudible returned invalid=false");
       setData(result);
       setLastUpdated(new Date());
@@ -155,11 +168,34 @@ export default function ClaudibleUsage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setData(null);
 
-    fetchData().finally(() => {
+    fetchData(provider).finally(() => {
       if (!cancelled) setLoading(false);
     });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setModelHubLoading(true);
+    api.dashboard
+      .modelHub()
+      .then((res: ModelHubResponse) => {
+        if (cancelled) return;
+        setModelHub(res);
+        setModelHubError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setModelHubError(err instanceof Error ? err.message : "Failed to load Model Hub");
+      })
+      .finally(() => {
+        if (!cancelled) setModelHubLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -167,7 +203,7 @@ export default function ClaudibleUsage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchData(provider);
     setRefreshing(false);
   };
 
@@ -199,7 +235,7 @@ export default function ClaudibleUsage() {
             Claudible Usage
           </h1>
           <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-(--on-surface-variant) font-500">
-            Upstream LLM Gateway &middot; claudible.io
+            Upstream LLM Gateway &middot; claudible.io ({provider.toUpperCase()})
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -212,6 +248,26 @@ export default function ClaudibleUsage() {
             {refreshing ? "Refreshing" : "Refresh"}
           </button>
         </div>
+      </div>
+
+      {/* Provider tabs */}
+      <div className="-mt-2 flex items-center gap-2">
+        {PROVIDER_TABS.map((t) => {
+          const active = t.key === provider;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setProvider(t.key)}
+              className={`h-8 px-4 rounded-full text-[12px] font-600 transition-colors border ${
+                active
+                  ? "bg-(--primary) text-white border-(--primary)"
+                  : "bg-(--surface-container-low) text-(--on-surface) border-[rgba(203,213,225,0.6)] hover:bg-(--surface-container)"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {lastUpdated && (
@@ -233,7 +289,7 @@ export default function ClaudibleUsage() {
               </code>{" "}
               table has an entry with provider{" "}
               <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
-                anthropic-compatible-cldb
+                {providerSlug}
               </code>{" "}
               and a valid{" "}
               <code className="bg-(--surface-container-low) px-1.5 py-0.5 rounded text-[11px]">
@@ -383,6 +439,9 @@ export default function ClaudibleUsage() {
               color="#f97316"
             />
           </div>
+
+          {/* Model Hub (account-independent) */}
+          <CldbModelHub data={modelHub} loading={modelHubLoading} error={modelHubError} />
 
           {/* Model Breakdown */}
           <CldbModelTable summary={modelBreakdown} />
