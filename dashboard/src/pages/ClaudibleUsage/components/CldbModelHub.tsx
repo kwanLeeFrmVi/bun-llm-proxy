@@ -36,10 +36,14 @@ export interface ModelHubResponse {
   endpoints: ModelHubEndpoint[];
 }
 
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+
 interface Props {
   data: ModelHubResponse | null;
   loading: boolean;
   error: string | null;
+  defaultOpen?: boolean;
 }
 
 function healthColor(status: string): string {
@@ -69,7 +73,11 @@ function HealthDot({ status }: { status: string }) {
   );
 }
 
-export function CldbModelHub({ data, loading, error }: Props) {
+export function CldbModelHub({ data, loading, error, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
+  const endpointCount = data?.endpoints.length ?? 0;
+  const modelCount = data?.endpoints.reduce((s, ep) => s + ep.models.length, 0) ?? 0;
+
   return (
     <div
       style={{
@@ -80,18 +88,37 @@ export function CldbModelHub({ data, loading, error }: Props) {
         boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
       }}
     >
-      <div
+      <button
+        onClick={() => setOpen((o) => !o)}
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "16px",
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          marginBottom: open ? "16px" : 0,
         }}
       >
-        <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--on-surface)" }}>
-          Model Hub
-        </p>
-        <p
+        <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {open ? (
+            <ChevronDown size={14} color="var(--on-surface-variant)" />
+          ) : (
+            <ChevronRight size={14} color="var(--on-surface-variant)" />
+          )}
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--on-surface)" }}>
+            Model Hub
+          </span>
+          {data && (
+            <span style={{ fontSize: "11px", color: "var(--on-surface-variant)" }}>
+              {endpointCount} endpoint{endpointCount === 1 ? "" : "s"} · {modelCount} model
+              {modelCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </span>
+        <span
           style={{
             fontSize: "10px",
             color: "var(--on-surface-variant)",
@@ -101,10 +128,10 @@ export function CldbModelHub({ data, loading, error }: Props) {
           }}
         >
           claudible.io/api/model-hub
-        </p>
-      </div>
+        </span>
+      </button>
 
-      {loading && (
+      {open && loading && (
         <p
           style={{
             fontSize: "12px",
@@ -117,7 +144,7 @@ export function CldbModelHub({ data, loading, error }: Props) {
         </p>
       )}
 
-      {error && !loading && (
+      {open && error && !loading && (
         <p
           style={{
             fontSize: "12px",
@@ -130,7 +157,7 @@ export function CldbModelHub({ data, loading, error }: Props) {
         </p>
       )}
 
-      {!loading && !error && data && data.endpoints.length === 0 && (
+      {open && !loading && !error && data && data.endpoints.length === 0 && (
         <p
           style={{
             fontSize: "12px",
@@ -143,7 +170,7 @@ export function CldbModelHub({ data, loading, error }: Props) {
         </p>
       )}
 
-      {!loading && !error && data && data.endpoints.length > 0 && (
+      {open && !loading && !error && data && data.endpoints.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {data.endpoints.map((ep) => (
             <div

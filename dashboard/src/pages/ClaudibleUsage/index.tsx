@@ -440,14 +440,14 @@ export default function ClaudibleUsage() {
             />
           </div>
 
-          {/* Model Hub (account-independent) */}
-          <CldbModelHub data={modelHub} loading={modelHubLoading} error={modelHubError} />
-
           {/* Model Breakdown */}
           <CldbModelTable summary={modelBreakdown} />
 
           {/* Recent Activity */}
           <CldbRecentTable usage={data.usage} loading={loading} />
+
+          {/* Model Hub (account-independent, collapsed by default) */}
+          <CldbModelHub data={modelHub} loading={modelHubLoading} error={modelHubError} />
         </>
       )}
 
