@@ -513,7 +513,7 @@ export const api = {
 
   // ─── Dashboard (claudible replica) ─────────────────────────────────────────
   dashboard: {
-    lookup: (provider: "cldb" | "vcd" = "cldb") =>
+    lookup: (provider: "cldb" | "vcd" = "vcd") =>
       request<any>("/api/dashboard/lookup", {
         method: "POST",
         body: JSON.stringify({ provider }),

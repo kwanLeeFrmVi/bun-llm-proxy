@@ -10,8 +10,8 @@ import { CldbModelHub, type ModelHubResponse } from "./components/CldbModelHub.t
 
 type ProviderKey = "cldb" | "vcd";
 const PROVIDER_TABS: { key: ProviderKey; label: string }[] = [
-  { key: "cldb", label: "CLDB" },
   { key: "vcd", label: "VCD" },
+  { key: "cldb", label: "CLDB" },
 ];
 
 // ─── Types — matching the real claudible.io /dashboard/lookup response ──────────
@@ -140,7 +140,7 @@ function resetsInLabel(): string {
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 export default function ClaudibleUsage() {
-  const [provider, setProvider] = useState<ProviderKey>("cldb");
+  const [provider, setProvider] = useState<ProviderKey>("vcd");
   const [data, setData] = useState<CldbLookupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

@@ -10,7 +10,7 @@ export async function POST(req: Request): Promise<Response> {
   const auth = await checkAdminAuth(req);
   if (!auth.ok) return auth.response;
 
-  let providerKey: "cldb" | "vcd" = "cldb";
+  let providerKey: "cldb" | "vcd" = "vcd";
   try {
     const body = (await req.json().catch(() => ({}))) as { provider?: string };
     if (body.provider === "vcd" || body.provider === "cldb") providerKey = body.provider;
